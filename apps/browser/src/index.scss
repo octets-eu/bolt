@@ -1,0 +1,168 @@
+/* Base reset and the utility classes this app uses. Values taken from tachyons 4.12,
+   which used to be imported wholesale; only these ~30 classes were ever referenced. */
+
+*, *::before, *::after { box-sizing: border-box; }
+html   { line-height: 1.15; -webkit-text-size-adjust: 100%; }
+body   { margin: 0; }
+button, input { font-family: inherit; font-size: 100%; line-height: 1.15; margin: 0; }
+img    { border-style: none; }
+
+.br2     { border-radius: .25rem; }
+.ma2     { margin: .5rem; }
+.ma3     { margin: 1rem; }
+.ml1     { margin-left: .25rem; }
+.ml2     { margin-left: .5rem; }
+.ml3     { margin-left: 1rem; }
+.ml4     { margin-left: 2rem; }
+.mh1     { margin-left: .25rem; margin-right: .25rem; }
+.mr2     { margin-right: .5rem; }
+.mr3     { margin-right: 1rem; }
+.ml-auto { margin-left: auto; }
+.pa1     { padding: .25rem; }
+.pa2     { padding: .5rem; }
+.ph2     { padding-left: .5rem; padding-right: .5rem; }
+.pl2     { padding-left: .5rem; }
+.f3      { font-size: 1.5rem; }
+.f5      { font-size: 1rem; }
+.f6      { font-size: .875rem; }
+.w-100   { width: 100%; }
+.di      { display: inline; }
+.flex    { display: flex; }
+.flex-row    { flex-direction: row; }
+.flex-wrap   { flex-wrap: wrap; }
+.items-center { align-items: center; }
+.tr      { text-align: right; }
+.truncate { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sans-serif { font-family: -apple-system, BlinkMacSystemFont, 'avenir next', avenir, 'helvetica neue', helvetica, ubuntu, roboto, noto, 'segoe ui', arial, sans-serif; }
+.pointer  { cursor: pointer; }
+.relative { position: relative; }
+.absolute { position: absolute; }
+.bg-white { background-color: #fff; }
+
+
+
+
+.cmd {
+  background-color: #fffb;
+  padding: 2px 4px;
+  color: #666;
+  font-family: monospace;
+  font-size: 1.1em;
+  border: 0 solid transparent;
+  cursor: pointer;
+}
+.cmd:hover {
+  background-color: #fff;
+  color: #333;
+}
+.cmd.on {
+  background-color: #cfc;
+  color: #262;
+}
+.cmd.on:hover {
+  background-color: #dfd;
+}
+.cmd svg {
+  width: 1em;
+  height: 1em;
+  vertical-align: -0.15em;
+}
+
+/* Overwrite internal Styles */
+
+pre, div {
+  padding: 0;
+  margin: 0;
+}
+
+
+/* app specific */
+
+.f7        { font-size: 0.7rem; }
+
+.dn        {display: none !important;}
+.outline   { outline: 1px solid white; }
+.vih       { visibility: hidden;}
+
+.z10       { z-index: 10;}
+.z11       { z-index: 11;}
+.z12       { z-index: 12;}
+
+.ll0       { left: 0;}
+.w1r       { width: 1rem;}
+
+.chess     { font-family: 'Chess'; }
+.fior      { font-family: 'Iosevka-Term-Regular'; }
+.fiom      { font-family: 'Iosevka-Term-Medium'; }
+.fiob      { font-family: 'Iosevka-Term-Bold'; }
+.sail      { font-family: 'SairaCondensed-Light'; }
+.sair      { font-family: 'SairaCondensed-Regular'; }
+.saim      { font-family: 'SairaCondensed-Medium'; }
+.mono      { font-family: monospace; }
+
+.lh1       { line-height: 1rem; }
+.h05       { height:  0.5rem; }
+.pa0       { padding: 0 !important; }
+.ma0       { margin:  0 !important; }
+
+.cred      { color: darkred; }
+.c156      { color: #156; }
+.cfe6      { color: #fe6} ;
+
+.ctb10      {color:            rgba(0,0,0,.1);}
+.ctb20      {color:            rgba(0,0,0,.2);}
+.ctw80      {color:            rgba(255,255,255,0.8);}
+.ctr20      {color:            rgba(255,0,0,.4);}
+.btb20      {background-color: rgba(0,0,0,.2);}
+.btw20      {background-color: rgba(255,255,255,.2);}
+
+.cfff      { color: #fff; }
+.ceee      { color: #eee; }
+.cddd      { color: #ddd; }
+.cccc      { color: #ccc; }
+.cbbb      { color: #bbb; }
+.caaa      { color: #aaa; }
+.c999      { color: #999; }
+.c888      { color: #888; }  // background
+.c777      { color: #777; }
+.c666      { color: #666; }
+.c555      { color: #555; }
+.c444      { color: #444; }
+.c333      { color: #333; }
+.c000      { color: #000; }
+
+.ctrans    { color: transparent !important; }
+.bg-trans  { background-color: transparent !important; }
+.bg-8a8    { background-color: #8a8; }
+.bg-89a    { background-color: #89a; } // selected data
+.bg-89b    { background-color: #89b; } // selected data
+.bg-a88    { background-color: #a88; } // selected navigation
+.bg-fdd    { background-color: #fdd; }
+.bg-aa7    { background-color: #aa7; } // game flag neutral
+.bg-fa7    { background-color: #fa7; } // game flag active
+
+.bg-fff    { background-color: #fff; }
+.bg-eee    { background-color: #eee; }
+.bg-ddd    { background-color: #ddd; }
+.bg-ccc    { background-color: #ccc; }
+.bg-aaa    { background-color: #aaa; }
+.bg-999    { background-color: #999; }
+.bg-888    { background-color: #888; }
+.bg-777    { background-color: #777; }
+.bg-555    { background-color: #555; } // header bg
+.bg-333    { background-color: #333; } // header bg
+
+.flex-grow {
+    flex: 1 0 auto;
+}
+.flex-shrink {
+    flex: 0 1 auto;
+}
+.viewport-y {
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+.viewport-xy {
+    overflow-y: auto;
+    overflow-x: auto;
+}

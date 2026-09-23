@@ -1,0 +1,10 @@
+.chrome-profile/
+.DS_Store
+**/.DS_Store
+.claude/settings.local.json
+Certificates/
+node_modules/
+dist/
+research/
+.env.local
+sessions/

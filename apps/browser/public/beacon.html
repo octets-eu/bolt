@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Bolt Beacon</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #000;
+               color: #8a8a8a; user-select: none; -webkit-user-select: none;
+               font: 14px/1.4 ui-monospace, Menlo, Consolas, monospace; }
+
+  #lamp   { position: fixed; inset: 0; background: #000; }
+  #lamp.on{ background: #fff; }
+
+  #ui { position: fixed; inset: auto 0 0 0; z-index: 1;
+        padding: 14px; padding-bottom: calc(14px + env(safe-area-inset-bottom));
+        display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+        background: rgba(0,0,0,.78); transition: opacity .18s; }
+  #ui.hidden { opacity: 0; pointer-events: none; }
+
+  button { font: inherit; min-width: 58px; padding: 11px 13px; border-radius: 8px;
+           border: 1px solid #3a3a3a; background: #141414; color: #cfcfcf; }
+  button.sel { background: #fff; border-color: #fff; color: #000; }
+
+  #read { margin-left: auto; text-align: right; white-space: nowrap; }
+  #read b { color: #f0f0f0; font-weight: 600; }
+</style>
+</head>
+<body>
+
+<div id="lamp"></div>
+
+<div id="ui">
+  <button data-hz="0">still</button>
+  <button data-hz="0.5">0.5</button>
+  <button data-hz="1">1</button>
+  <button data-hz="2">2</button>
+  <button data-hz="5">5</button>
+  <button id="torch">torch</button>
+  <button id="full">full</button>
+  <span id="read"></span>
+</div>
+
+<script>
+// Square-wave beacon for Bolt light-sensor homing.
+// Phase is computed from elapsed time, not accumulated per frame, so it never drifts.
+// Keep well under ~2 Hz for the light sensor; 5 Hz is here for the aliasing check.
+
+const lamp = document.getElementById('lamp');
+const ui   = document.getElementById('ui');
+const read = document.getElementById('read');
+
+let hz = 1;                 // 0 = steady on
+let t0 = performance.now();
+let cycles = 0;
+let lastOn = null;
+let torchTrack = null;
+let wakeLock = null;
+
+function setHz(v) {
+  hz = v;
+  t0 = performance.now();
+  cycles = 0;
+  ui.querySelectorAll('button[data-hz]').forEach(b =>
+    b.classList.toggle('sel', Number(b.dataset.hz) === v));
+}
+
+function frame(now) {
+  const elapsed = (now - t0) / 1000;
+  let on = true;
+
+  if (hz > 0) {
+    const period = 1 / hz;
+    on = (elapsed % period) < period / 2;
+    cycles = Math.floor(elapsed / period);
+  }
+
+  // the screen is the lamp only while the torch is off; with the torch on it stays black
+  lamp.classList.toggle('on', on && !torchTrack);
+
+  // Torch only on edges: applyConstraints is slow, calling it per frame stalls.
+  if (torchTrack && on !== lastOn) {
+    torchTrack.applyConstraints({ advanced: [{ torch: on }] }).catch(() => {});
+  }
+  lastOn = on;
+
+  read.innerHTML = `<b>${hz ? hz + ' Hz' : 'steady'}</b> &middot; ${cycles} cyc &middot; ${elapsed.toFixed(0)} s`;
+  requestAnimationFrame(frame);
+}
+
+async function keepAwake() {
+  try { wakeLock = await navigator.wakeLock.request('screen'); }
+  catch (e) { /* set Android screen timeout to Never instead */ }
+}
+
+async function enableTorch() {
+  if (torchTrack) {
+    torchTrack.stop();
+    torchTrack = null;
+    document.getElementById('torch').classList.remove('sel');
+    return;
+  }
+  // Chrome on Android: a multi-camera phone may hand out a rear camera without
+  // a flash, and getCapabilities() is often empty until the track has delivered
+  // frames. So: try every camera, rear ones first, wait for frames, and if the
+  // capabilities stay silent try the constraint anyway and read the setting back.
+  const tried = [];
+  try {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) throw new Error('no camera API (insecure page or old browser)');
+    const probe = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+    probe.getTracks().forEach(t => t.stop());
+    const devices = (await navigator.mediaDevices.enumerateDevices()).filter(d => d.kind === 'videoinput');
+    const rear = d => /back|rear|environment|world/i.test(d.label);
+    devices.sort((a, b) => (rear(b) ? 1 : 0) - (rear(a) ? 1 : 0));
+    for (const dev of devices) {
+      let stream = null;
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({ video: { deviceId: { exact: dev.deviceId } } });
+        const track = stream.getVideoTracks()[0];
+        const video = document.createElement('video');
+        video.muted = true; video.playsInline = true; video.srcObject = stream;
+        await video.play().catch(() => {});
+        await new Promise(r => setTimeout(r, 700));
+        let caps = track.getCapabilities ? track.getCapabilities() : {};
+        let ok = !!caps.torch;
+        if (!ok) {
+          await track.applyConstraints({ advanced: [{ torch: true }] }).catch(() => {});
+          const settings = track.getSettings ? track.getSettings() : {};
+          ok = settings.torch === true;
+          await track.applyConstraints({ advanced: [{ torch: false }] }).catch(() => {});
+        }
+        tried.push(`${dev.label || dev.deviceId.slice(0, 8)}: ${ok ? 'torch' : 'no torch'}`);
+        if (ok) {
+          torchTrack = track;
+          document.getElementById('torch').classList.add('sel');
+          return;
+        }
+        stream.getTracks().forEach(t => t.stop());
+      } catch (e) {
+        if (stream) stream.getTracks().forEach(t => t.stop());
+        tried.push(`${dev.label || dev.deviceId.slice(0, 8)}: ${e.message}`);
+      }
+    }
+    throw new Error('no camera offered a torch');
+  } catch (e) {
+    alert('Torch unavailable: ' + e.message + (tried.length ? '\n\n' + tried.join('\n') : '') + '\n\n' + navigator.userAgent.replace(/.*(Chrome\/[\d.]+).*/, '$1'));
+  }
+}
+
+ui.querySelectorAll('button[data-hz]').forEach(b =>
+  b.addEventListener('click', () => setHz(Number(b.dataset.hz))));
+
+document.getElementById('torch').addEventListener('click', enableTorch);
+document.getElementById('full').addEventListener('click', () =>
+  document.documentElement.requestFullscreen && document.documentElement.requestFullscreen().catch(() => {}));
+
+lamp.addEventListener('click', () => ui.classList.toggle('hidden'));
+
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') keepAwake();
+});
+
+setHz(hz);
+keepAwake();
+requestAnimationFrame(frame);
+</script>
+
+</body>
+</html>

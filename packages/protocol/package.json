@@ -1,0 +1,18 @@
+{
+  "name": "@bolt/protocol",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Message schemas shared by the driver, the views, the camera and the seeker.",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.0"
+  }
+}

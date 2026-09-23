@@ -1,0 +1,56 @@
+
+div.logger {
+
+  table {
+
+    font-family: monospace;
+    border-collapse: collapse;
+
+    td.id, td.device, td.target, td.source, td.command {
+      text-align: right;
+    }
+
+    thead {
+      font-weight: 700;
+      background-color: #666;
+      color: white;
+    }
+
+    tbody {
+
+      tr.info, tr.key {
+        td.type, td.subtype { background-color: #eee }
+      }
+      tr.action {
+        td.type, td.subtype { background-color: #fff4; }
+      }
+      tr.event.ack {
+        td.type, td.subtype    { background-color: #fffA; color: #888}
+      }
+
+      &td.type.event.ack { background-color: #fffA; }
+
+      font-size: 13px;
+
+      td {
+        padding: 0 2px;
+
+        &.timestamp { background-color: #fffA; }
+        &.bolt      { background-color: #fff4; }
+        &.type, &.subtype  { background-color: #fff8; }
+        &.id,    &.command { background-color: #fff6; }
+        &.device, &.target { background-color: #fff4; }
+        &.payload {
+          background-color: #fff8;
+          color: #888
+        }
+        &.sensor { background-color: #fffD; }
+
+
+
+      }
+
+    }
+
+  }
+}

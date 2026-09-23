@@ -1,0 +1,16 @@
+{
+  "mcpServers": {
+    "bolt-tools": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "chrome-devtools-mcp@1.8.0",
+        "--userDataDir=.chrome-profile",
+        "--ignoreDefaultChromeArg=--use-mock-keychain",
+        "--chromeArg=--enable-features=WebBluetoothNewPermissionsBackend"
+      ],
+      "env": {}
+    }
+  }
+}

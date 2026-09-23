@@ -1,0 +1,22 @@
+{
+  "name": "@bolt/web-ble",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Web Bluetooth transport for @bolt/core: discovery, pairing, reconnect, GATT.",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@bolt/core": "*"
+  },
+  "devDependencies": {
+    "@types/web-bluetooth": "^0.0.21",
+    "typescript": "^5.9.0"
+  }
+}
