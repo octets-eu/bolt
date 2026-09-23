@@ -47,12 +47,7 @@ export class WebBleTransport implements Transport {
 
       } else if (service.uuid === G.SPHERO_INITIALIZE_SERVICE) {
         for (const charac of await service.getCharacteristics()) {
-          if (charac.uuid === G.ANTIDOS_CHARACTERISTIC     ||
-              charac.uuid === G.DFU_CONTROL_CHARACTERISTIC ||
-              charac.uuid === G.DFU_INFO_CHARACTERISTIC    ||
-              charac.uuid === G.SUBS_CHARACTERISTIC) {
-            await this.map(charac);
-          }
+          if (charac.uuid === G.ANTIDOS_CHARACTERISTIC) await this.map(charac);
         }
       }
 
