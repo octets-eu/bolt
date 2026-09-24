@@ -25,9 +25,13 @@ export class Navigation {
     this.sensors   = sensors;
   }
 
-  /** Resolve once the ball neither moves nor turns, see `status.isStill`; the caller holds the motion stream. */
-  public async waitForStill (): Promise<void> {
-    while (!this.ctx.status.isStill) await wait(50);
+  /**
+   * Resolve once the ball neither moves nor turns, see `status.isStill`, or
+   * when `s` aborts: with a NaN locator it is never still. The caller holds
+   * the motion stream.
+   */
+  public async waitForStill (s: AbortSignal): Promise<void> {
+    while (!this.ctx.status.isStill && !s.aborted) await wait(50);
   }
 
   /**
@@ -71,13 +75,15 @@ export class Navigation {
 
     const t0 = this.ctx.now();
     const s = this.ctx.motion;
-    let swept = 0, last: number | null = null, moved = false;
+    let swept = 0, last: number | null = null, moved = false, ended = false;
     let done = (): void => {};
-    const turned = new Promise<void>((resolve) => { done = resolve; });
+    const turned = new Promise<void>((resolve) => { done = () => { ended = true; resolve(); }; });
 
     await this.actuators.motor.stabilize(StabilizationIndex.full);
 
+    // the hold outlives the step's end by the stop and the still wait; samples then change nothing
     const release = await this.sensors.motion.subscribe((sample) => {
+      if (ended) return;
       if (last !== null) swept += angleDistance(last, sample.angles.yaw);
       last = sample.angles.yaw;
       const still = this.ctx.status.isStill;
@@ -96,7 +102,7 @@ export class Navigation {
     });
 
     await turned;
-    await this.waitForStill();
+    await this.waitForStill(s);
     await this.actuators.motor.stabilize(StabilizationIndex.none);
     await release();
 
@@ -126,13 +132,15 @@ export class Navigation {
 
     const t0 = this.ctx.now();
     const s = this.ctx.motion;
-    let speed = startSpeed;
+    let speed = startSpeed, ended = false;
     let done = (): void => {};
-    const arrived = new Promise<void>((resolve) => { done = resolve; });
+    const arrived = new Promise<void>((resolve) => { done = () => { ended = true; resolve(); }; });
     
     await this.actuators.motor.stabilize(StabilizationIndex.full);
     
+    // the hold outlives the step's end by the stop and the still wait; samples then change nothing
     const release = await this.sensors.motion.subscribe((sample) => {
+      if (ended) return;
       const here = { x: sample.locator.positionX, y: sample.locator.positionY };
       const d = distance(here, target);
       if (d <= tolerance || s.aborted) {
@@ -153,7 +161,7 @@ export class Navigation {
 
     await arrived;
     await this.actuators.motor.stop();
-    await this.waitForStill();
+    await this.waitForStill(s);
     await this.actuators.motor.stabilize(StabilizationIndex.none);
     await release();
 

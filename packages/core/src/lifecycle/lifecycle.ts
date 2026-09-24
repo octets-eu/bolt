@@ -109,6 +109,9 @@ export class Lifecycle {
       void this.wake();
     });
     const { awakeSeen } = await this.wake();
+    // before reset needs it: on 2026-09-24 a link cut during a north spin left
+    // the firmware locator at NaN, reset's rotate never saw the ball still
+    await this.actuators.motor.resetLocator();
     // battery, charger, gyro max, infrared and collision feed the status and the log for the whole
     // connection. Taken awake: the sensor side does not ack switches while the Bolt sleeps.
     await this.sensors.battery.subscribe(null);
@@ -118,7 +121,6 @@ export class Lifecycle {
     await this.sensors.collision.subscribe(null, {});
     if (awakeSeen) await this.resetting;
     else await this.reset();
-    await this.actuators.motor.resetLocator();
     await this.readAll();
     this.ctx.log('info', 'takeover.out');
   }

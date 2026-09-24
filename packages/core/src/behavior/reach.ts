@@ -142,7 +142,7 @@ export async function reach (ctx: Context, actuators: Actuators, sensors: Sensor
   }
 
   await actuators.motor.stop();
-  while (!ctx.status.isStill) await wait(50);
+  while (!ctx.status.isStill && !s.aborted) await wait(50);
   await actuators.motor.stabilize(StabilizationIndex.none);
   await release();
 

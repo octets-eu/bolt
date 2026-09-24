@@ -16,7 +16,7 @@ export interface IEnvelope {
 /** Something the driver reports: an ack, sensor data, a collision, a log line. */
 export interface IEventMessage extends IEnvelope {
   kind: 'event';
-  /** e.g. "ack", "sensordata", "collision", "infrared", "battery", "charger", "info", "error", "action". */
+  /** e.g. "ack", "sensordata", "collision", "infrared", "battery", "charger", "info", "warn", "fatal", "action"; files before 2026-09-24 name warnings "error". */
   name: string;
   data?: unknown;
 }

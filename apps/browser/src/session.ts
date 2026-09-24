@@ -74,7 +74,7 @@ class SessionLog {
   }
 
   /** A note from a view or a script, e.g. "exported ..." or a camera click. */
-  note (bolt: string, name: 'info' | 'error' | 'fatal', text: string): IEventMessage {
+  note (bolt: string, name: 'info' | 'fatal', text: string): IEventMessage {
     const msg: IEventMessage = { v: PROTOCOL_VERSION, t: this.now(), bolt, kind: 'event', name, data: text };
     this.append(msg);
     return msg;
@@ -89,7 +89,7 @@ class SessionLog {
           this.append({ ...base, name: 'info',  data: entry.subtype });
           break;
         case 'warn':
-          this.append({ ...base, name: 'error', data: entry.subtype });
+          this.append({ ...base, name: 'warn', data: entry.subtype });
           break;
         case 'fatal':
           this.append({ ...base, name: 'fatal', data: entry.subtype });

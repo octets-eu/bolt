@@ -44,8 +44,8 @@ const formatter = {
   'info': ({ t, bolt, type, subtype }: ILogline) => m('tr', { className: [bolt, type, subtype].join(' ') }, [
     cell('.timestamp', time(t)), cell('.bolt', bolt), cell('.type', 'Info'), m('td.subtype', { colspan: 6 }, subtype),
   ]),
-  'error': ({ t, bolt, type, subtype }: ILogline) => m('tr', { className: [bolt, type, subtype].join(' ') }, [
-    cell('.timestamp', time(t)), cell('.bolt', bolt), cell('.type', 'Error'), m('td.subtype', { colspan: 6 }, subtype),
+  'warn': ({ t, bolt, type, subtype }: ILogline) => m('tr', { className: [bolt, type, subtype].join(' ') }, [
+    cell('.timestamp', time(t)), cell('.bolt', bolt), cell('.type', 'Warn'), m('td.subtype', { colspan: 6 }, subtype),
   ]),
   'fatal': ({ t, bolt, type, subtype }: ILogline) => m('tr', { className: [bolt, type, subtype].join(' ') }, [
     cell('.timestamp', time(t)), cell('.bolt', bolt), cell('.type', 'Fatal'), m('td.subtype', { colspan: 6 }, subtype),
@@ -71,7 +71,7 @@ function lineFor (bolt: string, entry: LogEntry): ILogline {
   const data: any = entry.data;
   switch (entry.type) {
     case 'info':   return { ...base, type: 'info',   subtype: entry.subtype };
-    case 'warn':   return { ...base, type: 'error',  subtype: entry.subtype };
+    case 'warn':   return { ...base, type: 'warn',   subtype: entry.subtype };
     case 'fatal':  return { ...base, type: 'fatal',  subtype: entry.subtype };
     case 'action': return { ...base, type: 'action', subtype: data?.name, data };
   }
@@ -97,12 +97,6 @@ const Logger = Factory.create('Logger', {
   info (source: { name: string }, info: string) {
     const msg = session.note(source.name, 'info', info);
     Logger.push({ t: msg.t, bolt: msg.bolt, type: 'info', subtype: info } as ILogline);
-    m.redraw();
-  },
-
-  error (source: { name: string }, error: string) {
-    const msg = session.note(source.name, 'error', error);
-    Logger.push({ t: msg.t, bolt: msg.bolt, type: 'error', subtype: error } as ILogline);
     m.redraw();
   },
 
