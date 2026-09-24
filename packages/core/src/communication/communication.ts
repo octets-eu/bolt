@@ -3,7 +3,7 @@ import type { Context } from '../context';
 import { BLACK } from './images';
 import type { Color } from '../config';
 import type { Image } from './images';
-import { anySignal, range, wait } from '../helpers/utils';
+import { range, wait, whenAborted } from '../helpers/utils';
 
 export interface BroadcastOptions {
   /** Infrared codes to send in turn, default all eight. */
@@ -12,12 +12,12 @@ export interface BroadcastOptions {
   /** Pause after each round. */
   pauseMs?:  number | undefined;
   strength?: number | undefined;
-  signal?:   AbortSignal | undefined;
 }
 
 /**
  * What the Bolt shows and tells: matrix images and text, LEDs, infrared
  * broadcasts. Sequences of actuator packets; nothing here moves the ball.
+ * A fullstop ends a running sequence, like a navigation step.
  */
 export class Communication {
 
@@ -43,20 +43,23 @@ export class Communication {
     await this.actuators.matrix.char(char, color);
   }
 
-  async blinkChar (char: string, times = 3, signal?: AbortSignal): Promise<void> {
-    const s = anySignal(this.ctx.motion, signal);
+  async blinkChar (char: string, times = 3): Promise<void> {
+    const s = this.ctx.motion;
+    const aborted = whenAborted(s);
     for (const _ of range(times)) {
       await this.actuators.matrix.char(' ', BLACK);
       await this.actuators.matrix.char(char, this.ctx.config.colors.matrix);
-      await wait(200, s);
+      await Promise.race([wait(200), aborted]);
+      if (s.aborted) return;
     }
   }
 
-  /** Scroll `text` once and resolve when the Bolt reports it done. */
-  async scrollText (text: string, color: Color = this.ctx.config.colors.matrix, speed = 10, signal?: AbortSignal): Promise<void> {
-    const done = this.ctx.events.once('scrolldone', { timeoutMs: 2000 + text.length * 1500, signal: anySignal(this.ctx.motion, signal) });
+  /** Scroll `text` once and resolve when the Bolt reports it done, or on fullstop. */
+  async scrollText (text: string, color: Color = this.ctx.config.colors.matrix, speed = 10): Promise<void> {
+    const aborted = whenAborted(this.ctx.motion);
+    const done = this.ctx.events.once('scrolldone', { timeoutMs: 2000 + text.length * 1500 });
     await this.actuators.matrix.scrollText(text, color, speed, false);
-    await done;
+    await Promise.race([done, aborted]);
   }
 
   /** The Bolt's colour as a ring with a dark centre: what a Bolt shows when idle. */
@@ -69,11 +72,13 @@ export class Communication {
 
   /** Emit infrared codes in turn so another Bolt listening on any channel hears this one. */
   async broadcastInfrared (options: BroadcastOptions = {}): Promise<void> {
-    const { codes = range(8), rounds = 1, pauseMs = 1000, strength = 255, signal } = options;
-    const s = anySignal(this.ctx.motion, signal);
+    const { codes = range(8), rounds = 1, pauseMs = 1000, strength = 255 } = options;
+    const s = this.ctx.motion;
+    const aborted = whenAborted(s);
     for (const _ of range(rounds)) {
       for (const code of codes) await this.actuators.infrared.send(code, strength);
-      if (pauseMs > 0) await wait(pauseMs, s);
+      if (pauseMs > 0) await Promise.race([wait(pauseMs), aborted]);
+      if (s.aborted) return;
     }
   }
 

@@ -323,9 +323,7 @@ class Tracker {
     this.tracks = {};
     this.blobs = [];
     this.history = {};
-    for (const b of Bolts.map((x: Bolt) => x)) void this.release(b).catch((e: unknown) => {
-      this.error = String(e);
-    });
+    for (const b of Bolts.map((x: Bolt) => x)) void this.release(b);
     m.redraw();
   }
 
@@ -343,9 +341,7 @@ class Tracker {
         this.readySeen.add(b.name);
         b.actuators.matrix.release(MATRIX_OWNER);
       }
-      if (b.status.matrix.owner !== MATRIX_OWNER) void this.light(b).catch((e: unknown) => {
-        this.error = String(e);
-      });
+      if (b.status.matrix.owner !== MATRIX_OWNER) void this.light(b);
     }
     const frame = this.grabFull();
     if (!frame) return;
@@ -384,9 +380,7 @@ class Tracker {
       const bolt = Bolts.find((x: Bolt) => x.name === name);
       if (!glow && bolt?.connected && bolt.status.ready && bolt.status.matrix.owner === MATRIX_OWNER
         && t - (this.seenAt[name] ?? t) > LOST_MS && t - (this.sweptAt[name] ?? -Infinity) > SWEEP_PAUSE_MS) {
-        void this.sweep(bolt).catch((e: unknown) => {
-          this.error = String(e);
-        });
+        void this.sweep(bolt);
       }
       if (!glow) {
         delete this.tracks[name];

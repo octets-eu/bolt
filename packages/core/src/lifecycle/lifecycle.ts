@@ -47,7 +47,7 @@ export class Lifecycle {
     });
     void sensors.awake.subscribe(() => {
       ctx.status.awake = true;
-      this.reset().catch((error: unknown) => ctx.log('warn', `reset after awake: ${String(error)}`));
+      void this.reset();
     });
   }
 
@@ -66,22 +66,17 @@ export class Lifecycle {
     return { awakeSeen, ms };
   }
 
-  /** Soft sleep; resolves when the Bolt reports it slept, which takes about two seconds. */
-  async sleep (timeoutMs = 3000): Promise<void> {
-    const slept = this.ctx.events.once('didsleep', { timeoutMs }).catch((): undefined => undefined);
+  /** Soft sleep; resolves on the ack. The didsleep notification follows 2 to 3.3 s later and sets the status. */
+  async sleep (): Promise<void> {
     await this.actuators.power.sleep();
-    await slept;
   }
 
   /**
-   * Known body state. Safe to call at any time; concurrent calls share one run.
+   * Known body state. Safe to call at any time: a call during a run joins it.
    * Everything here is forgotten by the firmware in sleep.
    */
   reset (): Promise<void> {
-    if (this.resetting) return this.resetting;
-    this.resetting = this.doReset().finally(() => {
-      this.resetting = null;
-    });
+    this.resetting ??= this.doReset();
     return this.resetting;
   }
 
@@ -98,6 +93,7 @@ export class Lifecycle {
     await this.navigation.rotate(90);
     await this.calibration.north();
     this.ctx.status.ready = true;
+    this.resetting = null;
     this.ctx.changed();
     this.ctx.log('info', 'reset.out');
   }
@@ -108,7 +104,7 @@ export class Lifecycle {
     await this.actuators.power.ping();
     void this.sensors.willsleep.subscribe(() => {
       if (!this.ctx.status.keepAwake) return;
-      this.wake().catch((error: unknown) => this.ctx.log('warn', `keepAwake: ${String(error)}`));
+      void this.wake();
     });
     const { awakeSeen } = await this.wake();
     // battery, charger, gyro max, infrared and collision feed the status and the log for the whole
@@ -149,6 +145,19 @@ export class Lifecycle {
     this.ctx.events.emit('fullstop', undefined);
     await this.actuators.motor.off();
     await this.communication.blinkChar('S', 5);
+  }
+
+  /**
+   * The end after an error: nothing is recovered, the page is reloaded. The
+   * app calls it once per connected Bolt on its first error. Aborts every
+   * running step and cuts the motors, not awaited: the link may be gone.
+   */
+  fail (error: unknown): void {
+    this.ctx.log('fatal', `${String(error)}, reload the page`);
+    this.ctx.abortMotion();
+    void this.actuators.motor.off();
+    this.ctx.status.ready = false;
+    this.ctx.changed();
   }
 
 }

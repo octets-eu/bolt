@@ -6,7 +6,6 @@ import type { AckPayload, Bytes } from './payloads';
 import type { Transport } from './transport';
 import { AckTimeoutError, CommandError, NotConnectedError, WriteError } from '../errors';
 import type { PacketSummary } from '../events/events';
-import { wait } from '../helpers/utils';
 
 /** A command's acknowledgement. `payload` is the decoded value for the command name, see `AckPayloads`; `raw` the bytes. */
 export interface Ack<T = undefined> {
@@ -20,15 +19,11 @@ export interface QueueOptions {
   /** GATT write with response (default): the write rejects on link errors instead of timing out on the ack. */
   withResponse?: boolean;
   ackTimeoutMs?: number;
-  /** Write retries on a transport error, e.g. "GATT operation already in progress". */
-  retries?:      number;
-  retryDelayMs?: number;
 }
 
 export interface QueueHooks {
   /** A packet is about to be written. */
   onAction?:     (action: PacketSummary & { readonly name: string }) => void;
-  onWriteError?: (name: string, attempt: number, error: unknown) => void;
   onChange?:     () => void;
 }
 
@@ -38,7 +33,6 @@ interface Pending {
   readonly bytes:   Uint8Array;
   readonly resolve: (ack: Ack<unknown>) => void;
   readonly reject:  (error: Error) => void;
-  attempts: number;
   timer:    ReturnType<typeof setTimeout> | null;
 }
 
@@ -51,8 +45,6 @@ export class Queue {
 
   readonly withResponse: boolean;
   readonly ackTimeoutMs: number;
-  readonly retries:      number;
-  readonly retryDelayMs: number;
 
   private readonly transport: Transport;
   private readonly hooks:     QueueHooks;
@@ -66,8 +58,6 @@ export class Queue {
     this.hooks        = hooks;
     this.withResponse = options.withResponse ?? true;
     this.ackTimeoutMs = options.ackTimeoutMs ?? 3000;
-    this.retries      = options.retries      ?? 3;
-    this.retryDelayMs = options.retryDelayMs ?? 50;
   }
 
   /** Commands queued or in flight. */
@@ -84,7 +74,7 @@ export class Queue {
         return;
       }
       const seq = this.nextSeq();
-      this.waiting.push({ seq, command, bytes: encode(seq, command), resolve, reject, attempts: 0, timer: null });
+      this.waiting.push({ seq, command, bytes: encode(seq, command), resolve, reject, timer: null });
       this.kick();
     }) as Promise<Ack<AckPayload<N>>>;
   }
@@ -128,26 +118,22 @@ export class Queue {
   private async write (pending: Pending): Promise<void> {
 
     const { command, bytes, seq } = pending;
-    pending.attempts += 1;
+    this.hooks.onAction?.({ id: seq, name: command.name, device: command.device, command: command.id, target: command.target ?? null, payload: command.data });
 
+    // no retry: in 289 sessions of 2026-09 no retried write went through, a
+    // failed write came with a disconnect or before the link was up
     try {
-      this.hooks.onAction?.({ id: seq, name: command.name, device: command.device, command: command.id, target: command.target ?? null, payload: command.data });
       await this.transport.write(bytes, this.withResponse);
-      if (this.inflight !== pending) return;  // cleared meanwhile
-      pending.timer = setTimeout(() => this.timeout(pending), this.ackTimeoutMs);
-
     } catch (error) {
-      this.hooks.onWriteError?.(command.name, pending.attempts, error);
-      if (this.inflight !== pending) return;
-      if (pending.attempts <= this.retries) {
-        await wait(this.retryDelayMs);
-        if (this.inflight === pending) void this.write(pending);
-      } else {
-        this.finish(pending);
-        pending.reject(new WriteError(command.name, error));
-        this.kick();
-      }
+      if (this.inflight !== pending) return;  // cleared meanwhile
+      this.finish(pending);
+      pending.reject(new WriteError(command.name, error));
+      this.kick();
+      return;
     }
+
+    if (this.inflight !== pending) return;  // cleared meanwhile
+    pending.timer = setTimeout(() => this.timeout(pending), this.ackTimeoutMs);
 
   }
 

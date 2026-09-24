@@ -34,11 +34,11 @@ export class Motor {
   /**
    * One roll when nothing is queued or in flight, else none. For loops that
    * steer on every sample: the newest command goes out and none pile up
-   * behind a slow ack. Not awaited; a failure is logged.
+   * behind a slow ack. Not awaited; a failure is unhandled and ends the session.
    */
   rollIfIdle (speed: number, heading: number): void {
     if (this.ctx.queue.pending > 0) return;
-    this.roll(speed, heading).catch((e) => this.ctx.log('warn', `rollIfIdle: ${String(e)}`));
+    void this.roll(speed, heading);
   }
 
   async stop (): Promise<void> {

@@ -87,8 +87,8 @@ export class Stream<T, O = undefined> {
   }
 
   private apply (): Promise<void> {
-    // serialised, and a failed setting does not block the next attempt
-    this.applying = this.applying.catch((): void => undefined).then(() => this.configure());
+    // serialised; a failed setting ends the session, see Lifecycle.fail
+    this.applying = this.applying.then(() => this.configure());
     return this.applying;
   }
 

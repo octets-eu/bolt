@@ -41,7 +41,7 @@ export function installKeyboard () {
 
     event.preventDefault();
     Bolts.forEach((bolt: Bolt) => {
-      if (bolt.connected) Promise.resolve(binding(bolt)).catch((e) => bolt.log('warn', `key ${event.key}: ${String(e)}`));
+      if (bolt.connected) void binding(bolt);
     });
 
   });

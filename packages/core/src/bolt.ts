@@ -55,7 +55,6 @@ export class Bolt implements Context {
 
     this.queue = new Queue(transport, config.queue ?? {}, {
       onAction:     (action) => this.log('action', action.name, action),
-      onWriteError: (command, attempt, error) => this.log('warn', `write ${command} try ${attempt}: ${String(error)}`),
       onChange:     () => this.changed(),
     });
     this.receiver = new Receiver(this.queue, this.events, (type, subtype, data) => this.log(type, subtype, data), () => this.now());

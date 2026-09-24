@@ -8,7 +8,7 @@ export { StatusBuffer, Window, Scalar, Circular, Vec2Channel, Vec3Channel, Angle
 export { Emitter } from './events/emitter';
 export type { Listener, OnceOptions } from './events/emitter';
 export * from './errors';
-export { wait, range, clamp, anySignal } from './helpers/utils';
+export { wait, range, clamp } from './helpers/utils';
 export { mod360, angleDistance, distance, headingTo, meanHeading } from './helpers/math';
 export type { Point, Vec3 } from './helpers/math';
 export { float32At, uint16At, int16At, uint32At } from './protocol/bytes';

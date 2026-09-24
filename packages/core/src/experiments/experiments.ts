@@ -2,12 +2,13 @@ import type { Actuators } from '../actuators/actuators';
 import type { Context } from '../context';
 import type { Navigation } from '../navigation/navigation';
 import type { Sensors } from '../sensors/sensors';
-import { anySignal, range, wait } from '../helpers/utils';
+import { range, wait } from '../helpers/utils';
 
 /**
  * Experiments: functions under test, a work log in code, run from the
  * console as `bolt.experiments.hop(90)`. A function stays here while it is
- * tried and measured and moves into its folder when it qualifies.
+ * tried and measured and moves into its folder when it qualifies. A
+ * fullstop ends every one that moves the ball, like a navigation step.
  */
 export class Experiments {
 
@@ -61,6 +62,7 @@ export class Experiments {
    */
   async hop (heading: number, speed: number = 110, graceMs: number = 250, retreatCm: number = 20, timeoutMs: number = 1200) {
     const { status } = this.ctx;
+    const s = this.ctx.motion;
     const motor = this.actuators.motor;
     const pos = () => ({ x: status.position.x || 0, y: status.position.y || 0 });
     const dist = (a: { x: number, y: number }, c: { x: number, y: number }) => Math.hypot(a.x - c.x, a.y - c.y);
@@ -69,7 +71,7 @@ export class Experiments {
     // 1. retreat until the locator says retreatCm, or 1.5 s
     const start = pos();
     let t0 = Date.now();
-    while (dist(pos(), start) < retreatCm && Date.now() - t0 < 1500) {
+    while (dist(pos(), start) < retreatCm && Date.now() - t0 < 1500 && !s.aborted) {
       await motor.roll(70, (heading + 180) % 360);
       await wait(80);
     }
@@ -100,7 +102,7 @@ export class Experiments {
     const charged = pos();
     t0 = Date.now();
     let reason = 'timeout';
-    while (Date.now() - t0 < timeoutMs) {
+    while (Date.now() - t0 < timeoutMs && !s.aborted) {
       await motor.roll(speed, heading);
       await wait(60);
       const dev = Math.abs(acc() - baseline);
@@ -114,6 +116,7 @@ export class Experiments {
         break;
       }
     }
+    if (s.aborted) reason = 'aborted';
     await motor.stop();
     await offCollision();
     await release();
@@ -125,9 +128,10 @@ export class Experiments {
 
   /** Rotate in place and take a lock-in reading per heading; the lobe of amplitudes points at the lighthouse. */
   async sweep (hz: number = 2, steps: number = 12, seconds: number = 1.5) {
+    const s = this.ctx.motion;
     const start = this.ctx.status.heading || 0;
     const rows: { heading: number, amplitude: number, mean: number }[] = [];
-    for (let k = 0; k < steps; k++) {
+    for (let k = 0; k < steps && !s.aborted; k++) {
       const heading = (start + k * 360 / steps) % 360;
       await this.actuators.motor.roll(0, heading);
       await wait(400);
@@ -135,36 +139,36 @@ export class Experiments {
       if ('error' in r) throw new Error(r.error);
       rows.push({ heading: Math.round(heading), amplitude: r.amplitude, mean: r.mean });
     }
-    await this.actuators.motor.roll(0, start);
+    if (!s.aborted) await this.actuators.motor.roll(0, start);
     const best = rows.reduce<typeof rows[number] | null>((m, r) => !m || r.amplitude > m.amplitude ? r : m, null);
     if (best) this.ctx.log('info', `sweep ${hz} Hz: best heading ${best.heading} with ${best.amplitude} lux`);
     return { best, rows };
   }
 
   /** `times` random points on a circle of `radius` around the locator origin, by rollToPoint. */
-  async circleAround (times: number, radius: number, signal?: AbortSignal): Promise<void> {
-    const s = anySignal(this.ctx.motion, signal);
+  async circleAround (times: number, radius: number): Promise<void> {
+    const s = this.ctx.motion;
     for (const _ of range(times)) {
-      if (s?.aborted) return;
+      if (s.aborted) return;
       const angle = Math.random() * Math.PI * 2;
       await this.navigation.rollToPoint({ x: Math.cos(angle) * radius, y: Math.sin(angle) * radius });
     }
   }
 
   /** Twenty random points on a 35 cm circle, then home. */
-  async action (signal?: AbortSignal): Promise<void> {
-    const s = anySignal(this.ctx.motion, signal);
-    await this.circleAround(20, 35, s);
-    await this.navigation.rollToPoint({ x: 0, y: 0 });
+  async action (): Promise<void> {
+    const s = this.ctx.motion;
+    await this.circleAround(20, 35);
+    if (!s.aborted) await this.navigation.rollToPoint({ x: 0, y: 0 });
   }
 
   /** Home, twenty points, home. */
-  async stress (signal?: AbortSignal): Promise<void> {
-    const s = anySignal(this.ctx.motion, signal);
+  async stress (): Promise<void> {
+    const s = this.ctx.motion;
     this.ctx.log('info', 'stress.in');
     await this.navigation.rollToPoint({ x: 0, y: 0 });
-    await this.circleAround(20, 35, s);
-    await this.navigation.rollToPoint({ x: 0, y: 0 });
+    if (!s.aborted) await this.circleAround(20, 35);
+    if (!s.aborted) await this.navigation.rollToPoint({ x: 0, y: 0 });
     this.ctx.log('info', 'stress.out');
   }
 

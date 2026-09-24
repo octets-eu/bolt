@@ -27,18 +27,13 @@ export class AckTimeoutError extends BoltError {
   }
 }
 
-/** The transport refused the bytes after the queue's retries. */
+/** The transport refused the bytes. */
 export class WriteError extends BoltError {
   readonly command: string;
   constructor (command: string, cause: unknown) {
     super(`${command}: write failed: ${String(cause)}`);
     this.command = command;
   }
-}
-
-/** A step was cut short by an abort signal, e.g. fullstop. */
-export class AbortedError extends BoltError {
-  constructor (what = 'operation') { super(`${what} aborted`); }
 }
 
 /** A step ran out of its time budget. */
@@ -48,8 +43,4 @@ export class TimeoutError extends BoltError {
 
 export class NotConnectedError extends BoltError {
   constructor (name: string) { super(`${name}: not connected`); }
-}
-
-export function isAbort (error: unknown): boolean {
-  return error instanceof AbortedError || (error instanceof Error && error.name === 'AbortError');
 }

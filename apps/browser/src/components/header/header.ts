@@ -29,8 +29,8 @@ const Header = Factory.create('Header', {
             m('button.cmd.br2.ml1', { onclick: Bolts.disconnect.bind(Bolts) },                               'DisConnect'),
             m('button.cmd.br2.ml1', { onclick: () => location.reload() },                                       'Reload'),
             m('button.cmd.br2.ml1', { onclick: () => Bolts.reset() },                                           'Reset'),
-            m('button.cmd.br2.ml1', { title: 'Sleep all', onclick: () => Bolts.forEach( (bolt: Bolt) => bolt.lifecycle.sleep().catch((e) => bolt.log('warn', String(e))) ) }, Icon('bed')),
-            m('button.cmd.br2.ml1', { title: 'Wake all',  onclick: () => Bolts.forEach( (bolt: Bolt) => bolt.lifecycle.wake().catch((e) => bolt.log('warn', String(e))) ) },  Icon('alarmClock')),
+            m('button.cmd.br2.ml1', { title: 'Sleep all', onclick: () => Bolts.forEach( (bolt: Bolt) => void bolt.lifecycle.sleep() ) }, Icon('bed')),
+            m('button.cmd.br2.ml1', { title: 'Wake all',  onclick: () => Bolts.forEach( (bolt: Bolt) => void bolt.lifecycle.wake() ) },  Icon('alarmClock')),
           ]
 
         ),

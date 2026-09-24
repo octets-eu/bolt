@@ -14,9 +14,9 @@ const BoltCommands = Factory.create('Layout', {
     const className  = bolt.name
     const streaming  = bolt.status.streaming.active;
     const stabilized = bolt.status.stabilization === StabilizationIndex.full;
-    /** Button handlers: run the step, report a failure in the log instead of an unhandled rejection. */
+    /** Button handlers: run the step; a failure is unhandled and ends the session. */
     const run = (fn: () => Promise<unknown>) => () => {
-      fn().catch((e) => bolt.log('warn', String(e)));
+      void fn();
     };
 
     return  ( !bolt.connected

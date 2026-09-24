@@ -2,12 +2,13 @@
 
 import m from 'mithril';
 
-import { Bolt, BoltConfig } from '@bolt/core';
+import { Bolt, BoltConfig, NotConnectedError } from '@bolt/core';
 import { WebBleTransport, isBluetoothAvailable, onAvailabilityChanged, getPermittedBolts, requestBolt, waitForAdvertisement } from '@bolt/web-ble';
 
 import { Logger }  from './components/logger/logger';
 import { Plotter } from './components/plotter/plotter';
 import { session } from './session';
+import { fatal } from './fatal';
 
 /**
  * The app's Bolt manager: which Bolts exist, how they get connected, and how
@@ -84,7 +85,7 @@ class bolts {
     Logger.reset();
     Plotter.reset();
     this.forEach((bolt: Bolt) => {
-      bolt.lifecycle.reset().catch((e) => console.warn(bolt.name, 'reset', e));
+      void bolt.lifecycle.reset();
     });
   }
 
@@ -100,7 +101,7 @@ class bolts {
     // and makes the Bolt re-advertise at once, so the reloaded page reconnects fast.
     // Async work (like a sleep command) cannot complete in this handler.
     window.addEventListener('pagehide', () => {
-      for (const bolt of this.bolts) {
+      for (const bolt of this.bolts.splice(0)) {
         if (bolt.connected) {
           console.log('Bolts.pagehide', bolt.name, 'disconnecting');
           bolt.transport.close();
@@ -178,6 +179,10 @@ class bolts {
     Plotter.attach(bolt);
     session.attach(bolt);
     bolt.events.on('change', () => m.redraw());
+    // a Bolt still on the list did not disconnect on purpose, see disconnectBolt and pagehide
+    bolt.events.on('disconnected', () => {
+      if (this.bolts.includes(bolt)) fatal(new NotConnectedError(bolt.name));
+    });
 
     this.bolts.push(bolt);
     m.redraw();
@@ -194,11 +199,7 @@ class bolts {
     bolt.log('info', 'Connected');
     console.log(...bolt.format('connected'));
 
-    try {
-      await bolt.lifecycle.takeover();
-    } catch (err) {
-      console.warn(...bolt.format('takeover failed'), err);
-    }
+    await bolt.lifecycle.takeover();
     m.redraw();
 
   }
@@ -212,8 +213,8 @@ class bolts {
     console.log(bolt.name, 'Disconnecting ...');
 
     if (bolt.connected) {
-      bolt.transport.close();
       this.remove(bolt);
+      bolt.transport.close();
       Logger.info(bolt, 'disconnected');
 
     } else {

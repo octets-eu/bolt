@@ -10,6 +10,11 @@ import { session } from './session';
 import { tracker } from './tracking/tracker';
 import { Debug } from './debug/debug';
 import { archiveSessions } from './archive';
+import { fatal } from './fatal';
+
+// any error ends the session, see fatal.ts
+window.addEventListener('error', (e) => fatal(e.error ?? e.message));
+window.addEventListener('unhandledrejection', (e) => fatal(e.reason));
 
 // for the console and the browser tools; the Bolts themselves are `Bolts.get(name)`
 window.Session = session;

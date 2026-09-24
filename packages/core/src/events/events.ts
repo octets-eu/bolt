@@ -3,7 +3,8 @@ import type { Packet } from '../protocol/packet';
 import type { Collision } from '../protocol/payloads';
 import type { SensorSample } from '../sensors/motion';
 
-export type LogType = 'info' | 'warn' | 'action' | 'event';
+/** `fatal`: the session ends, see Lifecycle.fail. */
+export type LogType = 'info' | 'warn' | 'fatal' | 'action' | 'event';
 
 export interface LogEntry {
   readonly timestamp: number;

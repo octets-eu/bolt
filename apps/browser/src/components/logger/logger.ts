@@ -47,6 +47,9 @@ const formatter = {
   'error': ({ t, bolt, type, subtype }: ILogline) => m('tr', { className: [bolt, type, subtype].join(' ') }, [
     cell('.timestamp', time(t)), cell('.bolt', bolt), cell('.type', 'Error'), m('td.subtype', { colspan: 6 }, subtype),
   ]),
+  'fatal': ({ t, bolt, type, subtype }: ILogline) => m('tr', { className: [bolt, type, subtype].join(' ') }, [
+    cell('.timestamp', time(t)), cell('.bolt', bolt), cell('.type', 'Fatal'), m('td.subtype', { colspan: 6 }, subtype),
+  ]),
   'camera': ({ t, bolt, type, subtype, data }: ILogline) => m('tr', { className: [bolt, type, subtype].join(' ') }, [
     cell('.timestamp', time(t)), cell('.bolt', bolt), cell('.type', 'Camera'), cell('.subtype', subtype),
     m('td.sensor', { colspan: 5 }, `x:${data.x.toFixed(1)}, y:${data.y.toFixed(1)}${data.heading !== undefined ? `, h:${Math.round(data.heading)}` : ''}`),
@@ -69,6 +72,7 @@ function lineFor (bolt: string, entry: LogEntry): ILogline {
   switch (entry.type) {
     case 'info':   return { ...base, type: 'info',   subtype: entry.subtype };
     case 'warn':   return { ...base, type: 'error',  subtype: entry.subtype };
+    case 'fatal':  return { ...base, type: 'fatal',  subtype: entry.subtype };
     case 'action': return { ...base, type: 'action', subtype: data?.name, data };
   }
   if (entry.subtype.startsWith('key')) return { ...base, type: 'key', subtype: entry.subtype };
@@ -99,6 +103,13 @@ const Logger = Factory.create('Logger', {
   error (source: { name: string }, error: string) {
     const msg = session.note(source.name, 'error', error);
     Logger.push({ t: msg.t, bolt: msg.bolt, type: 'error', subtype: error } as ILogline);
+    m.redraw();
+  },
+
+  /** The error that ends the session, see fatal.ts. */
+  fatal (source: { name: string }, error: string) {
+    const msg = session.note(source.name, 'fatal', error);
+    Logger.push({ t: msg.t, bolt: msg.bolt, type: 'fatal', subtype: error } as ILogline);
     m.redraw();
   },
 

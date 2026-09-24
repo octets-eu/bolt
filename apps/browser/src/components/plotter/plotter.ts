@@ -94,7 +94,7 @@ const Plotter = Factory.create('Plotter', {
 
     // one roll at a time; SPACE ends it, then the next click counts
     if (rolling) return;
-    const rolls = Bolts.map((bolt: Bolt) => bolt.connected && bolt.navigation.rollToPoint({ x, y }).catch((e) => bolt.log('warn', String(e))));
+    const rolls = Bolts.map((bolt: Bolt) => bolt.connected && bolt.navigation.rollToPoint({ x, y }));
     rolling = true;
     Promise.all(rolls).finally(() => { rolling = false; });
 

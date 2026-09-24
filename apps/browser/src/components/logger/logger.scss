@@ -21,6 +21,10 @@ div.logger {
       tr.info, tr.key {
         td.type, td.subtype { background-color: #eee }
       }
+      tr.fatal td {
+        color: red;
+        font-weight: 700;
+      }
       tr.action {
         td.type, td.subtype { background-color: #fff4; }
       }

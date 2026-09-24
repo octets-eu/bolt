@@ -98,7 +98,7 @@ const CameraView = Factory.create('Camera', {
         m('span.mono.f6.cfff.ml4', 'Track'),
         m('button.cmd.br2.ml1', { disabled: tr.running, onclick: () => tr.start() }, 'Start'),
         m('button.cmd.br2.ml1', { disabled: !tr.running, onclick: () => tr.stop() }, 'Stop'),
-        m('button.cmd.br2.ml1', { disabled: !tr.running, title: 'Drive to the mat centre by camera and face across the mat', onclick: () => { gotoMatCenter().catch((e) => Logger.error({ name: '*' }, String(e))); } }, 'Centre'),
+        m('button.cmd.br2.ml1', { disabled: !tr.running, title: 'Drive to the mat centre by camera and face across the mat', onclick: () => { void gotoMatCenter(); } }, 'Centre'),
         m('select.cmd.br2.ml1', { onchange: (e: Event) => { tr.fps = Number((e.target as HTMLSelectElement).value); } }, [2, 6, 10, 15].map(f => m('option', { value: f, selected: f === tr.fps }, `${f} fps`))),
         m('span.mono.f6.cfff.ml2', tr.running ? `${tr.frames} frames · ${tr.lastFrameMs} ms · ${tr.balls.length} balls · ${tr.blobs.length} blobs` : 'stopped'),
         m('button.cmd.br2.ml1', { disabled: !tr.running, title: 'With the ball out of view: keep the empty scene, a ball is then what differs from it', onclick: () => tr.reference() }, 'Reference'),
