@@ -31,6 +31,8 @@ export interface BoltEvents extends Record<string, unknown> {
   disconnected: undefined;
   /** Raised by lifecycle.fullstop so every running step aborts. */
   fullstop:     undefined;
+  /** A step began or ended, see Lifecycle.run; depth 1 is the outermost. */
+  step:         { readonly name: string; readonly depth: number; readonly phase: 'in' | 'out' };
 
   awake:        undefined;
   willsleep:    undefined;

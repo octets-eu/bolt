@@ -9,6 +9,7 @@ import { Logger }  from './components/logger/logger';
 import { Plotter } from './components/plotter/plotter';
 import { session } from './session';
 import { fatal } from './fatal';
+import { tracker } from './tracking/tracker';
 
 /**
  * The app's Bolt manager: which Bolts exist, how they get connected, and how
@@ -178,6 +179,7 @@ class bolts {
     Logger.attach(bolt);
     Plotter.attach(bolt);
     session.attach(bolt);
+    tracker.attach(bolt);
     bolt.events.on('change', () => m.redraw());
     // a Bolt still on the list did not disconnect on purpose, see disconnectBolt and pagehide
     bolt.events.on('disconnected', () => {

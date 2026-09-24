@@ -156,10 +156,13 @@ export class Lifecycle {
    */
   async run<T> (name: string, fn: () => Promise<T>): Promise<T> {
     this.running.push(name);
+    const depth = this.running.length;
     this.ctx.log('info', `${name}.in`);
+    this.ctx.events.emit('step', { name, depth, phase: 'in' });
     const result = await fn();
     this.running.pop();
     this.ctx.log('info', `${name}.out`);
+    this.ctx.events.emit('step', { name, depth, phase: 'out' });
     return result;
   }
 

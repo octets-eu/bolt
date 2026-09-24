@@ -101,8 +101,9 @@ export interface ITrack {
  * frame of the empty scene a ball is a changed region of a ball's size and
  * shape, and its matrix colour says whose it is; without one, a Bolt is the
  * blob of its lit matrix. Positions are kept
- * in floor centimetres in `tracks`; every fifth of a second a position goes to
- * the session file and the Logger. Runs on a hidden video element, so it keeps
+ * in floor centimetres in `tracks`. While a Bolt's step runs, every fifth of a
+ * second its position goes to the session file, and its position at the
+ * outermost step's start and end to the Logger as well, see `attach`. Runs on a hidden video element, so it keeps
  * going while another route is shown, and follows the camera: it starts when
  * the stream is connected and stops when it is not.
  */
@@ -127,6 +128,8 @@ class Tracker {
   private fullCtx = this.full.getContext('2d', { willReadFrequently: true })!;
   private timer: ReturnType<typeof setTimeout> | null = null;
   private lastPublish: { [bolt: string]: number } = {};
+  /** Bolts with a step running. */
+  private stepping = new Set<string>();
   private history: { [bolt: string]: { t: number, cm: TPoint }[] } = {};
 
   constructor () {
@@ -140,6 +143,30 @@ class Tracker {
       if (c.state === 'connected') this.start();
       else this.stop();
     });
+  }
+
+  /** A Bolt's outermost step turns the file log of its positions on and off, and puts its position at both ends on screen. */
+  attach (bolt: Bolt): () => void {
+    return bolt.events.on('step', ({ depth, phase }) => {
+      if (depth !== 1) return;
+      if (phase === 'in') this.stepping.add(bolt.name);
+      const msg = this.running ? this.position(bolt.name) : null;
+      if (msg) {
+        session.append(msg);
+        Logger.position(msg);
+      } else if (this.running) {
+        Logger.info(bolt, 'camera: not seen');
+      }
+      if (phase === 'out') this.stepping.delete(bolt.name);
+    });
+  }
+
+  /** The latest camera position of a Bolt as a message, or null while it is not seen. */
+  private position (name: string): IPositionMessage | null {
+    const track = this.tracks[name];
+    if (!track?.cm) return null;
+    const { cm, heading, confidence, t } = track;
+    return { v: PROTOCOL_VERSION, t, bolt: name, kind: 'position', x: Math.round(cm[0] * 10) / 10, y: Math.round(cm[1] * 10) / 10, ...(heading === undefined ? {} : { heading: Math.round(heading) }), confidence: Math.round(confidence * 100) / 100, source: 'camera' };
   }
 
   // ---- calibration ----
@@ -403,11 +430,10 @@ class Tracker {
       }
       const confidence = Math.min(1, glow.n / 40);
       this.tracks[name] = { bolt: name, glow, px, cm, heading, confidence, t };
-      if (cm && t - (this.lastPublish[name] || 0) >= 200) {
+      const msg = this.stepping.has(name) && t - (this.lastPublish[name] || 0) >= 200 ? this.position(name) : null;
+      if (msg) {
         this.lastPublish[name] = t;
-        const msg: IPositionMessage = { v: PROTOCOL_VERSION, t, bolt: name, kind: 'position', x: Math.round(cm[0] * 10) / 10, y: Math.round(cm[1] * 10) / 10, ...(heading === undefined ? {} : { heading: Math.round(heading) }), confidence: Math.round(confidence * 100) / 100, source: 'camera' };
         session.append(msg);
-        Logger.position(msg);
       }
     }
     if (this.frames % 3 === 0) m.redraw();
