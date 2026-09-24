@@ -10,8 +10,8 @@
     "packages/*"
   ],
   "scripts": {
-    "dev": "npm run dev --workspace apps/browser",
-    "build": "npm run build --workspaces --if-present",
+    "dev": "npm run build --workspace packages/core && (npm run dev --workspace packages/core & npm run dev --workspace apps/browser)",
+    "build": "npm run build --workspace packages/core && npm run build --workspace apps/browser",
     "preview": "npm run preview --workspace apps/browser",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "lint": "eslint ."

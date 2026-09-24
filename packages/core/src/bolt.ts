@@ -100,6 +100,10 @@ export class Bolt implements Context {
     this.events.emit('change', undefined);
   }
 
+  run<T> (name: string, fn: () => Promise<T>): Promise<T> {
+    return this.lifecycle.run(name, fn);
+  }
+
   /** console.log arguments that print the name in the Bolt's colour. */
   format (text: string): [string, string] {
     return [`%c${this.name} ${text}`, `color: ${this.config.colors.console}; font-weight: 800`];

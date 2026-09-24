@@ -5,6 +5,7 @@ import { angleDistance, distance, headingTo } from '../helpers/math';
 import type { Point } from '../helpers/math';
 import { StabilizationIndex } from '../protocol/constants';
 import { clamp, wait } from '../helpers/utils';
+import { log } from '../lifecycle/log';
 
 /**
  * Moving the ball on purpose. Every step ends on fullstop, holds the motion
@@ -13,7 +14,8 @@ import { clamp, wait } from '../helpers/utils';
  */
 export class Navigation {
 
-  private readonly ctx:       Context;
+  readonly logName = 'navigation';
+  readonly ctx:               Context;
   private readonly actuators: Actuators;
   private readonly sensors:   Sensors;
 
@@ -35,6 +37,7 @@ export class Navigation {
    * 2026-09-23 a stale (0, 0) against a locator at (154, 20) sent a 20 cm
    * roll 170 cm.
    */
+  @log
   public async roll (distance: number, heading: number): Promise<void> {
     const release = await this.sensors.motion.subscribe(null);
     await this.ctx.events.once('sensordata', { timeoutMs: 1000 });
@@ -52,12 +55,11 @@ export class Navigation {
    * goal is commanded and the ball has turned and is still, when the time
    * budget is spent, or on fullstop.
    */
+  @log
   public async rotate (degrees: number, lead = 120): Promise<void> {
 
     // isStill sees no turn under 1 degree, the loop would wait for one forever
     if (Math.abs(degrees) < 1) return;
-
-    this.ctx.log('info', `rotate.in`);
 
     const start = this.ctx.status.heading;
     const goal  = Math.abs(degrees);
@@ -98,8 +100,6 @@ export class Navigation {
     await this.actuators.motor.stabilize(StabilizationIndex.none);
     await release();
 
-    this.ctx.log('info', `rotate.out`);
-
   }
 
   /**
@@ -110,9 +110,8 @@ export class Navigation {
    * surface and slows on the approach. Ends when the time budget is spent,
    * or on fullstop.
    */
+  @log
   public async rollToPoint (target: Point, tolerance = 5): Promise<void> {
-
-    this.ctx.log('info', `rollToPoint.in`);
 
     const startSpeed    = 30;   // command at the first sample
     const speedStep     = 3;    // command change per sample, ~17 samples/s
@@ -157,9 +156,7 @@ export class Navigation {
     await this.waitForStill();
     await this.actuators.motor.stabilize(StabilizationIndex.none);
     await release();
-    
-    this.ctx.log('info', `rollToPoint.out`);
-  
+
   }
 
 }

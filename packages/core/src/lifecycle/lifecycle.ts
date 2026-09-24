@@ -32,6 +32,8 @@ export class Lifecycle {
   private readonly calibration: Calibration;
   private readonly navigation:  Navigation;
   private resetting:    Promise<void> | null = null;
+  /** Steps running now, outermost first; after an error the failed ones stay. */
+  private readonly running: string[] = [];
 
   constructor (ctx: Context, actuators: Actuators, sensors: Sensors, communication: Communication, calibration: Calibration, navigation: Navigation) {
     this.ctx         = ctx;
@@ -148,12 +150,27 @@ export class Lifecycle {
   }
 
   /**
+   * One step: `<name>.in`, `fn`, `<name>.out`. Steps nest, e.g. a roll runs
+   * a rollToPoint. An error passes through untouched and leaves the step
+   * in `running`, for `fail` to name.
+   */
+  async run<T> (name: string, fn: () => Promise<T>): Promise<T> {
+    this.running.push(name);
+    this.ctx.log('info', `${name}.in`);
+    const result = await fn();
+    this.running.pop();
+    this.ctx.log('info', `${name}.out`);
+    return result;
+  }
+
+  /**
    * The end after an error: nothing is recovered, the page is reloaded. The
    * app calls it once per connected Bolt on its first error. Aborts every
    * running step and cuts the motors, not awaited: the link may be gone.
    */
   fail (error: unknown): void {
-    this.ctx.log('fatal', `${String(error)}, reload the page`);
+    const during = this.running.length ? ` during ${this.running.join(' > ')}` : '';
+    this.ctx.log('fatal', `${String(error)}${during}, reload the page`);
     this.ctx.abortMotion();
     void this.actuators.motor.off();
     this.ctx.status.ready = false;

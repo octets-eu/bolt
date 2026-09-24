@@ -63,8 +63,6 @@ export async function reach (ctx: Context, actuators: Actuators, sensors: Sensor
   const cmPerSec      = 10;
   const chargeBudgetMs = 6000;
 
-  ctx.log('info', 'reach.in');
-
   const s = ctx.motion;
   const release = await sensors.motion.subscribe(null);
   await actuators.motor.stabilize(StabilizationIndex.full);
@@ -149,6 +147,6 @@ export async function reach (ctx: Context, actuators: Actuators, sensors: Sensor
   await release();
 
   const at = reason === 'blocked' && lastContact ? lastContact : here();
-  ctx.log('info', `reach.out: ${reason} at ${Math.round(at.x)},${Math.round(at.y)}, ${contacts} contacts, ${charges} charges`);
+  ctx.log('info', `reach: ${reason} at ${Math.round(at.x)},${Math.round(at.y)}, ${contacts} contacts, ${charges} charges`);
   return { reason, at, contacts, charges };
 }

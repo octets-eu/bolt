@@ -17,7 +17,9 @@
     "esModuleInterop": true,
     "isolatedModules": true,
     "skipLibCheck": true,
-    "noEmit": true
+    "rootDir": "src",
+    "outDir": "dist",
+    "sourceMap": true
   },
   "include": ["src"]
 }

@@ -20,6 +20,8 @@ export interface Context {
   /** Abort every running motion step and arm a fresh signal. */
   abortMotion (): void;
   log (type: LogType, subtype: string, data?: unknown): void;
+  /** Run `fn` as the step `name`, see Lifecycle.run and the `log` decorator. */
+  run<T> (name: string, fn: () => Promise<T>): Promise<T>;
   /**
    * Visible state changed; a UI may redraw. Every finished command and every
    * notification fires it already, so a status write that follows an ack or
