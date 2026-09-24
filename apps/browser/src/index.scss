@@ -78,6 +78,15 @@ pre, div {
 
 /* app specific */
 
+/* the page is the window: a view fills the section below menu and header */
+div.layout { height: 100vh; display: flex; flex-direction: column; }
+div.layout > section { flex: 1 1 auto; min-height: 0; overflow: auto; display: flex; flex-direction: column; }
+
+/* Bolts view: plotter and logger take all the height below their labels */
+div.panels.fill { flex: 1 1 auto; min-height: 0; }
+div.panels.fill > div.panel { display: flex; flex-direction: column; min-height: 0; }
+div.panels.fill > div.panel > :last-child { flex: 1 1 0; min-height: 0; }
+
 .f7        { font-size: 0.7rem; }
 
 .dn        {display: none !important;}

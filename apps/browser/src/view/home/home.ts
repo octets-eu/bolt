@@ -1,7 +1,6 @@
 import m from "mithril";
 
 import { Plotter }     from '../../components/plotter/plotter';
-import { Panel }     from '../../components/panel';
 import Factory      from '../../components/factory';
 
 import { Bolts }  from '../../bolts';
@@ -19,19 +18,16 @@ const Home = Factory.create('Home', {
     return m('[', [
       m('div.bolts.w-100', Bolts.map( (bolt: Bolt) => m(BoltCommands, { bolt }) )),
 
-      m('div.panels.w-100.bg-eee.f6.flex.flex-row', {}, [
-
-        m(Panel, {title: 'Plotter', flex: '0 0 512px'},
-          m(Plotter, {size: 512} )
-        ),
-        m(Panel, {title: 'Logger', flex: '1 1 600px' }, [
+      m('div.panels.fill.w-100.bg-eee.f6.flex.flex-row', [
+        m('div.panel', { style: { flex: '1 1 0', minWidth: 0 } }, [
+          m('div.pa1.ceee.sans-serif.bg-999', 'Plotter'),
+          m(Plotter),
+        ]),
+        // the label toggles the logger between all columns and the first four
+        m('div.panel', { style: { flex: '0 0 auto', maxWidth: '900px' } }, [
+          m('div.pa1.ceee.sans-serif.pointer.bg-999', { onclick: () => Logger.toggleWide() }, 'Logger'),
           m(Logger),
         ]),
-        // m(Panel, {title: 'Meta', width: '164px'}, [
-        //   m('pre.plotterstatus.f7.mono.c333.pa2', { style },
-        //   JSON.stringify(Plotter.meta(), null, 2))
-        // ]),
-
       ]),
     ]);
 

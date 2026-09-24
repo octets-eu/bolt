@@ -1,6 +1,14 @@
 
 div.logger {
 
+  // narrow: long names end in an ellipsis instead of widening the column
+  &.narrow td.subtype {
+    max-width: 32ch;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
   table {
 
     font-family: monospace;

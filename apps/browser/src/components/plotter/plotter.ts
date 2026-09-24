@@ -10,14 +10,16 @@ let marker = [] as any;
 let bolts  = {} as any;
 let rolling = false;
 
-const size = 512;
+// the canvas in CSS pixels, from its host's size; drawn in device pixels
+let width  = 512;
+let height = 512;
+let dpr    = 1;
 
 // The plotter owns one canvas for the life of the page. Views only host it,
 // so the drawing survives route changes and no view ever holds a stale one.
 const cvs = document.createElement('canvas');
 cvs.className = 'plotter bg-white';
-cvs.width  = size;
-cvs.height = size;
+cvs.style.position = 'absolute';
 cvs.addEventListener('click', (e) => Plotter.onClick(e));
 const ctx = cvs.getContext('2d') as CanvasRenderingContext2D;
 
@@ -30,7 +32,7 @@ function initMeta () {
     max:      0,         min:    +Infinity,
     maxx:     0,         maxy:    0,
     miny:    +Infinity,  minx:   +Infinity,
-    scale:    1,         transX:  size/2,          transY: size/2,
+    scale:    1,         transX:  width/2,         transY: height/2,
     axismax:  200,
   });
 }
@@ -74,12 +76,29 @@ const Plotter = Factory.create('Plotter', {
 
   meta () { return meta },
 
+  /** The canvas fills its host and follows every change of the host's size. */
   oncreate ( vnode: any ) {
     vnode.dom.appendChild(cvs);
+    vnode.state.resize = new ResizeObserver(([entry]) => {
+      if (!entry) return;
+      width  = Math.floor(entry.contentRect.width);
+      height = Math.floor(entry.contentRect.height);
+      dpr    = window.devicePixelRatio || 1;
+      cvs.width  = Math.round(width * dpr);
+      cvs.height = Math.round(height * dpr);
+      cvs.style.width  = `${width}px`;
+      cvs.style.height = `${height}px`;
+      Plotter.render();
+    });
+    vnode.state.resize.observe(vnode.dom);
+  },
+
+  onremove ( vnode: any ) {
+    vnode.state.resize.disconnect();
   },
 
   view () {
-    return m('div.plotter-host');
+    return m('div.plotter-host', { style: { position: 'relative', overflow: 'hidden' } });
   },
 
   onClick (event: MouseEvent) {
@@ -290,9 +309,9 @@ const Plotter = Factory.create('Plotter', {
 
       meta.axismax = Math.max(Math.hypot(meta.minx, meta.miny), Math.hypot(meta.maxx, meta.maxy));
 
-      meta.scale  = size / (meta.max - meta.min) / 1.05 / 2;
-      meta.transX = (size/2 - meta.cx * meta.scale );
-      meta.transY = (size/2 - meta.cy * meta.scale );
+      meta.scale  = Math.min(width, height) / (meta.max - meta.min) / 1.05 / 2;
+      meta.transX = (width/2  - meta.cx * meta.scale );
+      meta.transY = (height/2 - meta.cy * meta.scale );
 
     }
 
@@ -316,9 +335,9 @@ const Plotter = Factory.create('Plotter', {
 
     const t0 = Date.now();
 
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.fillStyle = '#ddd';
-    ctx.fillRect(0, 0, size, size);
+    ctx.fillRect(0, 0, width, height);
 
     ctx.translate(meta.transX, meta.transY);
     ctx.scale(meta.scale, meta.scale);

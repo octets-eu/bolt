@@ -23,38 +23,45 @@ function reduceSensorData (data: any): string {
 
 const cell = (cls: string, v: any) => m('td' + cls, v === undefined || v === null || v === '' ? ' ' : v);
 
+/** All nine columns, or only T, Bolt, Type and Name; toggled by the Logger label, wide after every reload. */
+let wide = true;
+const NARROW = 4;
+
+/** A cell over the remaining `span` columns, or one column when narrow. */
+const rest = (cls: string, span: number, v: any) => m('td' + cls, { colspan: wide ? span : 1 }, v);
+
 const formatter = {
-  'action': ({ t, bolt, type, subtype, data }: ILogline) => m('tr', { className: [bolt, type, subtype].join(' ') }, [
+  'action': ({ t, bolt, subtype, data }: ILogline) => [
     cell('.timestamp', time(t)), cell('.bolt', bolt), cell('.type', 'Action'), cell('.subtype', subtype),
     cell('.id', data.id), cell('.device', data.device), cell('.command', data.command), cell('.target', data.target || ' '),
     cell('.payload', (data.payload || []).join(' ')),
-  ]),
-  'event': ({ t, bolt, type, subtype, data }: ILogline) => m('tr', { className: [bolt, type, subtype].join(' ') }, [
+  ],
+  'event': ({ t, bolt, subtype, data }: ILogline) => [
     cell('.timestamp', time(t)), cell('.bolt', bolt), cell('.type', 'Event'), cell('.subtype', subtype),
     cell('.id', data?.msg?.id), cell('.device', data?.msg?.device), cell('.command', data?.msg?.command), cell('.target', data?.msg?.target),
     cell('.payload', data?.msg?.payload ? data.msg.payload.join(' ') : (typeof data === 'string' ? data : JSON.stringify(data?.sensordata ?? data ?? ''))),
-  ]),
-  'key': ({ t, bolt, type, subtype }: ILogline) => m('tr', { className: [bolt, type, subtype].join(' ') }, [
-    cell('.timestamp', time(t)), cell('.bolt', bolt), cell('.type', 'Key'), m('td.subtype', { colspan: 6 }, subtype),
-  ]),
-  'sensor': ({ t, bolt, type, subtype, data }: ILogline) => m('tr', { className: [bolt, type, subtype].join(' ') }, [
+  ],
+  'key': ({ t, bolt, subtype }: ILogline) => [
+    cell('.timestamp', time(t)), cell('.bolt', bolt), cell('.type', 'Key'), rest('.subtype', 6, subtype),
+  ],
+  'sensor': ({ t, bolt, subtype, data }: ILogline) => [
     cell('.timestamp', time(t)), cell('.bolt', bolt), cell('.type', 'Sensor'), cell('.subtype', subtype),
-    m('td.sensor', { colspan: 5 }, reduceSensorData(data?.sensordata)),
-  ]),
-  'info': ({ t, bolt, type, subtype }: ILogline) => m('tr', { className: [bolt, type, subtype].join(' ') }, [
-    cell('.timestamp', time(t)), cell('.bolt', bolt), cell('.type', 'Info'), m('td.subtype', { colspan: 6 }, subtype),
-  ]),
-  'warn': ({ t, bolt, type, subtype }: ILogline) => m('tr', { className: [bolt, type, subtype].join(' ') }, [
-    cell('.timestamp', time(t)), cell('.bolt', bolt), cell('.type', 'Warn'), m('td.subtype', { colspan: 6 }, subtype),
-  ]),
-  'fatal': ({ t, bolt, type, subtype }: ILogline) => m('tr', { className: [bolt, type, subtype].join(' ') }, [
-    cell('.timestamp', time(t)), cell('.bolt', bolt), cell('.type', 'Fatal'), m('td.subtype', { colspan: 6 }, subtype),
-  ]),
-  'camera': ({ t, bolt, type, subtype, data }: ILogline) => m('tr', { className: [bolt, type, subtype].join(' ') }, [
+    rest('.sensor', 5, reduceSensorData(data?.sensordata)),
+  ],
+  'info': ({ t, bolt, subtype }: ILogline) => [
+    cell('.timestamp', time(t)), cell('.bolt', bolt), cell('.type', 'Info'), rest('.subtype', 6, subtype),
+  ],
+  'warn': ({ t, bolt, subtype }: ILogline) => [
+    cell('.timestamp', time(t)), cell('.bolt', bolt), cell('.type', 'Warn'), rest('.subtype', 6, subtype),
+  ],
+  'fatal': ({ t, bolt, subtype }: ILogline) => [
+    cell('.timestamp', time(t)), cell('.bolt', bolt), cell('.type', 'Fatal'), rest('.subtype', 6, subtype),
+  ],
+  'camera': ({ t, bolt, subtype, data }: ILogline) => [
     cell('.timestamp', time(t)), cell('.bolt', bolt), cell('.type', 'Camera'), cell('.subtype', subtype),
-    m('td.sensor', { colspan: 5 }, `x:${data.x.toFixed(1)}, y:${data.y.toFixed(1)}${data.heading !== undefined ? `, h:${Math.round(data.heading)}` : ''}`),
-  ]),
-} as { [key: string]: (line: ILogline) => m.Vnode };
+    rest('.sensor', 5, `x:${data.x.toFixed(1)}, y:${data.y.toFixed(1)}${data.heading !== undefined ? `, h:${Math.round(data.heading)}` : ''}`),
+  ],
+} as { [key: string]: (line: ILogline) => m.Vnode[] };
 
 export interface ILogline {
   /** session-relative ms */
@@ -117,15 +124,23 @@ const Logger = Factory.create('Logger', {
     Logger.info(this, 'Reset');
   },
 
+  toggleWide () {
+    wide = !wide;
+  },
+
   view () {
-    const style = { height: '512px', overflowY: 'scroll' };
-    return m('div.logger', { style },
+    const head = [
+      m('td', 'T'), m('td', 'Bolt'), m('td', 'Type'), m('td', 'Name'),
+      m('td.tr', 'ID'), m('td.tr', 'D'), m('td.tr', 'C'), m('td.tr', 'T'), m('td.tr', 'Payload'),
+    ];
+    const row = (line: ILogline) => {
+      const cells = (formatter[line.type] ?? formatter.event!)(line);
+      return m('tr', { className: [line.bolt, line.type, line.subtype].join(' ') }, wide ? cells : cells.slice(0, NARROW));
+    };
+    return m('div.logger' + (wide ? '' : '.narrow'), { style: { overflowY: 'scroll' } },
       m('table', [
-        m('thead', m('tr', [
-          m('td', 'T'), m('td', 'Bolt'), m('td', 'Type'), m('td', 'Name'),
-          m('td.tr', 'ID'), m('td.tr', 'D'), m('td.tr', 'C'), m('td.tr', 'T'), m('td.tr', 'Payload'),
-        ])),
-        m('tbody', {}, log.slice(0, 2000).map((line: ILogline) => (formatter[line.type] ?? formatter.event!)(line))),
+        m('thead', m('tr', wide ? head : head.slice(0, NARROW))),
+        m('tbody', {}, log.slice(0, 2000).map(row)),
       ])
     );
   },
