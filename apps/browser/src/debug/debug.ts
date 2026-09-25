@@ -2,6 +2,7 @@ import { Logger } from '../components/logger/logger';
 import { tracker, MAT_BEARING, MAT_CORNERS } from '../tracking/tracker';
 import { Bolts } from '../bolts';
 import { Bolt } from '@bolt/core';
+import { tiltStep } from './tiltstep';
 
 /**
  * Camera-based helpers for experiments and debugging only. They live here,
@@ -128,4 +129,4 @@ export async function gotoMatCenter (tol = 4, name?: string): Promise<{ ok: bool
   return { ok: true, at, heading: across, reason: 'done', log: r.log };
 }
 
-export const Debug = { position, drive, calibrateHeading, goTo, gotoMatCenter, matCenter, headingForY: () => tracker.headingForY };
+export const Debug = { position, drive, calibrateHeading, goTo, gotoMatCenter, matCenter, headingForY: () => tracker.headingForY, tiltStep };
