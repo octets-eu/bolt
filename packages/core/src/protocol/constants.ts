@@ -158,6 +158,9 @@ export const FrameRotation = {
 export type FrameRotation = (typeof FrameRotation)[keyof typeof FrameRotation];
 
 export const RawMotorMode = { off: 0, forward: 1, reverse: 2, brake: 3, ignore: 4 } as const;
+
+/** Flags byte of driveWithHeading. `backward` as spherov2 names bit 0; checked by tiltStep's reverse brake. */
+export const DriveFlag = { backward: 0x01 } as const;
 export type RawMotorMode = (typeof RawMotorMode)[keyof typeof RawMotorMode];
 
 export const BatteryState = { unknown: 0, ok: 1, low: 2, critical: 3 } as const;

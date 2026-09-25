@@ -11,6 +11,8 @@ import { findColorBlobs, glowIn, classOf, IBlob, TColorClass, IRegion } from './
 import { changes, hasReference, setReference } from './changes';
 
 const KEY = 'bolt.camera.calibration';
+/** Each Bolt's marker from calibrateMarker, kept across reloads. */
+const MARKER_KEY = 'bolt.camera.marker';
 /** analysis size for the mat detector; blobs are found at full resolution */
 const W = 480, H = 270;
 /**
@@ -21,12 +23,17 @@ const W = 480, H = 270;
  */
 export const MARKER_LEVEL = 100;
 /**
- * Levels a sweep tries when a Bolt's glow is missing. The right one follows
- * the camera's exposure, which follows the room: on 2026-09-23 it was 100 in
- * daylight, 12 at dusk and 200 under the lamp.
+ * Levels calibrateMarker tries. The right one follows the camera's exposure,
+ * which follows the room: on 2026-09-23 it was 100 in daylight, 12 at dusk
+ * and 200 under the lamp.
  */
 const MARKER_LEVELS = [12, 20, 35, 60, 100, 150, 200, 240];
-/** Glow missing this long before a sweep, at least this long between sweeps of one Bolt, and the wait per level for the camera. */
+/** The matrix colour of each class, scaled by the level. */
+const CLASS_RGB: { [c in TColorClass]: [number, number, number] } = { red: [1, 0, 0], green: [0, 1, 0], blue: [0, 0, 1] };
+/**
+ * Glow missing this long before its level is tested again, at least this long
+ * between two tests of one Bolt, and the wait per lit or dark matrix for the camera.
+ */
 const LOST_MS = 2000, SWEEP_PAUSE_MS = 30000, LEVEL_WAIT_MS = 700;
 /** The name the tracker holds the matrix under, see `Actuators.holdMatrix`. */
 export const MATRIX_OWNER = 'tracker';
@@ -97,6 +104,25 @@ export interface ITrack {
 }
 
 /**
+ * The spot where the most pixels changed between two frames by more than a
+ * summed 80 of 3 x 255: the densest 16 px cell's centre. Null when nothing did.
+ */
+function changedSpot (before: Uint8ClampedArray, after: Uint8ClampedArray, W: number, region: IRegion): { cx: number, cy: number } | null {
+  const cells = new Map<number, number>();
+  for (let y = region.y0; y < region.y1; y++) for (let x = region.x0; x < region.x1; x++) {
+    const i = (y * W + x) * 4;
+    const d = Math.abs((after[i] ?? 0) - (before[i] ?? 0)) + Math.abs((after[i + 1] ?? 0) - (before[i + 1] ?? 0)) + Math.abs((after[i + 2] ?? 0) - (before[i + 2] ?? 0));
+    if (d <= 80) continue;
+    const k = (y >> 4) * 65536 + (x >> 4);
+    cells.set(k, (cells.get(k) ?? 0) + 1);
+  }
+  let best = -1, n = 0;
+  for (const [k, v] of cells) if (v > n) { n = v; best = k; }
+  if (best < 0) return null;
+  return { cx: (best % 65536) * 16 + 8, cy: Math.floor(best / 65536) * 16 + 8 };
+}
+
+/**
  * Finds Bolts in the camera frame and keeps their positions. With a reference
  * frame of the empty scene a ball is a changed region of a ball's size and
  * shape, and its matrix colour says whose it is; without one, a Bolt is the
@@ -138,6 +164,7 @@ class Tracker {
     try {
       const saved = localStorage.getItem(KEY);
       this.setCalibration(saved ? JSON.parse(saved) : { points: MAT_POINTS, targets: MAT_CORNERS });
+      this.marker = JSON.parse(localStorage.getItem(MARKER_KEY) ?? '{}');
     } catch { /* none */ }
     camera.onChange((c) => {
       if (c.state === 'connected') this.start();
@@ -254,8 +281,10 @@ class Tracker {
   private lighting = new Set<string>();
   /** Bolts seen ready since their marker was last lit; the reset after a wake clears the matrix, so each new reset lights it again. */
   private readySeen = new Set<string>();
-  /** Marker level per Bolt, found by a sweep; MARKER_LEVEL until then. */
-  public markerLevel: { [bolt: string]: number } = {};
+  /** Marker per Bolt from calibrateMarker, see markerOf. */
+  public marker: { [bolt: string]: { cls: TColorClass, level: number } } = {};
+  /** While a calibration lights and darkens a matrix, frames are not tracked. */
+  private calibrating = false;
   /** Session time of the last frame with a glow, and of the last sweep, per Bolt. */
   private seenAt: { [bolt: string]: number } = {};
   private sweptAt: { [bolt: string]: number } = {};
@@ -275,7 +304,7 @@ class Tracker {
     this.lighting.add(b.name);
     try {
       b.actuators.matrix.hold(MATRIX_OWNER);
-      await this.write(b, this.markerLevel[b.name] ?? MARKER_LEVEL);
+      await this.write(b, this.markerOf(b.name).level);
     } catch (error) {
       // a dark matrix must not stay held: give it back so the next frame tries again
       b.actuators.matrix.release(MATRIX_OWNER);
@@ -283,36 +312,64 @@ class Tracker {
     } finally { this.lighting.delete(b.name); }
   }
 
-  /** The whole matrix in the Bolt's colour, scaled so the brightest channel is `level`. */
-  private async write (b: Bolt, level: number): Promise<void> {
-    const [r = 0, g = 0, bl = 0] = Bolts.configFor(b.name).colors.matrix;
-    const k = level / Math.max(r, g, bl, 1);
-    await b.actuators.matrix.color([Math.round(r * k), Math.round(g * k), Math.round(bl * k)], MATRIX_OWNER);
+  /** A Bolt's marker: calibrated, or its configured colour at MARKER_LEVEL. */
+  markerOf (name: string): { cls: TColorClass, level: number } {
+    return this.marker[name] ?? { cls: classOf(Bolts.configFor(name).colors.matrix), level: MARKER_LEVEL };
+  }
+
+  /** The whole matrix in a class's colour at `level`. */
+  private async write (b: Bolt, level: number, cls = this.markerOf(b.name).cls): Promise<void> {
+    const [r, g, bl] = CLASS_RGB[cls];
+    await b.actuators.matrix.color([r * level, g * level, bl * level], MATRIX_OWNER);
   }
 
   /**
-   * Find the marker level the camera sees best: light each of MARKER_LEVELS,
-   * give the camera a few frames, keep the level with the biggest glow of the
-   * Bolt's colour in view. Keeps the old level when none shows.
+   * The marker the camera separates best from everything else in view. For
+   * each class (default: those no other connected Bolt's marker uses) and
+   * each of MARKER_LEVELS: a dark frame, then a lit one; what changed between
+   * them, around its densest spot, is the glow. A candidate scores the pixels
+   * the detector finds there (hits) against those it finds elsewhere in the
+   * lit frame (false alarms): fewest false alarms, then most hits. On
+   * 2026-09-25 under the lamp green showed as cyan (hue 182) inside the mat's
+   * hue range, red at 30 as hue 341, apart from it. Stored across reloads.
    */
-  private async sweep (b: Bolt): Promise<void> {
+  async calibrateMarker (b: Bolt, classes?: TColorClass[]): Promise<void> {
     if (this.sweeping.has(b.name)) return;
     this.sweeping.add(b.name);
     this.sweptAt[b.name] = session.now();
-    try {
-      const cls = classOf(Bolts.configFor(b.name).colors.matrix);
-      const glow = (): number => Math.max(0, ...this.blobs.filter(x => x.cls === cls).map(x => x.n), ...this.balls.map(x => x.glow[cls]));
-      let best = { level: this.markerLevel[b.name] ?? MARKER_LEVEL, n: 0 };
-      for (const level of MARKER_LEVELS) {
-        await this.write(b, level);
-        await new Promise(r => setTimeout(r, LEVEL_WAIT_MS));
-        const n = glow();
-        if (n > best.n) best = { level, n };
-      }
-      this.markerLevel[b.name] = best.level;
-      await this.write(b, best.level);
-      Logger.info({ name: 'Tracker' }, `marker level ${best.level} for ${b.name}: glow ${best.n} px`);
-    } finally { this.sweeping.delete(b.name); }
+    this.calibrating = true;
+    const taken = (Bolts.map((x: Bolt) => x) as Bolt[]).filter(x => x !== b && x.connected).map(x => this.markerOf(x.name).cls);
+    const candidates = classes ?? (Object.keys(CLASS_RGB) as TColorClass[]).filter(c => !taken.includes(c));
+    const wait = () => new Promise(r => setTimeout(r, LEVEL_WAIT_MS));
+    const grab = () => { const f = this.grabFull(); return f && { ...f, data: new Uint8ClampedArray(f.data) }; };
+    b.actuators.matrix.hold(MATRIX_OWNER);
+    let best: { cls: TColorClass, level: number, hits: number, falses: number } | null = null;
+    for (const cls of candidates) for (const level of MARKER_LEVELS) {
+      await b.actuators.matrix.color([0, 0, 0], MATRIX_OWNER);
+      await wait();
+      const dark = grab();
+      await this.write(b, level, cls);
+      await wait();
+      const lit = grab();
+      if (!dark || !lit) continue;
+      const glow = changedSpot(dark.data, lit.data, lit.width, lit.region);
+      if (!glow) continue;
+      const r = Math.max(20, this.pxPerCm([glow.cx, glow.cy]) * BALL_CM);
+      const found = findColorBlobs(lit.data, lit.width, lit.region, [cls]);
+      const hits = found.filter(x => Math.hypot(x.cx - glow.cx, x.cy - glow.cy) <= r).reduce((n, x) => n + x.n, 0);
+      const falses = found.filter(x => Math.hypot(x.cx - glow.cx, x.cy - glow.cy) > r).reduce((n, x) => n + x.n, 0);
+      if (hits > 0 && (!best || falses < best.falses || (falses === best.falses && hits > best.hits))) best = { cls, level, hits, falses };
+    }
+    if (best) {
+      this.marker[b.name] = { cls: best.cls, level: best.level };
+      localStorage.setItem(MARKER_KEY, JSON.stringify(this.marker));
+    }
+    await this.write(b, this.markerOf(b.name).level);
+    this.calibrating = false;
+    this.sweeping.delete(b.name);
+    Logger.info({ name: 'Tracker' }, best
+      ? `marker ${b.name}: ${best.cls} ${best.level}, ${best.hits} px, ${best.falses} px elsewhere`
+      : `marker ${b.name}: no candidate seen, kept ${this.markerOf(b.name).cls} ${this.markerOf(b.name).level}`);
   }
 
   /** Give the matrix back and show the resting pattern. */
@@ -356,6 +413,7 @@ class Tracker {
 
   /** One frame: one glow per Bolt with a known matrix colour, floor point, position to the log, heading from motion. */
   private step () {
+    if (this.calibrating) return;
     // the hold heals itself: a reconnect after a page reload comes up with a free matrix and the resting pattern,
     // and a Bolt that just completed its reset gets its marker written again
     for (const b of Bolts.map((x: Bolt) => x)) {
@@ -374,7 +432,7 @@ class Tracker {
     if (!frame) return;
     this.frames++;
     const bolts = Bolts.map((b: { name: string }) => b.name) as string[];
-    const classes = Array.from(new Set<TColorClass>(bolts.map(n => classOf(Bolts.configFor(n).colors.matrix))));
+    const classes = Array.from(new Set<TColorClass>(bolts.map(n => this.markerOf(n).cls)));
     const found = hasReference() && this.homography ? changes(frame.image) : null;
     const { region } = frame;
     // a changed region counts as a ball where it has a ball's size and shape at that point of the frame
@@ -390,7 +448,7 @@ class Tracker {
     this.blobs = balls ? [] : findColorBlobs(frame.data, frame.width, frame.region, classes).filter(b => !cal || rightOfMat([b.cx, b.cy], cal) <= RIGHT_MARGIN);
     const t = session.now();
     for (const name of bolts) {
-      const cls = classOf(Bolts.configFor(name).colors.matrix);
+      const cls = this.markerOf(name).cls;
       // a ball's matrix colour says whose it is, and a lone Bolt takes any; as a glow it stands where the matrix
       // shows, 0.45 r above the centre (2026-09-23), so the floor point below comes out as before
       const lit = balls?.filter(b => b.glow[cls] > 0) ?? [];
@@ -401,13 +459,13 @@ class Tracker {
       const last = this.tracks[name]?.glow;
       const near = last ? candidates.filter(b => Math.hypot(b.cx - last.cx, b.cy - last.cy) < 80).sort((a, b) => Math.hypot(a.cx - last.cx, a.cy - last.cy) - Math.hypot(b.cx - last.cx, b.cy - last.cy))[0] : undefined;
       const glow = near || candidates[0];
-      // a glow missing for a while, from a Bolt whose marker the tracker holds, starts a sweep for the level
+      // a glow missing for a while, from a Bolt whose marker the tracker holds, tests the levels of its colour again
       this.seenAt[name] ??= t;
       if (glow) this.seenAt[name] = t;
       const bolt = Bolts.find((x: Bolt) => x.name === name);
       if (!glow && bolt?.connected && bolt.status.ready && bolt.status.matrix.owner === MATRIX_OWNER
         && t - (this.seenAt[name] ?? t) > LOST_MS && t - (this.sweptAt[name] ?? -Infinity) > SWEEP_PAUSE_MS) {
-        void this.sweep(bolt);
+        void this.calibrateMarker(bolt, [this.markerOf(name).cls]);
       }
       if (!glow) {
         delete this.tracks[name];

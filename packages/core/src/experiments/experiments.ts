@@ -2,7 +2,8 @@ import type { Actuators } from '../actuators/actuators';
 import type { Context } from '../context';
 import type { Navigation } from '../navigation/navigation';
 import type { Sensors } from '../sensors/sensors';
-import { range, wait } from '../helpers/utils';
+import { range, wait, whenAborted } from '../helpers/utils';
+import { DriveFlag, RawMotorMode, StabilizationIndex } from '../protocol/constants';
 
 /**
  * Experiments: functions under test, a work log in code, run from the
@@ -143,6 +144,61 @@ export class Experiments {
     const best = rows.reduce<typeof rows[number] | null>((m, r) => !m || r.amplitude > m.amplitude ? r : m, null);
     if (best) this.ctx.log('info', `sweep ${hz} Hz: best heading ${best.heading} with ${best.amplitude} lux`);
     return { best, rows };
+  }
+
+  /**
+   * The drive's own limits, read later from the pitch: `runs` steps from rest
+   * at `speed` for `stepMs`, each ended by a brake (roll 0), alternating
+   * heading 0 and 180 so the ball swings about its start. Aim first, heading
+   * 0 along a free line. Only drives and marks: the samples and commands land
+   * in the session file between `tiltStep n: step` and `tiltStep n: brake`,
+   * where the evaluation finds tilt, its rise, the braking and the latency.
+   * `brake`: roll0 lets the firmware ramp down; reverse drives backward on
+   * the same heading at `brakeSpeed` until the ball is slow, then roll 0;
+   * rawBrake short-circuits the motors until still.
+   */
+  async tiltStep (runs = 10, speed = 150, stepMs = 400, brake: 'roll0' | 'reverse' | 'rawBrake' = 'roll0', brakeSpeed = 150): Promise<void> {
+    const s = this.ctx.motion;
+    const motor = this.actuators.motor;
+    const release = await this.sensors.motion.subscribe(null);
+    await motor.stabilize(StabilizationIndex.full);
+    this.ctx.log('info', `tiltStep: ${runs} runs at ${speed} for ${stepMs} ms, brake ${brake}${brake === 'reverse' ? ` ${brakeSpeed}` : ''}`);
+    for (let i = 1; i <= runs && !s.aborted; i++) {
+      const heading = i % 2 ? 0 : 180;
+      await motor.roll(0, heading);  // turn in place, then settle
+      await wait(300);
+      await this.navigation.waitForStill(s);
+      if (s.aborted) break;
+      this.ctx.log('info', `tiltStep ${i}: step heading ${heading}`);
+      await motor.roll(speed, heading);
+      await Promise.race([wait(stepMs), whenAborted(s)]);
+      this.ctx.log('info', `tiltStep ${i}: brake`);
+      if (brake === 'reverse') {
+        // until the speed along the way it was going is gone; the carriage's swing
+        // makes the plain speed jump, which ended the first tries after ~100 ms
+        const { x: ux, y: uy } = this.ctx.status.velocity;
+        const norm = Math.hypot(ux, uy) || 1;
+        await motor.roll(brakeSpeed, heading, DriveFlag.backward);
+        const t0 = this.ctx.now();
+        while (!s.aborted && this.ctx.now() - t0 < 2000) {
+          await wait(20);
+          const { x, y } = this.ctx.status.velocity;
+          if ((x * ux + y * uy) / norm < 3) break;
+        }
+        this.ctx.log('info', `tiltStep ${i}: brake end`);
+        await motor.stop();
+      } else if (brake === 'rawBrake') {
+        await motor.raw(RawMotorMode.brake, 0, RawMotorMode.brake, 0);
+      } else {
+        await motor.stop();
+      }
+      await wait(300);
+      await this.navigation.waitForStill(s);
+      if (brake === 'rawBrake') await motor.stop();  // back under the drive's control
+    }
+    await motor.stabilize(StabilizationIndex.none);
+    await release();
+    this.ctx.log('info', 'tiltStep: done');
   }
 
   /** `times` random points on a circle of `radius` around the locator origin, by rollToPoint. */

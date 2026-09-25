@@ -5,6 +5,8 @@ import { tracker, MAT_CORNERS } from '../../tracking/tracker';
 import { TPoint } from '../../tracking/homography';
 import { Logger } from '../../components/logger/logger';
 import { gotoMatCenter } from '../../debug/debug';
+import { Bolts } from '../../bolts';
+import { Bolt } from '@bolt/core';
 
 let clicks: TPoint[] = [];
 let targets: TPoint[] = MAT_CORNERS.map(p => [...p] as TPoint);
@@ -102,6 +104,9 @@ const CameraView = Factory.create('Camera', {
         m('select.cmd.br2.ml1', { onchange: (e: Event) => { tr.fps = Number((e.target as HTMLSelectElement).value); } }, [2, 6, 10, 15].map(f => m('option', { value: f, selected: f === tr.fps }, `${f} fps`))),
         m('span.mono.f6.cfff.ml2', tr.running ? `${tr.frames} frames · ${tr.lastFrameMs} ms · ${tr.balls.length} balls · ${tr.blobs.length} blobs` : 'stopped'),
         m('button.cmd.br2.ml1', { disabled: !tr.running, title: 'With the ball out of view: keep the empty scene, a ball is then what differs from it', onclick: () => tr.reference() }, 'Reference'),
+        m('button.cmd.br2.ml1', { disabled: !tr.running, title: 'Marker: try every colour and level on each ready Bolt, keep the one the camera separates best (about 40 s per Bolt, stored)', onclick: async () => {
+          for (const b of (Bolts.map((x: Bolt) => x) as Bolt[]).filter(x => x.connected && x.status.ready)) await tr.calibrateMarker(b);
+        } }, 'Marker'),
         m('span.mono.f6.cfff.ml4', 'Calibrate'),
         m('button.cmd.br2.ml1', { onclick: () => tr.calibrateFromMat() }, 'From mat'),
         m('button.cmd.br2.ml1', { disabled: clicks.length !== 4, onclick: () => {
