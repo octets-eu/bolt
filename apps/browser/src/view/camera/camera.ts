@@ -112,6 +112,11 @@ const CameraView = Factory.create('Camera', {
         m('span.mono.f6.cfff.ml2', tr.running ? `${tr.frames} frames · ${tr.lastFrameMs} ms · ${tr.balls.length} balls · ${tr.blobs.length} blobs` : 'stopped'),
         m('button.cmd.br2.ml1', { disabled: !tr.running, title: 'With the ball out of view: keep the empty scene, a ball is then what differs from it', onclick: () => tr.reference() }, 'Reference'),
         m('button.cmd.br2.ml1', { disabled: !tr.running, title: 'Pads: find the six paper pads on the floor, keep them and calibrate from them (stored)', onclick: () => tr.findPads() }, 'Pads'),
+        m('button.cmd.br2.ml1', { disabled: !tr.running, title: 'Ball on pads: start, place the ball on each pad centre for 2 s, then stop; corrects the ball position (stored)', onclick: () => {
+          const b = Bolts.map((x: Bolt) => x).find((x: Bolt) => tr.tracks[x.name]);
+          if (tr.ballWatching) tr.stopBallOnPads();
+          else if (b) tr.watchBallOnPads(b.name);
+        } }, tr.ballWatching ? `Ball: stop (${Object.keys(tr.ballOnPads).length} / 6)` : 'Ball on pads'),
         m('button.cmd.br2.ml1', { disabled: !tr.running, title: 'Marker: try every colour and level on each ready Bolt, keep the one the camera separates best (about 40 s per Bolt, stored)', onclick: async () => {
           for (const b of (Bolts.map((x: Bolt) => x) as Bolt[]).filter(x => x.connected && x.status.ready)) await tr.calibrateMarker(b);
         } }, 'Marker'),

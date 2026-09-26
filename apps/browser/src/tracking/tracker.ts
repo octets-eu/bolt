@@ -14,6 +14,8 @@ import { detectPads, IPad } from './pads';
 const MARKER_KEY = 'bolt.camera.marker';
 /** The floor pads from findPads, kept across reloads; the calibration follows from them. */
 const PADS_KEY = 'bolt.camera.pads';
+/** Where the ball read with it on each pad, kept across reloads; the ball correction follows from them. */
+const BALL_KEY = 'bolt.camera.ballOnPads';
 /**
  * Brightest matrix channel for the marker, of 255, until a sweep finds a
  * better one. Depends on the room light: in daylight 80 to 120 gives the most
@@ -47,6 +49,10 @@ const BALL_CM = 7.3;
  * right, far right, far left.
  */
 export const PAD_GRID: TPoint[] = [[0, 0], [40, 0], [40, 160], [0, 160]];
+/** Every pad's centre in the floor frame, by name; the outer four are PAD_GRID. */
+export const PAD_CENTRES: { [pad: string]: TPoint } = {
+  'near left': [0, 0], 'near right': [40, 0], 'middle left': [0, 80], 'middle right': [40, 80], 'far left': [0, 160], 'far right': [40, 160],
+};
 
 export interface ICalibration {
   /** four points in frame pixels, in the order of `targets` */
@@ -136,6 +142,8 @@ class Tracker {
       this.pads = JSON.parse(localStorage.getItem(PADS_KEY) ?? '[]');
     } catch { /* none */ }
     this.calibrateFromPads();
+    try { this.ballOnPads = JSON.parse(localStorage.getItem(BALL_KEY) ?? '{}'); } catch { /* none */ }
+    this.calibrateBall();
     camera.onChange((c) => {
       if (c.state === 'connected') this.start();
       else this.stop();
@@ -245,6 +253,13 @@ class Tracker {
   private readySeen = new Set<string>();
   /** The floor pads in frame pixels, near to far, see pads.ts. */
   public pads: IPad[] = [];
+  /** Where the tracker read the ball, uncorrected, with it centred on each pad, by pad name; see calibrateBall. */
+  public ballOnPads: { [pad: string]: TPoint } = {};
+  /** Read ball position to true floor position, from ballOnPads; null until the outer four are read. */
+  private ballFix: THomography | null = null;
+  /** Set while watchBallOnPads runs. */
+  private ballWatch = false;
+  get ballWatching (): boolean { return this.ballWatch; }
   /** Marker per Bolt from calibrateMarker, see markerOf. */
   public marker: { [bolt: string]: { cls: TColorClass, level: number } } = {};
   /** While a calibration lights and darkens a matrix, frames are not tracked. */
@@ -274,6 +289,79 @@ class Tracker {
       b.actuators.matrix.release(MATRIX_OWNER);
       throw error;
     } finally { this.lighting.delete(b.name); }
+  }
+
+  /**
+   * The ball correction. The tracker places a ball at its lit matrix, up to
+   * 7 cm above the floor, shifted down by a fixed part of the radius; that
+   * point reads too far from the camera. On 2026-09-26, the ball centred on
+   * the six pads read +3.1 to +3.3 cm in y near, +6.5 to +7.0 in the middle,
+   * +8.9 to +10.4 at the back, x within 1.7 cm. The outer four readings map
+   * onto the pad centres; returns how far the middle two then land from
+   * theirs, or null without the outer four.
+   */
+  calibrateBall (): number | null {
+    const read = PAD_GRID.map(p => Object.entries(PAD_CENTRES).find(([, c]) => c[0] === p[0] && c[1] === p[1])?.[0]).map(n => n ? this.ballOnPads[n] : undefined);
+    if (read.some(r => !r)) {
+      this.ballFix = null;
+      return null;
+    }
+    this.ballFix = computeHomography(read as TPoint[], PAD_GRID);
+    const off = (name: string): number => {
+      const r = this.ballOnPads[name], t = PAD_CENTRES[name];
+      if (!r || !t) return 0;
+      const c = applyHomography(this.ballFix!, r);
+      return Math.hypot(c[0] - t[0], c[1] - t[1]);
+    };
+    return Math.max(off('middle left'), off('middle right'));
+  }
+
+  /** A ball's floor position from its contact point in the frame: calibrated, then corrected for the glow's height. */
+  private ballCm (px: TPoint): TPoint | undefined {
+    const cm = this.toCm(px);
+    return cm && this.ballFix ? applyHomography(this.ballFix, cm) : cm;
+  }
+
+  /**
+   * Record the ball on the pads: while it runs, the last steady reading
+   * (2 s within 1.5 cm) within 25 cm of a pad counts for that pad. Place the
+   * ball on each pad centre in turn, then stopBallOnPads.
+   */
+  watchBallOnPads (name: string): void {
+    if (this.ballWatch) return;
+    this.ballWatch = true;
+    this.ballOnPads = {};
+    let steady: { t: number, cm: TPoint }[] = [], at = '';
+    const look = (): void => {
+      if (!this.ballWatch) return;
+      const track = this.tracks[name], now = Date.now();
+      const cm = track && this.toCm(track.px);
+      if (cm) steady.push({ t: now, cm });
+      steady = steady.filter(s => now - s.t < 2000);
+      if (steady.length >= 8) {
+        const mx = steady.reduce((a, s) => a + s.cm[0], 0) / steady.length, my = steady.reduce((a, s) => a + s.cm[1], 0) / steady.length;
+        if (Math.max(...steady.map(s => Math.hypot(s.cm[0] - mx, s.cm[1] - my))) < 1.5) {
+          for (const [pad, c] of Object.entries(PAD_CENTRES)) {
+            if (Math.hypot(mx - c[0], my - c[1]) > 25) continue;
+            this.ballOnPads[pad] = [Math.round(mx * 10) / 10, Math.round(my * 10) / 10];
+            if (at !== pad) Logger.info({ name: 'Tracker' }, `ball on ${pad}: reads ${mx.toFixed(1)},${my.toFixed(1)}`);
+            at = pad;
+          }
+        }
+      }
+      setTimeout(look, 170);
+    };
+    look();
+  }
+
+  /** End the recording and correct the ball from it. */
+  stopBallOnPads (): void {
+    this.ballWatch = false;
+    localStorage.setItem(BALL_KEY, JSON.stringify(this.ballOnPads));
+    const off = this.calibrateBall();
+    Logger.info({ name: 'Tracker' }, off === null
+      ? `ball on pads: ${Object.keys(this.ballOnPads).length} read, the outer four are needed, no correction`
+      : `ball on pads: corrected, middle pads ${off.toFixed(1)} cm off`);
   }
 
   /** Find the floor pads in the current frame, keep them and calibrate from them; false while there is no frame or OpenCV loads. */
@@ -448,7 +536,7 @@ class Tracker {
       // the glow is the top of the ball; the floor contact is about one radius further down the frame
       const radiusPx = this.pxPerCm([glow.cx, glow.cy]) * BALL_CM / 2;
       const px: TPoint = [glow.cx, glow.cy + radiusPx * 0.9];
-      const cm = this.toCm(px);
+      const cm = this.ballCm(px);
       let heading: number | undefined;
       if (cm) {
         const h = (this.history[name] ||= []);
