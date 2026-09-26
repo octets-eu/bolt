@@ -16,6 +16,11 @@ void (async () => {
   cv = cvModule;
 })();
 
+/** OpenCV for other frame analyses, see pads.ts; null while it loads. */
+export function opencv (): CV | null {
+  return cv;
+}
+
 /**
  * Working resolution, and the difference in the strongest colour channel,
  * of 255, that counts as changed. Tested 2026-09-23 on five frames against

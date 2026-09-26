@@ -6,15 +6,14 @@ import { camera } from '../camera';
 import { Bolts } from '../bolts';
 import { Bolt } from '@bolt/core';
 import { computeHomography, applyHomography, THomography, TPoint } from './homography';
-import { detectMatCorners } from './mat';
 import { findColorBlobs, glowIn, classOf, IBlob, TColorClass, IRegion } from './blobs';
 import { changes, hasReference, setReference } from './changes';
+import { detectPads, IPad } from './pads';
 
-const KEY = 'bolt.camera.calibration';
 /** Each Bolt's marker from calibrateMarker, kept across reloads. */
 const MARKER_KEY = 'bolt.camera.marker';
-/** analysis size for the mat detector; blobs are found at full resolution */
-const W = 480, H = 270;
+/** The floor pads from findPads, kept across reloads; the calibration follows from them. */
+const PADS_KEY = 'bolt.camera.pads';
 /**
  * Brightest matrix channel for the marker, of 255, until a sweep finds a
  * better one. Depends on the room light: in daylight 80 to 120 gives the most
@@ -40,39 +39,14 @@ export const MATRIX_OWNER = 'tracker';
 /** ball diameter in centimetres */
 const BALL_CM = 7.3;
 /**
- * The Bolt runs on the mat and left of it; right of the mat's right edge the
- * floor by the window has glints that pass as a glow (up to 366 px against a
- * ball's 45 to 150, 2026-09-23). Detections further right than this many
- * frame pixels are ignored, about a ball's radius so a glow at the edge stays.
+ * The floor frame: the centres of the outer paper pads, near left P1 at the
+ * origin, x across to P2, y along, away from the camera, in cm. The grid was
+ * measured 80 by 40 cm with a newspaper spread (Die Zeit, 80 x 57 cm) on
+ * 2026-09-26; the middle pads then came out at (0.3, 80.0) and (39.6, 80.2),
+ * every pad's edges at 8.6 to 11.2 cm for 10.5. In the order near left, near
+ * right, far right, far left.
  */
-const RIGHT_MARGIN = 40;
-
-/**
- * Signed distance of a frame point from the mat's right long edge in frame
- * pixels, positive away from the mat. The right edge is the pair of corners
- * with the largest target x, whatever order they were clicked in.
- */
-function rightOfMat (p: TPoint, cal: ICalibration): number {
-  const maxX = Math.max(...cal.targets.map(t => t[0]));
-  const edge = cal.points.filter((_, i) => cal.targets[i]?.[0] === maxX);
-  const [a, b] = edge;
-  if (edge.length !== 2 || !a || !b) return 0;
-  const cx = cal.points.reduce((s, q) => s + q[0], 0) / cal.points.length, cy = cal.points.reduce((s, q) => s + q[1], 0) / cal.points.length;
-  const side = (q: TPoint): number => ((b[0] - a[0]) * (q[1] - a[1]) - (b[1] - a[1]) * (q[0] - a[0])) / Math.hypot(b[0] - a[0], b[1] - a[1]);
-  return side([cx, cy]) < 0 ? side(p) : -side(p);
-}
-
-/** Default targets: the mat's corners, origin near-left, x across (61 cm), y away from the camera (182 cm). */
-export const MAT_CORNERS: TPoint[] = [[0, 0], [61, 0], [61, 182], [0, 182]];
-/**
- * Where the mat's corners lie in the frame, in the order of MAT_CORNERS: near
- * left, near right, far right, far left. The default calibration when the
- * browser has none; the mat is arranged to these points, see research/rig.md.
- * Clicked 2026-09-23 with the camera back on its mount.
- */
-export const MAT_POINTS: TPoint[] = [[387, 1002], [1652, 993], [1256, 68], [846, 68]];
-/** Compass bearing of the mat's far end, +y, by hand compass; a property of the room, see research/rig.md. */
-export const MAT_BEARING = 245;
+export const PAD_GRID: TPoint[] = [[0, 0], [40, 0], [40, 160], [0, 160]];
 
 export interface ICalibration {
   /** four points in frame pixels, in the order of `targets` */
@@ -148,8 +122,6 @@ class Tracker {
   /** Bolt heading that drives +y; nothing measures it since 2026-09-22, when Debug.calibrateHeading retired. */
   public headingForY: number | undefined;
 
-  private canvas = document.createElement('canvas');
-  private ctx = this.canvas.getContext('2d', { willReadFrequently: true })!;
   private full = document.createElement('canvas');
   private fullCtx = this.full.getContext('2d', { willReadFrequently: true })!;
   private timer: ReturnType<typeof setTimeout> | null = null;
@@ -159,13 +131,11 @@ class Tracker {
   private history: { [bolt: string]: { t: number, cm: TPoint }[] } = {};
 
   constructor () {
-    this.canvas.width = W;
-    this.canvas.height = H;
     try {
-      const saved = localStorage.getItem(KEY);
-      this.setCalibration(saved ? JSON.parse(saved) : { points: MAT_POINTS, targets: MAT_CORNERS });
       this.marker = JSON.parse(localStorage.getItem(MARKER_KEY) ?? '{}');
+      this.pads = JSON.parse(localStorage.getItem(PADS_KEY) ?? '[]');
     } catch { /* none */ }
+    this.calibrateFromPads();
     camera.onChange((c) => {
       if (c.state === 'connected') this.start();
       else this.stop();
@@ -208,22 +178,24 @@ class Tracker {
       }
       catch (error) { this.error = String(error); }
     }
-    try { cal ? localStorage.setItem(KEY, JSON.stringify(cal)) : localStorage.removeItem(KEY); } catch { /* private window */ }
     m.redraw();
   }
 
-  /** Calibrate from the mat's own corners, using the known 182 x 61 cm. */
-  calibrateFromMat (): boolean {
-    const frame = this.grab();
-    if (!frame) return false;
-    const corners = detectMatCorners(frame.data, W, H, frame.scale);
-    if (!corners) {
-      this.error = 'mat not found or only partly in the frame; previous calibration kept';
-      m.redraw();
-      return false;
+  /**
+   * The calibration from the six pads: the outer four onto PAD_GRID. Null
+   * without six. Returns how far the middle pads land from (0, 80) and
+   * (40, 80), the check the outer four cannot give themselves.
+   */
+  calibrateFromPads (): number | null {
+    if (this.pads.length !== 6) {
+      this.setCalibration(null);
+      return null;
     }
-    this.setCalibration({ points: corners, targets: MAT_CORNERS });
-    return true;
+    const [near, middle, far] = [0, 2, 4].map(i => this.pads.slice(i, i + 2).sort((a, b) => a.cx - b.cx));
+    const at = (p: IPad): TPoint => [p.cx, p.cy];
+    this.setCalibration({ points: [at(near![0]!), at(near![1]!), at(far![1]!), at(far![0]!)], targets: PAD_GRID });
+    const off = (p: IPad, x: number): number => { const c = this.toCm(at(p)); return c ? Math.hypot(c[0] - x, c[1] - 80) : Infinity; };
+    return Math.max(off(middle![0]!, 0), off(middle![1]!, 40));
   }
 
   /** Keep the current frame as the empty scene, the ball out of view; from then on a ball is what differs from it. */
@@ -242,14 +214,7 @@ class Tracker {
 
   // ---- frames ----
 
-  private grab (): { data: Uint8ClampedArray, scale: number } | null {
-    const video = camera.video;
-    if (!video || !video.videoWidth) return null;
-    this.ctx.drawImage(video, 0, 0, W, H);
-    return { data: this.ctx.getImageData(0, 0, W, H).data, scale: video.videoWidth / W };
-  }
-
-  /** Full-resolution pixels of the part of the frame worth looking at: the calibrated area, or everything. */
+  /** Full-resolution pixels, and the part of the frame worth looking at: below the far pads, or everything. */
   private grabFull (): { image: ImageData, data: Uint8ClampedArray, width: number, height: number, region: IRegion } | null {
     const video = camera.video;
     if (!video || !video.videoWidth) return null;
@@ -259,12 +224,9 @@ class Tracker {
       this.full.height = vh;
     }
     this.fullCtx.drawImage(video, 0, 0);
-    let region: IRegion = { x0: 0, y0: 0, x1: vw, y1: vh };
-    if (this.calibration) {
-      const xs = this.calibration.points.map(p => p[0]), ys = this.calibration.points.map(p => p[1]);
-      // generous margins: a ball just off the mat is still worth tracking, and the glow sits above the floor point
-      region = { x0: Math.max(0, Math.floor(Math.min(...xs)) - 300), y0: Math.max(0, Math.floor(Math.min(...ys)) - 80), x1: Math.min(vw, Math.ceil(Math.max(...xs)) + 300), y1: Math.min(vh, Math.ceil(Math.max(...ys)) + 30) };
-    }
+    // the floor from the far pads down, with room for a glow above a ball there; the room above is walls and furniture
+    const top = this.pads.length ? Math.min(...this.pads.map(p => p.cy)) - 80 : 0;
+    const region: IRegion = { x0: 0, y0: Math.max(0, Math.floor(top)), x1: vw, y1: vh };
     const image = this.fullCtx.getImageData(0, 0, vw, vh);
     return { image, data: image.data, width: vw, height: vh, region };
   }
@@ -281,6 +243,8 @@ class Tracker {
   private lighting = new Set<string>();
   /** Bolts seen ready since their marker was last lit; the reset after a wake clears the matrix, so each new reset lights it again. */
   private readySeen = new Set<string>();
+  /** The floor pads in frame pixels, near to far, see pads.ts. */
+  public pads: IPad[] = [];
   /** Marker per Bolt from calibrateMarker, see markerOf. */
   public marker: { [bolt: string]: { cls: TColorClass, level: number } } = {};
   /** While a calibration lights and darkens a matrix, frames are not tracked. */
@@ -310,6 +274,18 @@ class Tracker {
       b.actuators.matrix.release(MATRIX_OWNER);
       throw error;
     } finally { this.lighting.delete(b.name); }
+  }
+
+  /** Find the floor pads in the current frame, keep them and calibrate from them; false while there is no frame or OpenCV loads. */
+  findPads (): boolean {
+    const frame = this.grabFull();
+    const pads = frame && detectPads(frame.image);
+    if (!pads) return false;
+    this.pads = pads;
+    localStorage.setItem(PADS_KEY, JSON.stringify(pads));
+    const off = this.calibrateFromPads();
+    Logger.info({ name: 'Tracker' }, `pads: ${pads.length} found` + (off === null ? ', no calibration' : `, calibrated, middle pads ${off.toFixed(1)} cm off`));
+    return true;
   }
 
   /** A Bolt's marker: calibrated, or its configured colour at MARKER_LEVEL. */
@@ -438,14 +414,12 @@ class Tracker {
     // a changed region counts as a ball where it has a ball's size and shape at that point of the frame
     const balls = found && found.flatMap((c): IBall[] => {
       if (c.cx < region.x0 || c.cx > region.x1 || c.cy < region.y0 || c.cy > region.y1) return [];
-      if (this.calibration && rightOfMat([c.cx, c.cy], this.calibration) > RIGHT_MARGIN) return [];
       const r = this.pxPerCm([c.cx, c.cy]) * BALL_CM / 2, disc = Math.PI * r * r, aspect = c.w / c.h;
       if (aspect < 0.6 || aspect > 1.6 || c.area < 0.5 * disc || c.area > 1.5 * disc) return [];
       return [{ cx: c.cx, cy: c.cy, r, glow: glowIn(frame.data, frame.width, frame.height, c.cx, c.cy, r) }];
     });
     this.balls = balls ?? [];
-    const cal = this.calibration;
-    this.blobs = balls ? [] : findColorBlobs(frame.data, frame.width, frame.region, classes).filter(b => !cal || rightOfMat([b.cx, b.cy], cal) <= RIGHT_MARGIN);
+    this.blobs = balls ? [] : findColorBlobs(frame.data, frame.width, frame.region, classes);
     const t = session.now();
     for (const name of bolts) {
       const cls = this.markerOf(name).cls;

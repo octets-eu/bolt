@@ -1,15 +1,13 @@
 import m from 'mithril';
 import Factory from '../../components/factory';
 import { camera } from '../../camera';
-import { tracker, MAT_CORNERS } from '../../tracking/tracker';
+import { tracker } from '../../tracking/tracker';
 import { TPoint } from '../../tracking/homography';
 import { Logger } from '../../components/logger/logger';
-import { gotoMatCenter } from '../../debug/debug';
 import { Bolts } from '../../bolts';
 import { Bolt } from '@bolt/core';
 
 let clicks: TPoint[] = [];
-let targets: TPoint[] = MAT_CORNERS.map(p => [...p] as TPoint);
 
 /** Draw calibration and tracks over the video, in video pixels scaled to the element. */
 function drawOverlay (cv: HTMLCanvasElement) {
@@ -35,6 +33,16 @@ function drawOverlay (cv: HTMLCanvasElement) {
       if (tg) ctx.fillText(`${tg[0]},${tg[1]}`, p[0] * sx + 4, p[1] * sy - 4);
     });
   }
+  ctx.strokeStyle = 'cyan';
+  ctx.fillStyle = 'cyan';
+  ctx.lineWidth = 2;
+  tracker.pads.forEach((pad, i) => {
+    ctx.beginPath();
+    pad.corners.forEach((p, k) => k ? ctx.lineTo(p[0] * sx, p[1] * sy) : ctx.moveTo(p[0] * sx, p[1] * sy));
+    ctx.closePath();
+    ctx.stroke();
+    ctx.fillText(`P${i + 1}`, pad.cx * sx + 8, pad.cy * sy - 8);
+  });
   ctx.fillStyle = 'yellow';
   clicks.forEach((p, i) => {
     ctx.beginPath();
@@ -100,39 +108,15 @@ const CameraView = Factory.create('Camera', {
         m('span.mono.f6.cfff.ml4', 'Track'),
         m('button.cmd.br2.ml1', { disabled: tr.running, onclick: () => tr.start() }, 'Start'),
         m('button.cmd.br2.ml1', { disabled: !tr.running, onclick: () => tr.stop() }, 'Stop'),
-        m('button.cmd.br2.ml1', { disabled: !tr.running, title: 'Drive to the mat centre by camera and face across the mat', onclick: () => { void gotoMatCenter(); } }, 'Centre'),
         m('select.cmd.br2.ml1', { onchange: (e: Event) => { tr.fps = Number((e.target as HTMLSelectElement).value); } }, [2, 6, 10, 15].map(f => m('option', { value: f, selected: f === tr.fps }, `${f} fps`))),
         m('span.mono.f6.cfff.ml2', tr.running ? `${tr.frames} frames · ${tr.lastFrameMs} ms · ${tr.balls.length} balls · ${tr.blobs.length} blobs` : 'stopped'),
         m('button.cmd.br2.ml1', { disabled: !tr.running, title: 'With the ball out of view: keep the empty scene, a ball is then what differs from it', onclick: () => tr.reference() }, 'Reference'),
+        m('button.cmd.br2.ml1', { disabled: !tr.running, title: 'Pads: find the six paper pads on the floor, keep them and calibrate from them (stored)', onclick: () => tr.findPads() }, 'Pads'),
         m('button.cmd.br2.ml1', { disabled: !tr.running, title: 'Marker: try every colour and level on each ready Bolt, keep the one the camera separates best (about 40 s per Bolt, stored)', onclick: async () => {
           for (const b of (Bolts.map((x: Bolt) => x) as Bolt[]).filter(x => x.connected && x.status.ready)) await tr.calibrateMarker(b);
         } }, 'Marker'),
-        m('span.mono.f6.cfff.ml4', 'Calibrate'),
-        m('button.cmd.br2.ml1', { onclick: () => tr.calibrateFromMat() }, 'From mat'),
-        m('button.cmd.br2.ml1', { disabled: clicks.length !== 4, onclick: () => {
-          tr.setCalibration({ points: clicks.map(p => [...p] as TPoint), targets: targets.map(p => [...p] as TPoint) });
-          clicks = [];
-        } }, 'From 4 clicks'),
-        m('button.cmd.br2.ml1', { onclick: () => {
-          clicks = [];
-          tr.setCalibration(null);
-        } }, 'Clear'),
-        m('span.mono.f6.cfff.ml2', tr.homography ? 'calibrated' : 'not calibrated'),
+        m('span.mono.f6.cfff.ml2', tr.homography ? 'calibrated by the pads' : 'not calibrated: press Pads'),
         m('span.mono.f6.ml2', { style: { color: '#fc8' } }, tr.error),
-      ]),
-      m('div.w-100.pa2.bg-777.flex.items-center.flex-wrap.mono.f6.cfff', [
-        m('span.mr2', 'Click 4 floor points on the picture, in this order, then enter their centimetres:'),
-        targets.map((t, i) => m('span.mr3', [`#${i + 1} `,
-          m('input.mono.f6', { style: { width: '3.5rem' }, value: t[0], onchange: (e: Event) => {
-            const tg = targets[i];
-            if (tg) tg[0] = Number((e.target as HTMLInputElement).value);
-          } }), ' , ',
-          m('input.mono.f6', { style: { width: '3.5rem' }, value: t[1], onchange: (e: Event) => {
-            const tg = targets[i];
-            if (tg) tg[1] = Number((e.target as HTMLInputElement).value);
-          } }),
-        ])),
-        m('span.ml3', `clicked: ${clicks.length} / 4`),
       ]),
       m('div.w-100.bg-eee.pa2', [
         m('div.relative', { style: { maxWidth: '1280px' }, onclick }, [
