@@ -153,16 +153,19 @@ export class Experiments {
    * 0 along a free line. Only drives and marks: the samples and commands land
    * in the session file between `tiltStep n: step` and `tiltStep n: brake`,
    * where the evaluation finds tilt, its rise, the braking and the latency.
-   * `brake`: roll0 lets the firmware ramp down; reverse drives backward on
-   * the same heading at `brakeSpeed` until the ball is slow, then roll 0;
-   * rawBrake short-circuits the motors until still.
+   * `brake`: roll0 lets the firmware slow down; reverse drives backward on
+   * the same heading at `brakeValue` until the ball is slow, then roll 0 (the
+   * firmware chases that backward speed at full effort, the wheels spin back
+   * inside the shell); ramp lowers the forward speed to 0 over `brakeValue`
+   * ms, one roll per 50 ms; rawBrake sends raw mode 3, undocumented (the
+   * documented modes are 0 to 2), until still.
    */
-  async tiltStep (runs = 10, speed = 150, stepMs = 400, brake: 'roll0' | 'reverse' | 'rawBrake' = 'roll0', brakeSpeed = 150): Promise<void> {
+  async tiltStep (runs = 10, speed = 150, stepMs = 400, brake: 'roll0' | 'reverse' | 'ramp' | 'rawBrake' = 'roll0', brakeValue = 150): Promise<void> {
     const s = this.ctx.motion;
     const motor = this.actuators.motor;
     const release = await this.sensors.motion.subscribe(null);
     await motor.stabilize(StabilizationIndex.full);
-    this.ctx.log('info', `tiltStep: ${runs} runs at ${speed} for ${stepMs} ms, brake ${brake}${brake === 'reverse' ? ` ${brakeSpeed}` : ''}`);
+    this.ctx.log('info', `tiltStep: ${runs} runs at ${speed} for ${stepMs} ms, brake ${brake}${brake === 'reverse' || brake === 'ramp' ? ` ${brakeValue}` : ''}`);
     for (let i = 1; i <= runs && !s.aborted; i++) {
       const heading = i % 2 ? 0 : 180;
       await motor.roll(0, heading);  // turn in place, then settle
@@ -178,12 +181,20 @@ export class Experiments {
         // makes the plain speed jump, which ended the first tries after ~100 ms
         const { x: ux, y: uy } = this.ctx.status.velocity;
         const norm = Math.hypot(ux, uy) || 1;
-        await motor.roll(brakeSpeed, heading, DriveFlag.backward);
+        await motor.roll(brakeValue, heading, DriveFlag.backward);
         const t0 = this.ctx.now();
         while (!s.aborted && this.ctx.now() - t0 < 2000) {
           await wait(20);
           const { x, y } = this.ctx.status.velocity;
           if ((x * ux + y * uy) / norm < 3) break;
+        }
+        this.ctx.log('info', `tiltStep ${i}: brake end`);
+        await motor.stop();
+      } else if (brake === 'ramp') {
+        const t0 = this.ctx.now();
+        for (let left = 1; left > 0 && !s.aborted; left = 1 - (this.ctx.now() - t0) / brakeValue) {
+          await motor.roll(speed * left, heading);
+          await wait(50);
         }
         this.ctx.log('info', `tiltStep ${i}: brake end`);
         await motor.stop();
