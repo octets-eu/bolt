@@ -17,10 +17,15 @@ export interface IPad {
   corners: TPoint[];
 }
 
-/** Bluer than the wood by this much, and this bright in blue. */
-const BLUE_OVER_RED = 35, GREEN_OVER_RED = 15, MIN_BLUE = 170;
-/** A pad at the far end covers about 1200 pixels, one near the camera about 21000. */
-const MIN_AREA = 1000;
+/**
+ * Bluer than the wood by this much, and this bright in blue. On 2026-09-28
+ * the far left pad in dimmer light read (137, 163, 170), blue over red 33,
+ * and failed 35 / 15 / 170; the wood beside it read (103, 95, 79), blue
+ * under red by 24, so 25 / 10 / 150 keeps a wide gap to it.
+ */
+const BLUE_OVER_RED = 25, GREEN_OVER_RED = 10, MIN_BLUE = 150;
+/** A pad at the far end covers 1000 to 1300 pixels, one near the camera about 23000; a dim far pad loses its edge. */
+const MIN_AREA = 700;
 /** Flat on the floor seen at a slant: 1.5 to 4.3 times as wide as high on 2026-09-26. */
 const MIN_ASPECT = 1.4, MAX_ASPECT = 5;
 /**

@@ -6,7 +6,7 @@ import { range, wait, whenAborted } from '../helpers/utils';
 import { DriveFlag, RawMotorMode, StabilizationIndex } from '../protocol/constants';
 import { distance, headingTo } from '../helpers/math';
 import type { Point } from '../helpers/math';
-import { DriveModel, stopNow, targetSpeed } from './landing';
+import { DriveModel, stoppingDistance, stopNow, targetSpeed } from './landing';
 import type { LandingResult } from './landing';
 import { sampleLoop } from './sample-loop';
 
@@ -227,33 +227,34 @@ export class Experiments {
    * `ground` picks the model, since speeds and slip differ on mat and floor.
    */
   async rollToPointAdaptive (target: Point, ground: 'mat' | 'floor' = 'mat', vCruise = 60): Promise<LandingResult> {
-    const model = (this.models[ground] ??= new DriveModel());
+    const model = (this.models[ground] ??= new DriveModel(ground === 'floor' ? 0.6 : 0.5));
     const freezeCm    = 5;   // closer than this the heading stays: locator noise would swing it
     const steadyAccel = 15;  // cm/s², below it the speed counts as steady and teaches the model
     const t0 = this.ctx.now();
     let budgetMs: number | null = null;  // from the first sample's distance, as rollToPoint
     let heading = this.ctx.status.heading, commands = 0;
     let last: { t: number, v: number } | null = null;
-    const stop = { v: 0, at: null as Point | null };
+    const start = { ...this.ctx.status.position };
+    const stop = { v: 0, d: 0, predicted: 0, at: null as Point | null };
 
     const reason = await sampleLoop(this.ctx, this.actuators, this.sensors, (sample): 'arrived' | 'budget' | undefined => {
       const here = { x: sample.locator.positionX, y: sample.locator.positionY };
       const v = Math.hypot(sample.locator.velocityX, sample.locator.velocityY);
       const d = distance(here, target);
       budgetMs ??= 2 * (2500 + d / 10 * 1000);
+      const dtS = last ? (sample.t - last.t) / 1000 : 0.06;
 
-      if (stopNow(d, v, model)) {
+      if (stopNow(d, v, model, dtS)) {
         stop.v = v;
+        stop.d = d;
+        stop.predicted = stoppingDistance(v, model);
         stop.at = here;
         return 'arrived';
       }
       if (sample.t - t0 > budgetMs) return 'budget';
 
       const vWanted = targetSpeed(d, model, vCruise);
-      if (last && vWanted === vCruise) {
-        const dtS = (sample.t - last.t) / 1000;
-        if (Math.abs(v - last.v) / dtS < steadyAccel) model.learnSpeed(vWanted, v, dtS);
-      }
+      if (last && vWanted === vCruise && Math.abs(v - last.v) / dtS < steadyAccel) model.learnSpeed(vWanted, v, dtS);
       last = { t: sample.t, v };
       if (d > freezeCm) heading = headingTo(here, target);
       commands += 1;
@@ -262,9 +263,15 @@ export class Experiments {
     });
 
     const at = { ...this.ctx.status.position };
+    // the stop decision before learning from it: the model then changes
+    const decided = stop.at ? { v: stop.v, d: stop.d, predicted: stop.predicted, coast: distance(stop.at, at) } : null;
     if (stop.at) model.learnStop(stop.v, distance(stop.at, at));
-    const result: LandingResult = { reason, errorCm: distance(at, target), timeMs: this.ctx.now() - t0, commands, model: { b: model.b, aBrake: model.aBrake } };
-    this.ctx.log('info', `rollToPointAdaptive: ${reason}, ${result.errorCm.toFixed(1)} cm off, ${result.timeMs} ms, ${commands} commands, b ${model.b.toFixed(0)}, aBrake ${model.aBrake.toFixed(0)}`);
+    const way = distance(start, target) || 1;
+    const alongCm = ((at.x - target.x) * (target.x - start.x) + (at.y - target.y) * (target.y - start.y)) / way;
+    const result: LandingResult = { reason, errorCm: distance(at, target), timeMs: this.ctx.now() - t0, commands, alongCm, stop: decided, model: { b: model.b, tauS: model.tauS } };
+    this.ctx.log('info', `rollToPointAdaptive: ${reason}, ${result.errorCm.toFixed(1)} cm off (${alongCm.toFixed(1)} along), ${result.timeMs} ms, ${commands} commands`
+      + (decided ? `; stop at ${decided.v.toFixed(0)} cm/s ${decided.d.toFixed(1)} cm out, predicted ${decided.predicted.toFixed(1)}, coasted ${decided.coast.toFixed(1)}` : '')
+      + `; b ${model.b.toFixed(0)}, tau ${model.tauS.toFixed(2)} s`);
     return result;
   }
 
