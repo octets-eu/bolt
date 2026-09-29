@@ -1,5 +1,4 @@
 import type { Actuators } from '../actuators/actuators';
-import type { Calibration } from '../calibration/calibration';
 import type { Context } from '../context';
 import type { Communication } from '../communication/communication';
 import type { Navigation } from '../navigation/navigation';
@@ -19,9 +18,9 @@ export interface WakeResult {
  *   locator, reads every value once, keeps the Bolt awake.
  * - `reset` runs whenever the Bolt is or becomes awake under our control:
  *   still, stabilized, lights, streaming mask and notification switches, all
- *   of which the firmware forgets in sleep, then a rotate, then north. It
- *   leaves the locator alone and the stabilization loop off: navigation
- *   engages the loop only while it drives.
+ *   of which the firmware forgets in sleep, then a full turn in place that
+ *   proves the shell turns. It leaves the locator alone and the
+ *   stabilization loop off: navigation engages the loop only while it drives.
  */
 export class Lifecycle {
 
@@ -29,18 +28,16 @@ export class Lifecycle {
   private readonly actuators: Actuators;
   private readonly sensors:   Sensors;
   private readonly communication: Communication;
-  private readonly calibration: Calibration;
   private readonly navigation:  Navigation;
   private resetting:    Promise<void> | null = null;
   /** Steps running now, outermost first; after an error the failed ones stay. */
   private readonly running: string[] = [];
 
-  constructor (ctx: Context, actuators: Actuators, sensors: Sensors, communication: Communication, calibration: Calibration, navigation: Navigation) {
+  constructor (ctx: Context, actuators: Actuators, sensors: Sensors, communication: Communication, navigation: Navigation) {
     this.ctx         = ctx;
     this.actuators   = actuators;
     this.sensors     = sensors;
     this.communication   = communication;
-    this.calibration = calibration;
     this.navigation  = navigation;
     void sensors.didsleep.subscribe(() => {
       ctx.status.awake = false;
@@ -92,8 +89,9 @@ export class Lifecycle {
     await this.actuators.led.set(front, back);
     await this.communication.restingPattern();
     await this.sensors.reapply();
-    await this.navigation.rotate(90);
-    await this.calibration.north();
+    await this.navigation.rotate(360);
+    // no north: it varies by over 100 degrees between spots 25 cm apart (research/bolt.md);
+    // calibration.north() stays for the compass button
     this.ctx.status.ready = true;
     this.resetting = null;
     this.ctx.changed();
@@ -121,6 +119,8 @@ export class Lifecycle {
     await this.sensors.collision.subscribe(null, {});
     if (awakeSeen) await this.resetting;
     else await this.reset();
+    // the reset's turn moved the ball: 0,0 is where it lies now
+    await this.actuators.motor.resetLocator();
     await this.readAll();
     this.ctx.log('info', 'takeover.out');
   }
