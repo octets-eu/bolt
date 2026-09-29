@@ -24,7 +24,10 @@ export class Motor {
     return this.ctx.queue.send({ name, device, id, target, data });
   }
 
-  /** Drive at `speed` (0..255) on `heading` (degrees). The firmware is said to stop driving after a while without a repeat, not measured. */
+  /**
+   * Drive at `speed` (0..255) on `heading` (degrees, clockwise seen from above). The firmware is said to
+   * stop driving after a while without a repeat, not measured.
+   */
   async roll (speed: number, heading: number, flags = 0): Promise<void> {
     const h = mod360(Math.round(heading));
     this.ctx.status.heading = h;
@@ -63,7 +66,7 @@ export class Motor {
     this.ctx.status.stabilization = index;
   }
 
-  /** The current orientation becomes heading 0. */
+  /** The current orientation becomes heading 0 and yaw 0. Heading counts clockwise, yaw counter-clockwise. The locator keeps its axes. */
   async resetYaw (): Promise<void> {
     await this.send('resetYaw', DeviceId.driving, DrivingCommand.resetYaw, [], Target.st);
     this.ctx.status.heading = 0;

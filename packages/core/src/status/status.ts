@@ -21,7 +21,7 @@ export class Status {
   awake:         boolean | null = null;
   /** Body state known: a `lifecycle.reset` completed since the last wake. Sleep and a new reset clear it. */
   ready:         boolean = false;
-  /** Commanded heading in degrees, 0..359. */
+  /** Commanded heading in degrees, 0..359, clockwise seen from above; the measured `angles.yaw` counts the other way. */
   heading:       number = 0;
   stabilization: number | null = null;
   voltage:       number | null = null;

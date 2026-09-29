@@ -53,7 +53,9 @@ export class Navigation {
 
   /**
    * Turn in place by `degrees` from the commanded heading, either way and
-   * any amount: 360 is a full turn, 720 two. On every sample the commanded
+   * any amount: 360 is a full turn, 720 two. Positive turns clockwise, like
+   * the heading; the measured yaw goes negative (rotate(94) from yaw 0 ended
+   * at yaw -95, 2026-09-29). On every sample the commanded
    * heading is set `lead` degrees ahead of the yaw turned so far, capped at
    * the goal, so the ball turns without stopping at steps. Ends once the
    * goal is commanded and the ball has turned and is still, when the time

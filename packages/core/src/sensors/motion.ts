@@ -5,7 +5,10 @@ import type { Vec3 } from '../helpers/math';
 import { float32At } from '../protocol/bytes';
 import { Stream } from '../events/stream';
 
-/** Degrees. Pitch and roll are gravity referenced; yaw is relative to the last yaw reset and drifts. */
+/**
+ * Degrees. Pitch and roll are gravity referenced; yaw is relative to the last yaw reset and drifts.
+ * Yaw counts counter-clockwise seen from above, headings clockwise: after a yaw reset heading = -yaw.
+ */
 export interface Angles { readonly pitch: number; readonly roll: number; readonly yaw: number }
 
 /** Dead-reckoned position in cm and velocity in cm/s, in the locator frame. */
