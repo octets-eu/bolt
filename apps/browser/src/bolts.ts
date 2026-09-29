@@ -36,7 +36,7 @@ class bolts {
       },
     },
 
-    'SB-2B96' : {
+    'SB-11DF' : {
       colors: {
         console: '#79C', plot: 'blue',  backcolor: '#759cc5', log: '#5895d444',
         front: [10, 0, 0], back: [ 5, 5, 5], black: [0, 0, 0], matrix: [30, 30, 240]
