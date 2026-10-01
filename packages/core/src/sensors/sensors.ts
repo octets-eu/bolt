@@ -152,7 +152,7 @@ export class Sensors {
     return payload;
   }
 
-  /** Strength at the four infrared receivers: front left, front right, back right, back left. */
+  /** Channel each infrared receiver is hearing, 255 for none: front left, front right, back right, back left. Visible a few ms per frame. */
   async infraredReadings (): Promise<readonly number[]> {
     const { payload } = await this.send('infraredReadings', DeviceId.sensor, SensorCommand.getInfraredReadings);
     this.ctx.status.infrared = payload;
