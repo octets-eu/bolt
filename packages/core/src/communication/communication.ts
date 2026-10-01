@@ -39,6 +39,18 @@ export class Communication {
     }
   }
 
+  /** Into the log, one line each. frames: the animation frames stored on the Bolt. */
+  async log (what: 'frames'): Promise<void> {
+    switch (what) {
+      case 'frames': {
+        const frames = await this.actuators.matrix.frames();
+        if (!frames.length) this.ctx.log('info', 'matrix frames: none');
+        for (const f of frames) this.ctx.log('info', `matrix frame ${f}`);
+        break;
+      }
+    }
+  }
+
   async char (char: string, color: Color = this.ctx.config.colors.matrix): Promise<void> {
     await this.actuators.matrix.char(char, color);
   }
@@ -62,12 +74,9 @@ export class Communication {
     await Promise.race([done, aborted]);
   }
 
-  /** The Bolt's colour as a ring with a dark centre: what a Bolt shows when idle. */
+  /** IMAGES 'resting': what a Bolt shows when idle. */
   async restingPattern (): Promise<void> {
-    const { matrix, black } = this.ctx.config.colors;
-    await this.actuators.matrix.color(black);
-    await this.actuators.matrix.fill(1, 1, 6, 6, matrix);
-    await this.actuators.matrix.fill(3, 3, 4, 4, black);
+    await this.actuators.matrix.animate('show', 'resting');
   }
 
   /** Emit infrared codes in turn so another Bolt listening on any channel hears this one. */

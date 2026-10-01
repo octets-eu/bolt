@@ -84,12 +84,20 @@ export class WebBleTransport implements Transport {
 
   }
 
+  /**
+   * One packet in pieces of at most 20 bytes: a longer GATT write fails on
+   * the Bolt (2026-10-01: a 17 byte packet passed, a 24 byte one failed),
+   * spherov2 splits the same way. The Bolt reassembles by the start and end
+   * bytes.
+   */
   async write (bytes: Uint8Array, withResponse = true): Promise<void> {
     const charac = this.characteristics.get(G.APIV2_CHARACTERISTIC);
     if (!charac) throw new Error(`${this.name}: not connected`);
-    const value = new Uint8Array(bytes);
-    if (withResponse) await charac.writeValueWithResponse(value);
-    else              await charac.writeValueWithoutResponse(value);
+    for (let i = 0; i < bytes.length; i += 20) {
+      const value = bytes.slice(i, i + 20);
+      if (withResponse) await charac.writeValueWithResponse(value);
+      else              await charac.writeValueWithoutResponse(value);
+    }
   }
 
   onFrame (listener: FrameListener) {

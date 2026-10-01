@@ -95,7 +95,7 @@ export class Calibration {
     if (reported && !s.aborted && accepted) {
       await this.actuators.motor.roll(0, reported.angle);
       await Promise.race([wait(400), aborted]);
-      await this.communication.showImage(IMAGES.chevron);
+      await this.communication.showImage(IMAGES.cruising);
     }
     await this.actuators.motor.stabilize(StabilizationIndex.none);
     await release();

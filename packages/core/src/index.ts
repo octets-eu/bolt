@@ -48,4 +48,5 @@ export { Calibration } from './calibration/calibration';
 export type { NorthOptions, NorthResult } from './calibration/calibration';
 export { Behavior } from './behavior/behavior';
 export type { ReachResult } from './behavior/reach';
+export type { LockOnResult } from './behavior/lock-on';
 export { Experiments } from './experiments/experiments';

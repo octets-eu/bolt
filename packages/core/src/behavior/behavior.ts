@@ -4,6 +4,8 @@ import type { Sensors } from '../sensors/sensors';
 import type { Point } from '../helpers/math';
 import { reach } from './reach';
 import type { ReachResult } from './reach';
+import { lockOn } from './lock-on';
+import type { LockOnResult } from './lock-on';
 import { log } from '../lifecycle/log';
 
 /**
@@ -29,6 +31,12 @@ export class Behavior {
   @log
   async reach (target: Point, tolerance = 5): Promise<ReachResult> {
     return reach(this.ctx, this.actuators, this.sensors, target, tolerance);
+  }
+
+  /** Turn to face a Bolt that sends `channel` weakly; see lock-on.ts. */
+  @log
+  async lockOn (channel: number): Promise<LockOnResult> {
+    return lockOn(this.ctx, this.actuators, this.sensors, channel);
   }
 
 }

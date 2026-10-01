@@ -82,12 +82,17 @@ export const IOCommand = {
   setAllLeds:         0x1c,
   setMatrixPixel:     0x2d,
   setMatrixColor:     0x2f,
+  saveMatrixFrame:    0x30,
+  saveMatrixAnimation: 0x31,
+  listMatrixFrames:   0x34,
+  deleteMatrixAnimations: 0x35,
   clearMatrix:        0x38,
   setMatrixRotation:  0x3a,
   scrollMatrixText:   0x3b,
   drawMatrixLine:     0x3d,
   fillMatrix:         0x3e,
   setMatrixChar:      0x42,
+  playMatrixAnimation: 0x43,
 } as const;
 
 export const IONotify = {

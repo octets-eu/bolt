@@ -80,22 +80,29 @@ export class Lifecycle {
   }
 
   private async doReset (): Promise<void> {
+
     this.ctx.log('info', 'reset.in');
     this.ctx.status.ready = false;
     this.ctx.changed();
+
     const { front, back } = this.ctx.config.colors;
+    
     await this.actuators.motor.stop();
     await this.actuators.motor.stabilize(StabilizationIndex.none);
     await this.actuators.led.set(front, back);
+    await this.communication.log('frames');
     await this.communication.restingPattern();
     await this.sensors.reapply();
     await this.navigation.rotate(360);
     // no north: it varies by over 100 degrees between spots 25 cm apart (research/bolt.md);
     // calibration.north() stays for the compass button
+    
     this.ctx.status.ready = true;
     this.resetting = null;
     this.ctx.changed();
+  
     this.ctx.log('info', 'reset.out');
+  
   }
 
   /** The app assumes control of a freshly connected Bolt. */
@@ -114,9 +121,11 @@ export class Lifecycle {
     // connection. Taken awake: the sensor side does not ack switches while the Bolt sleeps.
     await this.sensors.battery.subscribe(null);
     await this.sensors.charger.subscribe(null);
-    await this.sensors.gyromax.subscribe(null);
+    // the one global reaction: a flash of '!'; behaviors add listeners of their own
+    await this.sensors.gyromax.subscribe(() => void this.actuators.matrix.push('flash', 'collision'));
     await this.sensors.infrared.subscribe(null);
-    await this.sensors.collision.subscribe(null, {});
+    // half the default thresholds of 100: a hand's hit at rest should flash
+    await this.sensors.collision.subscribe(() => void this.actuators.matrix.push('flash', 'collision'), { xThreshold: 50, yThreshold: 50 });
     if (awakeSeen) await this.resetting;
     else await this.reset();
     // the reset's turn moved the ball: 0,0 is where it lies now
