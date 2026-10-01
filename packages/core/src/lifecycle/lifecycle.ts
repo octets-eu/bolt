@@ -91,7 +91,7 @@ export class Lifecycle {
     await this.actuators.motor.stabilize(StabilizationIndex.none);
     await this.actuators.led.set(front, back);
     await this.communication.log('frames');
-    await this.communication.restingPattern();
+    await this.communication.state('motor', 'resting');
     await this.sensors.reapply();
     await this.navigation.rotate(360);
     // no north: it varies by over 100 degrees between spots 25 cm apart (research/bolt.md);

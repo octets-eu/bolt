@@ -4,12 +4,11 @@ import type { AckPayload } from '../protocol/payloads';
 import type { Ack } from '../protocol/queue';
 import type { FrameRotation } from '../protocol/constants';
 import type { Color } from '../config';
-import { BLACK, IMAGES, RED } from '../communication/images';
-import type { Image } from '../communication/images';
+import { BLACK, IMAGES, RED, WHITE } from '../communication/images';
+import type { Image, ImageName } from '../communication/images';
 import { clamp } from '../helpers/utils';
 
 type Mode = 'show' | 'blink' | 'flash';
-type ImageName = keyof typeof IMAGES;
 interface Layer { readonly id: number; readonly mode: Mode }
 
 /**
@@ -28,6 +27,7 @@ export class Matrix {
   private stored = new Map<string, number>();
   private nextFrame = 0;
   private playing = false;
+  private turn: Promise<unknown> = Promise.resolve();
   /** animationdone notifies still due for animations a play or a stop replaced. */
   private replaced = 0;
 
@@ -117,36 +117,51 @@ export class Matrix {
   }
 
   /**
-   * The matrix as a stack of animations stored on the Bolt, in its matrix
-   * colour; nothing goes over Bluetooth while one runs. `animate` sets the
-   * base, `push` lays one on top, `pop` plays the one below again (one
-   * command: each animation is stored once, on first use). show: the first
-   * image, held. blink: the images in turn, 2 per second, looped. flash:
-   * three times, 8 per second, in full red, then it pops itself on
-   * `animationdone`. A single image blinks and flashes with dark. Each
-   * layer keeps the palette it was stored with. Any other write stops the
-   * running animation.
+   * The matrix as a stack of animations stored on the Bolt; nothing goes
+   * over Bluetooth while one runs. `animate` replaces the base, under any
+   * layer on top; `push` lays one on top; `pop` plays the one below again
+   * (one command: each animation is stored once, on first use). show: the
+   * first image, held. blink: the images in turn, 2 per second, looped.
+   * flash: three times, 8 per second, then it pops itself on
+   * `animationdone`. A single image blinks and flashes with dark. `mark` is
+   * laid over every frame and does not blink. Image pixels index the
+   * palette black, colour, white; the colour is the Bolt's matrix colour,
+   * red for a flash. Stack changes run in call order. Any other write stops
+   * the running animation.
    */
-  async animate (mode: Mode, ...names: ImageName[]): Promise<void> {
-    if (!this.free('matrixAnimate')) return;
-    this.stack = [await this.store(mode, names)];
-    await this.play();
+  animate (mode: Mode, names: readonly ImageName[], mark: ImageName | null = null): Promise<void> {
+    return this.inTurn(async () => {
+      if (!this.free('matrixAnimate')) return;
+      this.stack[0] = await this.store(mode, names, mark);
+      if (this.stack.length === 1) await this.play();
+    });
   }
 
-  async push (mode: Mode, ...names: ImageName[]): Promise<void> {
-    if (!this.free('matrixPush')) return;
-    const layer = await this.store(mode, names);
-    // a flash on a flash restarts it instead of stacking a second one
-    if (mode === 'flash' && this.stack.at(-1)?.mode === 'flash') this.stack.pop();
-    this.stack.push(layer);
-    await this.play();
+  push (mode: Mode, ...names: ImageName[]): Promise<void> {
+    return this.inTurn(async () => {
+      if (!this.free('matrixPush')) return;
+      const layer = await this.store(mode, names, null);
+      // a flash on a flash restarts it instead of stacking a second one
+      if (mode === 'flash' && this.stack.length > 1 && this.stack.at(-1)?.mode === 'flash') this.stack.pop();
+      this.stack.push(layer);
+      await this.play();
+    });
   }
 
-  async pop (): Promise<void> {
-    if (!this.free('matrixPop')) return;
-    this.stack.pop();
-    if (this.stack.length) await this.play();
-    else await this.clear();
+  pop (): Promise<void> {
+    return this.inTurn(async () => {
+      if (!this.free('matrixPop')) return;
+      this.stack.pop();
+      if (this.stack.length) await this.play();
+      else await this.clear();
+    });
+  }
+
+  /** One stack change after the other; a failed one does not block the next. */
+  private inTurn (step: () => Promise<void>): Promise<void> {
+    const run = this.turn.then(step);
+    this.turn = run.then(undefined, () => undefined);
+    return run;
   }
 
   private async play (): Promise<void> {
@@ -165,41 +180,44 @@ export class Matrix {
   }
 
   /**
-   * The animation for `mode` and `names`, stored on first use. A frame is 4
-   * bit planes of a palette index per pixel, 8 bytes each: byte k is column
-   * 7 - k, bit r is row r, so a frame shows like `showImage` (2026-10-01;
-   * spherov2's row order showed it turned 90 degrees clockwise). The first
-   * store of a page session deletes what an earlier one left.
+   * The animation for `mode`, `names` and `mark`, stored on first use. A
+   * frame is 4 bit planes of a palette index per pixel, 8 bytes each: byte
+   * k is column 7 - k, bit r is row r, so a frame shows like `showImage`
+   * (2026-10-01; spherov2's row order showed it turned 90 degrees
+   * clockwise). The first store of a page session deletes what an earlier
+   * one left.
    */
-  private async store (mode: Mode, names: readonly ImageName[]): Promise<Layer> {
-    const key = `${mode} ${names.join(' ')}`;
+  private async store (mode: Mode, names: readonly ImageName[], mark: ImageName | null): Promise<Layer> {
+    const key = `${mode} ${names.join(' ')} ${mark ?? ''}`;
     const known = this.stored.get(key);
     if (known !== undefined) return { id: known, mode };
     if (!this.stored.size) {
       await this.send('matrixDeleteAnimations', DeviceId.userIO, IOCommand.deleteMatrixAnimations, [], Target.st);
       this.nextFrame = 0;
     }
-    const images: Image[] = names.map(n => IMAGES[n]);
+    const images: Image[] = names.length ? names.map(n => IMAGES[n]) : [[]];
     if (images.length === 1 && mode !== 'show') images.push([]);
     const frames = mode === 'flash' ? [...images, ...images, ...images] : mode === 'show' ? images.slice(0, 1) : images;
+    const over = mark ? IMAGES[mark] : [];
     const indexes: number[] = [];
     for (const frame of frames) {
       const index = this.nextFrame++;
+      const pixel = (row: number, col: number) => over[row]?.[col] || frame[row]?.[col] || 0;
       const planes: number[] = [];
       for (let bit = 0; bit < 4; bit++) {
         for (let k = 0; k < 8; k++) {
           let byte = 0;
-          for (let row = 0; row < 8; row++) byte |= (((frame[row]?.[7 - k] ?? 0) >> bit) & 1) << row;
+          for (let row = 0; row < 8; row++) byte |= ((pixel(row, 7 - k) >> bit) & 1) << row;
           planes.push(byte);
         }
       }
       await this.send('matrixSaveFrame', DeviceId.userIO, IOCommand.saveMatrixFrame, [index >> 8, index & 0xff, ...planes], Target.st);
       indexes.push(index);
     }
-    const lit = mode === 'flash' ? RED : this.ctx.config.colors.matrix;
+    const palette = [BLACK, mode === 'flash' ? RED : this.ctx.config.colors.matrix, WHITE];
     const id = this.stored.size;
     const list = [indexes.length, ...indexes].flatMap(v => [v >> 8, v & 0xff]);
-    await this.send('matrixSaveAnimation', DeviceId.userIO, IOCommand.saveMatrixAnimation, [id, mode === 'flash' ? 8 : 2, 0, 2, ...BLACK, ...lit, ...list], Target.st);
+    await this.send('matrixSaveAnimation', DeviceId.userIO, IOCommand.saveMatrixAnimation, [id, mode === 'flash' ? 8 : 2, 0, palette.length, ...palette.flat(), ...list], Target.st);
     this.stored.set(key, id);
     return { id, mode };
   }

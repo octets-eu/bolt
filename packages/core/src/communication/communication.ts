@@ -2,8 +2,11 @@ import type { Actuators } from '../actuators/actuators';
 import type { Context } from '../context';
 import { BLACK } from './images';
 import type { Color } from '../config';
-import type { Image } from './images';
+import type { Image, ImageName } from './images';
 import { range, wait, whenAborted } from '../helpers/utils';
+
+/** What shows on the matrix, by who sets it. */
+export type Slot = 'motor' | 'infrared' | 'mark';
 
 export interface BroadcastOptions {
   /** Infrared codes to send in turn, default all eight. */
@@ -23,6 +26,7 @@ export class Communication {
 
   private readonly ctx:       Context;
   private readonly actuators: Actuators;
+  private readonly slots: { [slot in Slot]: ImageName | null } = { motor: null, infrared: null, mark: null };
 
   constructor (ctx: Context, actuators: Actuators) {
     this.ctx       = ctx;
@@ -74,9 +78,16 @@ export class Communication {
     await Promise.race([done, aborted]);
   }
 
-  /** IMAGES 'resting': what a Bolt shows when idle. */
-  async restingPattern (): Promise<void> {
-    await this.actuators.matrix.animate('show', 'resting');
+  /**
+   * One slot of what the matrix shows; each caller sets only its own. motor
+   * and infrared blink with each other when both are set, one alone is
+   * held; mark is laid over both and does not blink. A collision flash
+   * stays on top and drops back onto the result.
+   */
+  async state (slot: Slot, image: ImageName | null): Promise<void> {
+    this.slots[slot] = image;
+    const names = [this.slots.motor, this.slots.infrared].filter((n): n is ImageName => n !== null);
+    await this.actuators.matrix.animate(names.length === 2 ? 'blink' : 'show', names, this.slots.mark);
   }
 
   /** Emit infrared codes in turn so another Bolt listening on any channel hears this one. */

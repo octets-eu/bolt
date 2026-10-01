@@ -1,4 +1,5 @@
 import type { Actuators } from '../actuators/actuators';
+import type { Communication } from '../communication/communication';
 import type { Context } from '../context';
 import type { Sensors } from '../sensors/sensors';
 import type { Point } from '../helpers/math';
@@ -20,11 +21,13 @@ export class Behavior {
   readonly ctx:               Context;
   private readonly actuators: Actuators;
   private readonly sensors:   Sensors;
+  private readonly communication: Communication;
 
-  constructor (ctx: Context, actuators: Actuators, sensors: Sensors) {
+  constructor (ctx: Context, actuators: Actuators, sensors: Sensors, communication: Communication) {
     this.ctx       = ctx;
     this.actuators = actuators;
     this.sensors   = sensors;
+    this.communication = communication;
   }
 
   /** Roll to a locator point, over what can be charged over; see reach.ts. */
@@ -36,7 +39,7 @@ export class Behavior {
   /** Turn to face a Bolt that sends `channel` weakly; see lock-on.ts. */
   @log
   async lockOn (channel: number): Promise<LockOnResult> {
-    return lockOn(this.ctx, this.actuators, this.sensors, channel);
+    return lockOn(this.ctx, this.actuators, this.sensors, this.communication, channel);
   }
 
 }

@@ -1,4 +1,5 @@
 import type { Actuators } from '../actuators/actuators';
+import type { Communication } from '../communication/communication';
 import type { Context } from '../context';
 import type { Sensors } from '../sensors/sensors';
 import { angleDistance, mod360 } from '../helpers/math';
@@ -32,18 +33,17 @@ export interface LockOnResult {
  * - The notify carries no side; 0x22 does (front left, front right, back
  *   right, back left), but a poll catches it in 1 to 4 % of polls.
  *
- * search: blinking O until a notify on `channel`. track: static O; find
- * both edges of the zone it hears in (20 degree steps, then halved to 5),
- * aim at their middle; the first 0x22 reading on one pair tells front from
- * back, back turns 180. locked: U, its open end toward the sender. No
- * notify for 1 s goes back to search. Ends on a collision, a fullstop, or
+ * search: infrared 'infra-listen' until a notify on `channel`. track:
+ * 'tracking'; find both edges of the zone it hears in (20 degree steps,
+ * then halved to 5), aim at their middle; the first 0x22 reading on one
+ * pair tells front from back, back turns 180. locked: 'infra-listen' and
+ * the mark 'locked'. No notify for 1 s goes back to search. Ends on a collision, a fullstop, or
  * a zone without an edge (heard all round).
  */
-export async function lockOn (ctx: Context, actuators: Actuators, sensors: Sensors, channel: number): Promise<LockOnResult> {
+export async function lockOn (ctx: Context, actuators: Actuators, sensors: Sensors, communication: Communication, channel: number): Promise<LockOnResult> {
   const s = ctx.motion;
   const { status } = ctx;
-  const { matrix, motor } = actuators;
-  const color = ctx.config.colors.matrix;
+  const { motor } = actuators;
   const t0 = ctx.now();
   const time = { search: 0, track: 0, locked: 0 };
   let state = 'search' as keyof typeof time, since = t0;
@@ -52,6 +52,10 @@ export async function lockOn (ctx: Context, actuators: Actuators, sensors: Senso
   let notifies = 0, heard = -Infinity, turns = 0, tracks = 0;
   let side: LockOnResult['side'] = 'unknown', edges: number[] = [];
   const done = () => reason !== null || s.aborted;
+  const show = async (st: keyof typeof time) => {
+    await communication.state('infrared', st === 'track' ? 'tracking' : 'infra-listen');
+    await communication.state('mark', st === 'locked' ? 'locked' : null);
+  };
 
   // listen is one-shot: re-arm after every notify
   const offInfrared = await sensors.infrared.subscribe(({ payload }) => {
@@ -94,19 +98,11 @@ export async function lockOn (ctx: Context, actuators: Actuators, sensors: Senso
     return (inside + deaf) / 2;
   };
 
-  const display = (async () => {
-    let shown = '';
-    while (!done()) {
-      const want = state === 'search' ? (shown === 'O' ? '' : 'O') : state === 'track' ? 'O' : 'U';
-      if (want !== shown) await (want ? matrix.char(want, color) : matrix.clear());
-      shown = want;
-      await wait(state === 'search' ? 500 : 100);
-    }
-  })();
+  await show(state);
 
   while (!done()) {
     if (state === 'search') {
-      if (ctx.now() - heard < 1000) state = enter('track');
+      if (ctx.now() - heard < 1000) { state = enter('track'); await show(state); }
       else { await wait(50); continue; }
     }
     if (state === 'track') {
@@ -127,16 +123,17 @@ export async function lockOn (ctx: Context, actuators: Actuators, sensors: Senso
       }
       if (side === 'back') await turnTo(status.heading + 180);
       state = enter('locked');
+      await show(state);
       continue;
     }
-    if (ctx.now() - heard > 1000) state = enter('search');
+    if (ctx.now() - heard > 1000) { state = enter('search'); await show(state); }
     else await wait(50);
   }
 
   reason ??= 'aborted';
   enter(state);
-  await display;
-  await matrix.clear();
+  await communication.state('infrared', null);
+  await communication.state('mark', null);
   await motor.stop();
   while (!status.isStill && !s.aborted) await wait(50);
   await motor.stabilize(StabilizationIndex.none);

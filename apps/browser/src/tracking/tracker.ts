@@ -440,7 +440,7 @@ class Tracker {
   private async release (b: Bolt): Promise<void> {
     if (b.status.matrix.owner !== MATRIX_OWNER) return;
     b.actuators.matrix.release(MATRIX_OWNER);
-    if (b.connected) await b.communication.restingPattern();
+    if (b.connected) await b.communication.state('motor', 'resting');
   }
 
   start () {
