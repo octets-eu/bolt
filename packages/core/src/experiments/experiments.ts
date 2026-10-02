@@ -302,4 +302,15 @@ export class Experiments {
     this.ctx.log('info', 'stress.out');
   }
 
+  /**
+   * Hide and seek over the room, by infrared at `strength` (the sender's).
+   * The seeker drives by the front lobe only. 16 is the weakest strength
+   * that reached 4 m and the one with the narrowest lobes; measured in
+   * research/infrared-external-device.md, "Bolt to Bolt, 4 m apart"
+   * (2026-10-02). Not written yet.
+   */
+  async hideAndSeek (strength = 16): Promise<void> {
+    this.ctx.log('info', `hideAndSeek: strength ${strength}, not written yet`);
+  }
+
 }
