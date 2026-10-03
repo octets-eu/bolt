@@ -1,10 +1,12 @@
 import type { Actuators } from '../actuators/actuators';
+import type { Infrared } from '../actuators/infrared';
+import type { Communication } from '../communication/communication';
 import type { Context } from '../context';
 import type { Navigation } from '../navigation/navigation';
 import type { Sensors } from '../sensors/sensors';
 import { range, wait, whenAborted } from '../helpers/utils';
 import { DriveFlag, RawMotorMode, StabilizationIndex } from '../protocol/constants';
-import { distance, headingTo } from '../helpers/math';
+import { distance, headingTo, mod360 } from '../helpers/math';
 import type { Point } from '../helpers/math';
 import { DriveModel, stoppingDistance, stopNow, targetSpeed } from './landing';
 import type { LandingResult } from './landing';
@@ -22,12 +24,14 @@ export class Experiments {
   private readonly actuators: Actuators;
   private readonly sensors:   Sensors;
   private readonly navigation: Navigation;
+  private readonly communication: Communication;
 
-  constructor (ctx: Context, actuators: Actuators, sensors: Sensors, navigation: Navigation) {
+  constructor (ctx: Context, actuators: Actuators, sensors: Sensors, navigation: Navigation, communication: Communication) {
     this.ctx        = ctx;
     this.actuators  = actuators;
     this.sensors    = sensors;
     this.navigation = navigation;
+    this.communication = communication;
   }
 
   /**
@@ -300,6 +304,92 @@ export class Experiments {
     if (!s.aborted) await this.circleAround(20, 35);
     if (!s.aborted) await this.navigation.rollToPoint({ x: 0, y: 0 });
     this.ctx.log('info', 'stress.out');
+  }
+
+  /**
+   * Weakest infrared strength that arrives, per distance. `sender` (the
+   * other Bolt's emitters) sends channel 1 ten frames at each strength of
+   * `ladder` while this Bolt counts notifies; then it aims at the front lobe
+   * and rolls `stepCm` toward the sender. Aim: -60 to +60 degrees in 20
+   * degree steps, five frames each, at the weakest strength that arrived 5
+   * of 10 here; turn to the notify-weighted mean. Ends after `minutes`, on a
+   * collision (arrived), a fullstop, or when nothing arrives. Setup: start
+   * facing the sender, line of sight, nothing that reflects. Basis in
+   * research/infrared-external-device.md, "Bolt to Bolt, 4 m apart"
+   * (2026-10-02).
+   */
+  async calibrateInfraredLadder (sender: Infrared, ladder = [1, 2, 4, 8, 16, 32], stepCm = 50, minutes = 2) {
+    const { status } = this.ctx;
+    const s = this.ctx.motion;
+    const { motor } = this.actuators;
+    const channel = 1;
+    const t0 = Date.now();
+    const start = { ...status.position };
+    let notifies = 0, collisions = 0;
+    const offInfrared = await this.sensors.infrared.subscribe(({ payload }) => {
+      if (payload[0] === channel) notifies++;
+      void this.sensors.listenInfrared(true);
+    });
+    const offCollision = await this.sensors.collision.subscribe(() => { collisions++; }, {});
+    const release = await this.sensors.motion.subscribe(null);
+    await motor.stabilize(StabilizationIndex.full);
+    /** Notifies while the sender sends `frames` at `strength`, one per 200 ms. */
+    const count = async (strength: number, frames: number) => {
+      await this.sensors.listenInfrared(true);
+      const n = notifies;
+      for (let k = 0; k < frames && !s.aborted; k++) {
+        const t = Date.now();
+        await sender.send(channel, strength);
+        await wait(Math.max(0, 200 - (Date.now() - t)));
+      }
+      await wait(100);
+      return notifies - n;
+    };
+    const turnTo = async (h: number) => {
+      await motor.roll(0, mod360(Math.round(h)));
+      await wait(300);
+      while (!status.isStill && !s.aborted) await wait(50);
+    };
+    const rows: { cm: number, heard: Record<number, number>, aim: number | null }[] = [];
+    let reason = 'time';
+    while (!s.aborted) {
+      if (Date.now() - t0 > minutes * 60000) break;
+      await this.communication.state('infrared', 'infra-listen');
+      const heard: Record<number, number> = {};
+      for (const strength of ladder) heard[strength] = await count(strength, 10);
+      const row = { cm: Math.round(distance(start, status.position)), heard, aim: null as number | null };
+      rows.push(row);
+      this.ctx.log('info', `calibrateInfraredLadder ${row.cm} cm: ${ladder.map(st => `${st}:${heard[st]}`).join(' ')}`);
+      const weakest = ladder.find(st => (heard[st] ?? 0) >= 5);
+      if (weakest === undefined) { reason = 'lost'; break; }
+      if (s.aborted || Date.now() - t0 > minutes * 60000) break;
+      await this.communication.state('infrared', 'tracking');
+      const h0 = status.heading;
+      let sum = 0, weight = 0;
+      for (const o of [-60, -40, -20, 0, 20, 40, 60]) {
+        await turnTo(h0 + o);
+        const n = await count(weakest, 5);
+        sum += o * n; weight += n;
+      }
+      if (weight === 0) { reason = 'lost'; break; }
+      row.aim = Math.round(sum / weight);
+      const aim = h0 + row.aim, p = status.position;
+      await this.communication.state('motor', 'cruising');
+      const before = collisions;
+      await this.navigation.rollToPoint({ x: p.x + stepCm * Math.sin(aim * Math.PI / 180), y: p.y + stepCm * Math.cos(aim * Math.PI / 180) });
+      await this.communication.state('motor', null);
+      if (collisions > before) { reason = 'collision'; break; }
+    }
+    if (s.aborted) reason = 'aborted';
+    await this.communication.state('motor', null);
+    await this.communication.state('infrared', null);
+    await motor.stop();
+    await motor.stabilize(StabilizationIndex.none);
+    await release();
+    await offCollision();
+    await offInfrared();
+    this.ctx.log('info', `calibrateInfraredLadder: ${reason} after ${Math.round((Date.now() - t0) / 1000)} s, ${rows.length} positions`);
+    return { reason, rows };
   }
 
   /**

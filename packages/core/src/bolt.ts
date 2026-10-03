@@ -74,7 +74,7 @@ export class Bolt implements Context {
     this.navigation  = new Navigation(this, this.actuators, this.sensors);
     this.lifecycle   = new Lifecycle(this, this.actuators, this.sensors, this.communication, this.navigation);
     this.behavior    = new Behavior(this, this.actuators, this.sensors, this.communication);
-    this.experiments = new Experiments(this, this.actuators, this.sensors, this.navigation);
+    this.experiments = new Experiments(this, this.actuators, this.sensors, this.navigation, this.communication);
 
   }
 
