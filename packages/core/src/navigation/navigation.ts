@@ -35,10 +35,19 @@ export class Navigation {
   /**
    * Resolve once the ball neither moves nor turns, see `status.isStill`, or
    * when `s` aborts: with a NaN locator it is never still. The caller holds
-   * the motion stream.
+   * the motion stream. A pause in the samples is not rest: it waits for the
+   * next one (2026-10-03: a stalled page left half a second without a sample
+   * and ended a rotate).
    */
   public async waitForStill (s: AbortSignal): Promise<void> {
-    while (!this.ctx.status.isStill && !s.aborted) await wait(50);
+    const still = (): boolean => {
+      try { return this.ctx.status.isStill; }
+      catch (error) {
+        if (!this.sensors.motion.active) throw error;
+        return false;
+      }
+    };
+    while (!still() && !s.aborted) await wait(50);
   }
 
   /**
