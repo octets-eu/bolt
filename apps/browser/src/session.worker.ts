@@ -56,6 +56,9 @@ addEventListener('message', async (e: MessageEvent) => {
       case 'read':
         postMessage({ type: 'read', id: msg.id, text: readAll(), size });
         break;
+      case 'sync':
+        postMessage({ type: 'synced', id: msg.id, size });
+        break;
       case 'close':
         handle?.close();
         handle = null;

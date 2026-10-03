@@ -119,8 +119,13 @@ const Logger = Factory.create('Logger', {
     Logger.push({ t: msg.t, bolt: msg.bolt, type: msg.source || 'camera', subtype: 'position', data: msg } as ILogline);
   },
 
-  reset () {
+  /** Empties the lines on screen; the session file keeps everything. */
+  clear () {
     while (log.length) { log.shift(); }
+  },
+
+  reset () {
+    Logger.clear();
     Logger.info(this, 'Reset');
   },
 

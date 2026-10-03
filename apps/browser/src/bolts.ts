@@ -82,12 +82,10 @@ class bolts {
     return Array.from(new Set([...Object.keys(this.configs), ...this.bolts.map(b => b.name)]));
   }
 
-  reset () {
+  async reset () {
     Logger.reset();
     Plotter.reset();
-    this.forEach((bolt: Bolt) => {
-      void bolt.lifecycle.reset();
-    });
+    await Promise.all(this.map((bolt: Bolt) => bolt.lifecycle.reset()));
   }
 
   activate () {
@@ -98,17 +96,17 @@ class bolts {
       m.redraw();
     });
 
-    // Chrome drops GATT links on navigation anyway; closing them here is synchronous
-    // and makes the Bolt re-advertise at once, so the reloaded page reconnects fast.
-    // Async work (like a sleep command) cannot complete in this handler.
-    window.addEventListener('pagehide', () => {
-      for (const bolt of this.bolts.splice(0)) {
-        if (bolt.connected) {
-          console.log('Bolts.pagehide', bolt.name, 'disconnecting');
-          bolt.transport.close();
-        }
-      }
-    });
+    // Off since 2026-10-02: after this close the reloaded page got no advertisement
+    // for minutes, twice. Chrome drops GATT links on navigation anyway; closing them
+    // here was meant to make the Bolt re-advertise at once.
+    // window.addEventListener('pagehide', () => {
+    //   for (const bolt of this.bolts.splice(0)) {
+    //     if (bolt.connected) {
+    //       console.log('Bolts.pagehide', bolt.name, 'disconnecting');
+    //       bolt.transport.close();
+    //     }
+    //   }
+    // });
 
   }
 
@@ -206,8 +204,9 @@ class bolts {
 
   }
 
-  public disconnect () {
-    this.forEach(this.disconnectBolt.bind(this));
+  public async disconnect () {
+    // a copy: disconnectBolt removes the Bolt from the list
+    await Promise.all([...this.bolts].map(bolt => this.disconnectBolt(bolt)));
   }
 
   public async disconnectBolt ( bolt: Bolt ) {

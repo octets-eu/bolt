@@ -123,6 +123,13 @@ class SessionLog {
     this.ready.then(() => this.worker.postMessage({ type: 'append', text }));
   }
 
+  /** Resolves once every line appended so far is in the file; the worker answers in order. */
+  async save (): Promise<void> {
+    this.flush();
+    await this.ready;
+    await this.call({ type: 'sync' });
+  }
+
   /** The whole session file as text, header first. */
   async toJsonl (): Promise<string> {
     this.flush();
