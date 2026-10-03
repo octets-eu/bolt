@@ -39,6 +39,13 @@ export class Matrix {
       this.playing = false;
       if (this.stack.at(-1)?.mode === 'flash') void this.pop();
     });
+    // sleep wipes what is stored on the Bolt (2026-10-03: no frames listed after a wake, the play of a stored id failed)
+    ctx.events.on('didsleep', () => {
+      this.stack = [];
+      this.stored.clear();
+      this.playing = false;
+      this.replaced = 0;
+    });
   }
 
   private send<N extends string> (name: N, device: DeviceId, id: number, data: readonly number[], target: Target): Promise<Ack<AckPayload<N>>> {
