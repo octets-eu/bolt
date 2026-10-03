@@ -7,6 +7,13 @@ import { StabilizationIndex } from '../protocol/constants';
 import { clamp, wait } from '../helpers/utils';
 import { log } from '../lifecycle/log';
 
+export interface RotateResult {
+  /** Degrees still missing to the goal, signed like the turn asked for; from the yaw. */
+  readonly error:  number;
+  /** Corrections after the turn, 0 to 5. */
+  readonly rounds: number;
+}
+
 /**
  * Moving the ball on purpose. Every step ends on fullstop, holds the motion
  * stream while it drives and switches stabilization on before and off
@@ -55,17 +62,21 @@ export class Navigation {
    * Turn in place by `degrees` from the commanded heading, either way and
    * any amount: 360 is a full turn, 720 two. Positive turns clockwise, like
    * the heading; the measured yaw goes negative (rotate(94) from yaw 0 ended
-   * at yaw -95, 2026-09-29). On every sample the commanded
-   * heading is set `lead` degrees ahead of the yaw turned so far, capped at
-   * the goal, so the ball turns without stopping at steps. Ends once the
-   * goal is commanded and the ball has turned and is still, when the time
-   * budget is spent, or on fullstop.
+   * at yaw -95, 2026-09-29). On every sample the commanded heading is set
+   * `lead` degrees ahead of the yaw turned so far, capped at the goal, so
+   * the ball turns without stopping at steps.
+   *
+   * The firmware's own loop stops short of a commanded heading and ignores
+   * a small error: on the floor 2026-10-03 nothing moved under 4 degrees and
+   * larger turns ended 3 (SB-9129) and 4.5 (SB-11DF) degrees short. So once
+   * the ball is still the yaw is read, and what is missing is added to the
+   * command, up to five rounds, until the turn is within `tolerance`. Ends
+   * also when the time budget of the turn is spent, or on fullstop.
    */
   @log
-  public async rotate (degrees: number, lead = 120): Promise<void> {
+  public async rotate (degrees: number, tolerance = 2, lead = 120): Promise<RotateResult> {
 
-    // isStill sees no turn under 1 degree, the loop would wait for one forever
-    if (Math.abs(degrees) < 1) return;
+    if (Math.abs(degrees) <= tolerance) return { error: degrees, rounds: 0 };
 
     const start = this.ctx.status.heading;
     const goal  = Math.abs(degrees);
@@ -74,24 +85,31 @@ export class Navigation {
     const settleMs      = 1200; // start, overshoot and the still window
     const degPerSec     = 330;  // turn rate on the floor, 720 minus 360
     const budgetMs      = 2 * (settleMs + goal / degPerSec * 1000);
+    const maxRounds     = 5;
 
     const t0 = this.ctx.now();
     const s = this.ctx.motion;
-    let swept = 0, last: number | null = null, moved = false, ended = false;
+    const { motor } = this.actuators;
+    let swept = 0, last: number | null = null, paced = false;
     let done = (): void => {};
-    const turned = new Promise<void>((resolve) => { done = () => { ended = true; resolve(); }; });
+    const goalDue = new Promise<void>((resolve) => { done = () => { paced = true; resolve(); }; });
+    /** Degrees still missing, signed like `degrees`: the yaw counts the other way round. */
+    const missing = (): number => degrees + swept;
+    /** The half second `isStill` looks at lies after the command. */
+    const settle = async (): Promise<void> => {
+      await wait(600);
+      await this.waitForStill(s);
+    };
 
-    await this.actuators.motor.stabilize(StabilizationIndex.full);
+    await motor.stabilize(StabilizationIndex.full);
 
-    // the hold outlives the step's end by the stop and the still wait; samples then change nothing
+    // the hold outlives the turn: the rounds and the result read the yaw swept
     const release = await this.sensors.motion.subscribe((sample) => {
-      if (ended) return;
       if (last !== null) swept += angleDistance(last, sample.angles.yaw);
       last = sample.angles.yaw;
-      const still = this.ctx.status.isStill;
-      moved ||= !still;
+      if (paced) return;
       const ahead = Math.min(Math.abs(swept) + lead, goal);
-      if (s.aborted || (ahead === goal && moved && still)) {
+      if (s.aborted || ahead === goal) {
         done();
         return;
       }
@@ -100,13 +118,28 @@ export class Navigation {
         done();
         return;
       }
-      this.actuators.motor.rollIfIdle(0, start + sign * ahead);
+      motor.rollIfIdle(0, start + sign * ahead);
     });
 
-    await turned;
-    await this.waitForStill(s);
-    await this.actuators.motor.stabilize(StabilizationIndex.none);
+    await goalDue;
+    let command = start + degrees, rounds = 0;
+    if (!s.aborted) {
+      await motor.roll(0, command);
+      await settle();
+    }
+    while (Math.abs(missing()) > tolerance && rounds < maxRounds && !s.aborted) {
+      command += missing();
+      await motor.roll(0, command);
+      await settle();
+      rounds++;
+    }
+
+    await motor.stabilize(StabilizationIndex.none);
     await release();
+
+    const error = Math.round(missing() * 10) / 10;
+    this.ctx.log('info', `rotate ${degrees}: ${error} missing after ${rounds} rounds`);
+    return { error, rounds };
 
   }
 

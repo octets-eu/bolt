@@ -42,6 +42,7 @@ export { Power } from './actuators/power';
 export { Lifecycle } from './lifecycle/lifecycle';
 export type { WakeResult } from './lifecycle/lifecycle';
 export { Navigation } from './navigation/navigation';
+export type { RotateResult } from './navigation/navigation';
 export { Communication } from './communication/communication';
 export type { BroadcastOptions } from './communication/communication';
 export { Calibration } from './calibration/calibration';
