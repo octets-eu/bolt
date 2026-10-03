@@ -31,10 +31,6 @@ const BoltCommands = Factory.create('Layout', {
           m('button.br2.mh1.cmd', { title: 'Wake',                                           onclick: run(() => bolt.lifecycle.wake()) },  Icon('alarmClock')),
           m('button.br2.mh1.cmd', { onclick: run(() => bolt.lifecycle.reset()) },                                    'Reset'),
           m('button.br2.mh1.cmd', { title: 'North: spins until two agree, faces it',               onclick: run(() => bolt.calibration.north()) },   Icon('compass')),
-          m('button.br2.mh1.cmd', { title: 'Aim: where the ball faces becomes heading 0 (the locator keeps its axes)', onclick: run(async () => {
-            await bolt.actuators.motor.resetYaw();
-            bolt.log('info', 'aim: heading 0 is where the ball faces');
-          }) }, Icon('crosshair')),
           m('button.br2.mh1.cmd', { title: 'Action: circle around, then roll back to origin',         onclick: run(() => bolt.experiments.action()) },      Icon('play')),
           m('button.br2.mh1.cmd', { title: 'Stress: roll to origin, circle around, roll to origin',   onclick: run(() => bolt.experiments.stress()) },      Icon('flame')),
           m('button.br2.mh1.cmd', { title: 'Info: query battery, charger, infrared, ambient light',   onclick: run(() => bolt.lifecycle.readAll()) }, Icon('info')),

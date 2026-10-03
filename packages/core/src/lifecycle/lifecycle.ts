@@ -14,13 +14,17 @@ export interface WakeResult {
 /**
  * Power and session state.
  *
- * - `takeover` runs once per connection: the app assumes control, zeroes the
- *   locator, reads every value once, keeps the Bolt awake.
- * - `reset` runs whenever the Bolt is or becomes awake under our control:
- *   still, stabilized, lights, streaming mask and notification switches, all
- *   of which the firmware forgets in sleep, then a full turn in place that
- *   proves the shell turns. It leaves the locator alone and the
- *   stabilization loop off: navigation engages the loop only while it drives.
+ * - `takeover` runs once per connection: the app assumes control, reads
+ *   every value once, keeps the Bolt awake.
+ * - `reset` runs whenever the Bolt is or becomes awake under our control and
+ *   leaves one defined state: yaw 0, position 0, the locator's +y along
+ *   heading 0, which is the Bolt's front. Only a wake gives that (2026-10-03:
+ *   a yaw reset turns the heading frame and leaves the locator axes, a
+ *   locator reset zeroes the position only), so every reset sleeps and wakes
+ *   the Bolt. Before that a full turn in place proves the shell turns; after
+ *   it nothing moves the ball, only lights, streaming mask and notification
+ *   switches go out, all of which the firmware forgets in sleep. The
+ *   stabilization loop stays off: navigation engages it only while it drives.
  */
 export class Lifecycle {
 
@@ -87,13 +91,20 @@ export class Lifecycle {
 
     const { front, back } = this.ctx.config.colors;
     
-    await this.actuators.motor.stop();
+    // off, not a roll to the heading the status holds: that heading is not the Bolt's yet
+    await this.actuators.motor.off();
+    // the turn first: nothing moves the ball once the wake has laid its frame
+    await this.sensors.reapply();
+    await this.navigation.rotate(360);
+    await this.sleepWake();
+    this.ctx.status.heading  = 0;
+    this.ctx.status.position = { x: 0, y: 0 };
+
     await this.actuators.motor.stabilize(StabilizationIndex.none);
     await this.actuators.led.set(front, back);
     await this.communication.log('frames');
     await this.communication.state('motor', 'resting');
     await this.sensors.reapply();
-    await this.navigation.rotate(360);
     // no north: it varies by over 100 degrees between spots 25 cm apart (research/bolt.md);
     // calibration.north() stays for the compass button
     
@@ -105,6 +116,16 @@ export class Lifecycle {
   
   }
 
+  /** Sleep, then wake; resolves on the awake notification. A commanded sleep sends no willsleep (2026-10-03). */
+  private async sleepWake (): Promise<void> {
+    const slept = this.ctx.events.once('didsleep', { timeoutMs: 5000 });
+    await this.actuators.power.sleep();
+    await slept;
+    const awake = this.ctx.events.once('awake', { timeoutMs: 1000 });
+    await this.actuators.power.wake();
+    await awake;
+  }
+
   /** The app assumes control of a freshly connected Bolt. */
   async takeover (): Promise<void> {
     this.ctx.log('info', 'takeover.in');
@@ -114,9 +135,6 @@ export class Lifecycle {
       void this.wake();
     });
     const { awakeSeen } = await this.wake();
-    // before reset needs it: on 2026-09-24 a link cut during a north spin left
-    // the firmware locator at NaN, reset's rotate never saw the ball still
-    await this.actuators.motor.resetLocator();
     // battery, charger, gyro max, infrared and collision feed the status and the log for the whole
     // connection. Taken awake: the sensor side does not ack switches while the Bolt sleeps.
     await this.sensors.battery.subscribe(null);
@@ -128,8 +146,6 @@ export class Lifecycle {
     await this.sensors.collision.subscribe(() => void this.actuators.matrix.push('flash', 'collision'), { xThreshold: 50, yThreshold: 50 });
     if (awakeSeen) await this.resetting;
     else await this.reset();
-    // the reset's turn moved the ball: 0,0 is where it lies now
-    await this.actuators.motor.resetLocator();
     await this.readAll();
     this.ctx.log('info', 'takeover.out');
   }
