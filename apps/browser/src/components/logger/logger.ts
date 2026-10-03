@@ -7,7 +7,14 @@ import { Bolt, LogEntry } from '@bolt/core';
 import { IPositionMessage } from '@bolt/protocol';
 import { session } from '../../session';
 
+/** Lines on screen, newest first, at most `MAX`. */
 const log = [] as ILogline[];
+const MAX = 2000;
+/** Lines not on screen yet, oldest first; `flush` moves them every 250 ms. */
+const pending = [] as ILogline[];
+let timer: ReturnType<typeof setTimeout> | null = null;
+/** The table body while the Logger is mounted. Its rows are written here directly, mithril never diffs them. */
+let body: HTMLTableSectionElement | null = null;
 
 function time (t: number) {
   const s = t / 1000;
@@ -87,11 +94,46 @@ function lineFor (bolt: string, entry: LogEntry): ILogline {
   return { ...base, type: 'event', subtype: entry.subtype, data };
 }
 
+/** One table row as DOM, built once; the cells come from the formatters. */
+function rowFor (line: ILogline): HTMLTableRowElement {
+  const tr = document.createElement('tr');
+  tr.className = [line.bolt, line.type, line.subtype].join(' ');
+  const cells = (formatter[line.type] ?? formatter.event!)(line);
+  m.render(tr, wide ? cells : cells.slice(0, NARROW));
+  return tr;
+}
+
+/**
+ * The pending lines onto the screen, in one step. Drawn through mithril the
+ * unkeyed rows were all rewritten for every new line, on every sensor
+ * sample: with 2000 rows the page stalled up to 3 s and a command took 130
+ * instead of 30 ms (2026-10-03).
+ */
+function flush (): void {
+  timer = null;
+  const lines = pending.splice(0);
+  for (const line of lines) log.unshift(line);
+  log.length = Math.min(log.length, MAX);
+  if (!body) return;
+  const rows = document.createDocumentFragment();
+  for (const line of lines.reverse()) rows.append(rowFor(line));
+  body.prepend(rows);
+  while (body.rows.length > MAX) body.deleteRow(-1);
+}
+
+/** Every line of `log` anew, e.g. after mounting or when the columns change. */
+function fill (): void {
+  body?.replaceChildren(...log.map(rowFor));
+}
+
 const Logger = Factory.create('Logger', {
 
   name: 'Logger',
 
-  push: Array.prototype.unshift.bind(log),
+  push (line: ILogline) {
+    pending.push(line);
+    timer ??= setTimeout(flush, 250);
+  },
 
   /** A Bolt's log entries become lines. */
   attach (bolt: Bolt): () => void {
@@ -121,7 +163,9 @@ const Logger = Factory.create('Logger', {
 
   /** Empties the lines on screen; the session file keeps everything. */
   clear () {
-    while (log.length) { log.shift(); }
+    log.length = 0;
+    pending.length = 0;
+    body?.replaceChildren();
   },
 
   reset () {
@@ -131,6 +175,7 @@ const Logger = Factory.create('Logger', {
 
   toggleWide () {
     wide = !wide;
+    fill();
   },
 
   view () {
@@ -138,14 +183,14 @@ const Logger = Factory.create('Logger', {
       m('td', 'T'), m('td', 'Bolt'), m('td', 'Type'), m('td', 'Name'),
       m('td.tr', 'ID'), m('td.tr', 'D'), m('td.tr', 'C'), m('td.tr', 'T'), m('td.tr', 'Payload'),
     ];
-    const row = (line: ILogline) => {
-      const cells = (formatter[line.type] ?? formatter.event!)(line);
-      return m('tr', { className: [line.bolt, line.type, line.subtype].join(' ') }, wide ? cells : cells.slice(0, NARROW));
-    };
     return m('div.logger' + (wide ? '' : '.narrow'), { style: { overflowY: 'scroll' } },
       m('table', [
         m('thead', m('tr', wide ? head : head.slice(0, NARROW))),
-        m('tbody', {}, log.slice(0, 2000).map(row)),
+        m('tbody', {
+          oncreate: (vnode: m.VnodeDOM) => { body = vnode.dom as HTMLTableSectionElement; fill(); },
+          onremove: () => { body = null; },
+          onbeforeupdate: () => false,
+        }),
       ])
     );
   },
