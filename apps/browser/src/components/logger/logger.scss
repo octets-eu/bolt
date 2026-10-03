@@ -14,6 +14,10 @@ div.logger {
     font-family: monospace;
     border-collapse: collapse;
 
+    // one line per entry: only the last cell of a row may wrap
+    td            { white-space: nowrap; }
+    td:last-child { white-space: normal; }
+
     td.id, td.device, td.target, td.source, td.command {
       text-align: right;
     }

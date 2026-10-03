@@ -20,11 +20,11 @@ const BoltCommands = Factory.create('Layout', {
     };
 
     return  ( !bolt.connected
-      ? m('div.commands.w-100.pa2', { className }, m('[', [
+      ? m('div.commands.w-100.flex.items-center.flex-wrap', { className }, m('[', [
           m('div.di.ma2.f3.mono', bolt.name),
           m('span.ml3.f5.mono', `Connecting: rssi: ${bolt.status.rssi}, txPOwer: ${bolt.status.txPower}`)
         ]))
-      : m('div.commands.w-100.pa2', { className }, [
+      : m('div.commands.w-100.flex.items-center.flex-wrap', { className }, [
           m('div.di.f3.ma2.mono', bolt.name),
           m('button.br2.mh1.cmd', { onclick: () => Bolts.disconnectBolt(bolt) },                         'Disconnect'),
           m('button.br2.mh1.cmd', { title: 'Sleep (soft, wakes on command)',                onclick: run(() => bolt.lifecycle.sleep()) }, Icon('bed')),

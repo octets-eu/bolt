@@ -24,7 +24,7 @@ const reload = async () => {
 const Header = Factory.create('Header', {
   view () {
 
-    return m('header.w-100.pa2.bg-777',
+    return m('header.w-100.pa2.bg-777.flex.items-center.flex-wrap',
 
       !Bolts.count()
         ? m('[',[
