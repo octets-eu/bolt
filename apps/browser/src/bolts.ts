@@ -2,7 +2,7 @@
 
 import m from 'mithril';
 
-import { Bolt, BoltConfig, NotConnectedError } from '@bolt/core';
+import { Bolt, BoltConfig, NotConnectedError, seekToCollision } from '@bolt/core';
 import { WebBleTransport, isBluetoothAvailable, onAvailabilityChanged, getPermittedBolts, requestBolt, waitForAdvertisement } from '@bolt/web-ble';
 
 import { Logger }  from './components/logger/logger';
@@ -72,6 +72,13 @@ class bolts {
 
   public count () {return this.bolts.length;}
   public get (name: string) { return this.find( (bolt: Bolt) => bolt.name === name); }
+
+  /** The seekToCollision experiment with two connected Bolts by name; see @bolt/core experiments/seek-to-collision.ts. */
+  public seekToCollision ({ seeker, sender, seconds = 60 }: { seeker: string, sender: string, seconds?: number }) {
+    const a = this.get(seeker), b = this.get(sender);
+    if (!a || !b) throw new NotConnectedError(a ? sender : seeker);
+    return seekToCollision(a, b, seconds);
+  }
 
   configFor (name: string): BoltConfig {
     return this.configs[name] || this.defaultConfig;

@@ -11,6 +11,8 @@ import type { Point } from '../helpers/math';
 import { DriveModel, stoppingDistance, stopNow, targetSpeed } from './landing';
 import type { LandingResult } from './landing';
 import { sampleLoop } from './sample-loop';
+import { seek, sendLadder } from './seek-to-collision';
+import type { SeekResult } from './seek-to-collision';
 
 /**
  * Experiments: functions under test, a work log in code, run from the
@@ -390,6 +392,16 @@ export class Experiments {
     await offInfrared();
     this.ctx.log('info', `calibrateInfraredLadder: ${reason} after ${Math.round((Date.now() - t0) / 1000)} s, ${rows.length} positions`);
     return { reason, rows };
+  }
+
+  /** Send the infrared ladder until fullstop; see seek-to-collision.ts. */
+  async sendLadder (): Promise<number> {
+    return sendLadder(this.ctx, this.actuators);
+  }
+
+  /** Find the Bolt that sends the ladder and roll into it, until fullstop; see seek-to-collision.ts. */
+  async seek (): Promise<SeekResult> {
+    return seek(this.ctx, this.actuators, this.sensors);
   }
 
   /**

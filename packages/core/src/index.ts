@@ -51,3 +51,4 @@ export { Behavior } from './behavior/behavior';
 export type { ReachResult } from './behavior/reach';
 export type { LockOnResult } from './behavior/lock-on';
 export { Experiments } from './experiments/experiments';
+export { seekToCollision } from './experiments/seek-to-collision';
