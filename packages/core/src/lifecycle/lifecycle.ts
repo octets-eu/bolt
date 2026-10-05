@@ -21,8 +21,9 @@ export interface WakeResult {
  *   heading 0, which is the Bolt's front. Only a wake gives that (2026-10-03:
  *   a yaw reset turns the heading frame and leaves the locator axes, a
  *   locator reset zeroes the position only), so every reset sleeps and wakes
- *   the Bolt. Before that a full turn in place proves the shell turns; after
- *   it nothing moves the ball, only lights, streaming mask and notification
+ *   the Bolt. A full turn in place before that proved the shell turns; it is
+ *   commented out since 2026-10-05, because it shifts the ball a bit. So
+ *   nothing moves the ball, only lights, streaming mask and notification
  *   switches go out, all of which the firmware forgets in sleep. The
  *   stabilization loop stays off: navigation engages it only while it drives.
  */
@@ -32,17 +33,17 @@ export class Lifecycle {
   private readonly actuators: Actuators;
   private readonly sensors:   Sensors;
   private readonly communication: Communication;
-  private readonly navigation:  Navigation;
+  // private readonly navigation:  Navigation;   // with the turn in reset
   private resetting:    Promise<void> | null = null;
   /** Steps running now, outermost first; after an error the failed ones stay. */
   private readonly running: string[] = [];
 
-  constructor (ctx: Context, actuators: Actuators, sensors: Sensors, communication: Communication, navigation: Navigation) {
+  constructor (ctx: Context, actuators: Actuators, sensors: Sensors, communication: Communication, _navigation: Navigation) {
     this.ctx         = ctx;
     this.actuators   = actuators;
     this.sensors     = sensors;
     this.communication   = communication;
-    this.navigation  = navigation;
+    // this.navigation  = _navigation;
     void sensors.didsleep.subscribe(() => {
       ctx.status.awake = false;
       ctx.status.ready = false;
@@ -94,8 +95,9 @@ export class Lifecycle {
     // off, not a roll to the heading the status holds: that heading is not the Bolt's yet
     await this.actuators.motor.off();
     // the turn first: nothing moves the ball once the wake has laid its frame
-    await this.sensors.reapply();
-    await this.navigation.rotate(360);
+    // commented out 2026-10-05: the turn shifts the ball a bit, a Bolt placed on a start point has to keep spot and direction
+    // await this.sensors.reapply();
+    // await this.navigation.rotate(360);
     await this.sleepWake();
     this.ctx.status.heading  = 0;
     this.ctx.status.position = { x: 0, y: 0 };
