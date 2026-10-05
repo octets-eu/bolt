@@ -156,22 +156,21 @@ export class Navigation {
    * Drive to a locator point: on every sample, aim and send one roll until
    * within `tolerance`, then stop. The speed follows the locator speed: the
    * command rises while the ball is slower than half the distance per second
-   * (3 to 30 cm/s) and falls while it is faster, so it breaks free on any
-   * surface and slows on the approach. Ends when the time budget is spent,
-   * or on fullstop.
+   * (3 to `maxWant` cm/s) and falls while it is faster, so it breaks free on
+   * any surface and slows on the approach. Ends when the time budget is
+   * spent, or on fullstop.
    */
   @log
-  public async rollToPoint (target: Point, tolerance = 5): Promise<void> {
+  public async rollToPoint (target: Point, tolerance = 5, maxWant = 30): Promise<void> {
 
     const startSpeed    = 30;   // command at the first sample
     const speedStep     = 3;    // command change per sample, ~17 samples/s
     const minSpeed      = 15;   // command range
     const maxSpeed      = 100;
     const secondsToGo   = 2;    // wanted speed is the distance covered in this time
-    const minWant       = 3;    // wanted speed range, cm/s
-    const maxWant       = 30;
+    const minWant       = 3;    // lowest wanted speed, cm/s
     const settleMs      = 2500; // breakaway and the approach under 3 cm/s
-    const cmPerSec      = 10;   // mean over a leg on the floor
+    const cmPerSec      = Math.min(10, maxWant / 2); // mean over a leg: 10 on the floor at 30, half the top speed below that (chosen)
     let budgetMs: number | null = null; // from the first sample's distance; status.position is stale while the stream is off
 
     const t0 = this.ctx.now();
