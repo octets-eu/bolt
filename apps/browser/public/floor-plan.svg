@@ -1,0 +1,129 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Floor plan of the living room, redrawn from floor-plan.png (768 x 530 px)
+  and turned 90 degrees anticlockwise against it: the source's right wall is
+  now the top, its top wall the left side.
+
+  Units: 1 user unit = 1 cm. x to the right, y down.
+  The sheet is 500 x 700 cm, its origin the upper left corner. A grid of
+  20 cm tiles covers it, 25 x 35 tiles, tile 0,0 at the origin, drawn as
+  white dotted lines over floor and furniture.
+  The room is centred on the sheet: its frame lies at 30, 22.5 of the sheet,
+  and everything below is given in the room's frame.
+  Origin of the room: the top wall is y = 0, the leftmost point of the walls
+  is x = 0.
+  A point x, y of the source's orientation is y, 655 - x here.
+  Scale of the source: 111.3 px per metre, read off twelve labelled walls
+  (110.3 to 113 px per metre each).
+
+  Points are wall centre lines, rounded to 1 cm. The labels are the texts
+  of the source, not computed: change a point and its label stays as it was.
+  Changed against the source: the wall labelled "1,24m" ended 19 cm short
+  of the wall labelled "2,24m". It now ends at that wall's end, 1,295. Its
+  label was set to the new length, 1,28m, and the partition's side labelled
+  "1,34m" to 1,53m like its other side.
+  Both parts of the partition are centred on y = 295. The source labels the
+  wall 12 cm thick; with its skirting board (Fussleiste) it is 19 cm for the
+  Bolts, and is drawn and labelled so. The walls on either side of it,
+  measured to the 12 cm wall, come out 1 to 3 cm shorter than their labels.
+  The opening is 143 cm wide, measured. The source gave 137 cm: each part
+  of the partition was shortened by 3 cm and is now 3 cm shorter than its
+  label.
+  Start points of the Bolts: on the partition's centre line, green 60 cm
+  from the left part's end, blue 60 cm from the right part's end, 23 cm
+  apart. The circles have the Bolt's diameter, 7.3 cm.
+  At the start each Bolt faces the middle of the nearer partition end, back
+  to back: green along -x, blue along +x. With x, y the Bolt's locator
+  after a reset there, on the sheet green is at 241 - y, 317.5 - x and blue
+  at 264 + y, 317.5 + x.
+  Furniture: three rectangles from floor-plan-furniture.png, each filling a
+  corner on the right wall. Measured is the corner pointing into the room;
+  the text is its distance from the horizontal wall x its distance from the
+  right wall, in cm; 71x108 is the other way round, 71 from the right wall.
+  Distances count from the outer walls' centre lines and
+  from the partition's skirting board, y = 285.5 and y = 304.5.
+  Danger zones: floor where navigation is hard but no collision is to be
+  expected, such as cables. One 60 wide and 120 high in the upper right
+  corner, 421,0. One 160 wide and 80 high south of the partition's left
+  part, from the left wall and the skirting board.
+  Not redrawn: the short grey strokes on the floor and on some walls.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 700" width="1000" height="1400">
+
+  <!-- outer walls, anticlockwise from the lower end of the left side -->
+  <defs>
+    <path id="outer-wall" d="
+      M 0,423
+      L 1,295
+      L 1,68
+      L 100,0
+      L 421,0
+      L 421,91
+      L 440,91
+      L 440,655
+      L 232,655
+      Z"/>
+    <pattern id="tile" width="20" height="20" patternUnits="userSpaceOnUse">
+      <path fill="none" stroke="#fff" stroke-width="1" stroke-dasharray="1 3" stroke-dashoffset="0.5"
+            d="M 0,0 H 20 M 0,20 H 20 M 0,0 V 20 M 20,0 V 20"/>
+    </pattern>
+  </defs>
+
+  <g transform="translate(30,22.5)">
+    <use href="#outer-wall" fill="#c8c8c8"/>
+
+    <!-- furniture, under the walls' strokes -->
+    <g id="furniture" fill="#8a8a8a">
+      <rect id="furniture-1" x="317" y="229.5" width="123" height="56"/>
+      <rect id="furniture-2" x="369" y="304.5" width="71"  height="108"/>
+      <rect id="furniture-3" x="225" y="480"   width="215" height="175"/>
+    </g>
+
+    <!-- danger zones: hard to navigate, no collision to expect -->
+    <g id="danger" fill="#f80" fill-opacity="0.4">
+      <rect id="danger-1" x="361" y="0"     width="60"  height="120"/>
+      <rect id="danger-2" x="1"   y="304.5" width="160" height="80"/>
+    </g>
+  </g>
+
+  <!-- grid of 20 cm tiles, in the sheet's frame -->
+  <rect id="grid" width="500" height="700" fill="url(#tile)"/>
+
+  <g transform="translate(30,22.5)">
+    <use href="#outer-wall" fill="none" stroke="#000" stroke-width="5" stroke-linejoin="miter"/>
+
+    <!-- partition between the two halves, with the opening from x = 151 to x = 294 -->
+    <line id="partition-left"  stroke="#000" stroke-width="19" x1="1"   y1="295" x2="151" y2="295"/>
+    <line id="partition-right" stroke="#000" stroke-width="19" x1="294" y1="295" x2="440" y2="295"/>
+
+    <!-- furniture measures -->
+    <g font-family="Helvetica, Arial, sans-serif" font-size="9" text-anchor="middle" fill="#000">
+      <text x="378.5" y="255">56x123</text>
+      <text x="404.5" y="362">71x108</text>
+      <text x="332.5" y="570">175x215</text>
+    </g>
+
+    <!-- start points of the Bolts -->
+    <circle id="start-green" fill="#0a0" cx="211" cy="295" r="3.65"/>
+    <circle id="start-blue"  fill="#06f" cx="234" cy="295" r="3.65"/>
+
+    <!-- wall lengths as labelled in the source, except the two noted above and the partition's thickness -->
+    <g id="labels" font-family="Helvetica, Arial, sans-serif" font-size="9" font-weight="bold" text-anchor="middle">
+      <g transform="translate(22,364)"><rect x="-17" y="-7" width="34" height="14" rx="1.5" fill="#333"/><text y="3.2" fill="#fff">1,28m</text></g>
+      <g transform="translate(22,181)"><rect x="-17" y="-7" width="34" height="14" rx="1.5" fill="#333"/><text y="3.2" fill="#fff">2,24m</text></g>
+      <g transform="translate(62,50)"><rect x="-17" y="-7" width="34" height="14" rx="1.5" fill="#333"/><text y="3.2" fill="#fff">1,20m</text></g>
+      <g transform="translate(136,522)"><rect x="-17" y="-7" width="34" height="14" rx="1.5" fill="#333"/><text y="3.2" fill="#fff">3,30m</text></g>
+      <g transform="translate(78,314)"><rect x="-17" y="-7" width="34" height="14" rx="1.5" fill="#333"/><text y="3.2" fill="#fff">1,53m</text></g>
+      <g transform="translate(78,276)"><rect x="-17" y="-7" width="34" height="14" rx="1.5" fill="#333"/><text y="3.2" fill="#fff">1,53m</text></g>
+      <g transform="translate(261,13)"><rect x="-17" y="-7" width="34" height="14" rx="1.5" fill="#333"/><text y="3.2" fill="#fff">3,22m</text></g>
+      <g transform="translate(298,320)"><rect x="-17" y="-7" width="34" height="14" rx="1.5" fill="#333"/><text y="3.2" fill="#fff">0,19m</text></g>
+      <g transform="translate(336,642)"><rect x="-17" y="-7" width="34" height="14" rx="1.5" fill="#333"/><text y="3.2" fill="#fff">2,08m</text></g>
+      <g transform="translate(365,314)"><rect x="-17" y="-7" width="34" height="14" rx="1.5" fill="#333"/><text y="3.2" fill="#fff">1,49m</text></g>
+      <g transform="translate(365,276)"><rect x="-17" y="-7" width="34" height="14" rx="1.5" fill="#333"/><text y="3.2" fill="#fff">1,49m</text></g>
+      <g transform="translate(418,480)"><rect x="-17" y="-7" width="34" height="14" rx="1.5" fill="#333"/><text y="3.2" fill="#fff">3,56m</text></g>
+      <g transform="translate(418,191)"><rect x="-17" y="-7" width="34" height="14" rx="1.5" fill="#333"/><text y="3.2" fill="#fff">1,99m</text></g>
+      <g transform="translate(414,104)"><rect x="-17" y="-7" width="34" height="14" rx="1.5" fill="#333"/><text y="3.2" fill="#fff">0,19m</text></g>
+      <g transform="translate(399,46)"><rect x="-17" y="-7" width="34" height="14" rx="1.5" fill="#333"/><text y="3.2" fill="#fff">0,92m</text></g>
+    </g>
+  </g>
+</svg>
