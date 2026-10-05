@@ -2,7 +2,7 @@
 
 import m from 'mithril';
 
-import { Bolt, BoltConfig, NotConnectedError, seekToCollision } from '@bolt/core';
+import { Bolt, BoltConfig, NotConnectedError, passBy, seekToCollision } from '@bolt/core';
 import { WebBleTransport, isBluetoothAvailable, onAvailabilityChanged, getPermittedBolts, requestBolt, waitForAdvertisement } from '@bolt/web-ble';
 
 import { Logger }  from './components/logger/logger';
@@ -78,6 +78,13 @@ class bolts {
     const a = this.get(seeker), b = this.get(sender);
     if (!a || !b) throw new NotConnectedError(a ? sender : seeker);
     return seekToCollision(a, b, seconds);
+  }
+
+  /** The passBy experiment with two connected Bolts by name; see @bolt/core experiments/pass-by.ts. */
+  public passBy ({ roller, sender, from, to, passes, cmPerSec, ladder }: { roller: string, sender: string, from: { x: number, y: number }, to: { x: number, y: number }, passes?: number, cmPerSec?: number, ladder?: number[] }) {
+    const a = this.get(roller), b = this.get(sender);
+    if (!a || !b) throw new NotConnectedError(a ? sender : roller);
+    return passBy(a, b, from, to, passes, cmPerSec, ladder);
   }
 
   configFor (name: string): BoltConfig {
