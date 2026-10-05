@@ -104,8 +104,8 @@
     </g>
 
     <!-- start points of the Bolts -->
-    <circle id="start-green" fill="#0a0" cx="211" cy="295" r="3.65"/>
-    <circle id="start-blue"  fill="#06f" cx="234" cy="295" r="3.65"/>
+    <circle id="start-green" fill="#0a0" fill-opacity="0.35" cx="211" cy="295" r="3.65"/>
+    <circle id="start-blue"  fill="#06f" fill-opacity="0.35" cx="234" cy="295" r="3.65"/>
 
     <!-- wall lengths as labelled in the source, except the two noted above and the partition's thickness -->
     <g id="labels" font-family="Helvetica, Arial, sans-serif" font-size="9" font-weight="bold" text-anchor="middle">

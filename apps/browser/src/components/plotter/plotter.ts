@@ -23,18 +23,38 @@ cvs.style.position = 'absolute';
 cvs.addEventListener('click', (e) => Plotter.onClick(e));
 const ctx = cvs.getContext('2d') as CanvasRenderingContext2D;
 
-const meta = { } as any;
+// canvas pixels per cm and the sheet's corner on the canvas, set by every render
+const meta = { scale: 1, transX: 0, transY: 0 };
 
-function initMeta () {
-  Object.assign(meta, {
-    length:   0,
-    cx:       0,         cy:      0,
-    max:      0,         min:    +Infinity,
-    maxx:     0,         maxy:    0,
-    miny:    +Infinity,  minx:   +Infinity,
-    scale:    1,         transX:  width/2,         transY: height/2,
-    axismax:  200,
-  });
+// The floor plan, public/floor-plan.svg: a sheet of 500 x 700 cm, origin upper
+// left, y down. The plot's coordinates are the sheet's.
+const SHEET = { width: 500, height: 700 };
+const plan  = new Image();
+plan.src    = '/floor-plan.svg';
+plan.onload = () => Plotter.render();
+
+/**
+ * Where each Bolt stands at its reset, on the sheet in cm, and the heading it
+ * faces there, clockwise from the sheet's top; see the plan's header. A Bolt
+ * without a start is not plotted and not sent anywhere.
+ */
+const starts: { [name: string]: { x: number, y: number, heading: number } } = {
+  'SB-9129': { x: 241, y: 317.5, heading: 270 },   // green, faces the left partition end
+  'SB-11DF': { x: 264, y: 317.5, heading:  90 },   // blue, faces the right partition end
+};
+
+/** The ends of the partition's two parts on the sheet, in the middle of their faces: the view always holds both. */
+const partitionEnds = [{ positionX: 181, positionY: 317.5 }, { positionX: 324, positionY: 317.5 }];
+
+/**
+ * A locator offset as a sheet offset, for a Bolt that faced `heading` at its
+ * reset, and a sheet offset as a locator offset: the same turn both ways,
+ * since it holds the mirror between the locator's y to the front and the
+ * sheet's y down.
+ */
+function turn (heading: number, x: number, y: number) {
+  const c = Math.cos(heading * Math.PI / 180), s = Math.sin(heading * Math.PI / 180);
+  return { x: x * c + y * s, y: x * s - y * c };
 }
 
 
@@ -48,13 +68,6 @@ const plot = {
   fillRect (ctx: CanvasRenderingContext2D, cx: number, cy: number, size: number) {
     const s2 = size/2;
     ctx.fillRect(cx - s2, cy -s2, size, size);
-  },
-
-  strokeLine (ctx: any, x1: number, y1: number, x2: number, y2: number) {
-    ctx.beginPath();
-    ctx.moveTo(x1, y1);
-    ctx.lineTo(x2, y2);
-    ctx.stroke();
   },
 
   circle(ctx: any, x: number, y: number, radius: number, fill: string, stroke?: string) {
@@ -113,22 +126,28 @@ const Plotter = Factory.create('Plotter', {
 
     // one roll at a time; SPACE ends it, then the next click counts
     if (rolling) return;
-    const rolls = Bolts.map((bolt: Bolt) => bolt.connected && bolt.navigation.rollToPoint({ x, y }));
+    const rolls = Bolts.map((bolt: Bolt) => {
+      const start = starts[bolt.name];
+      return bolt.connected && start && bolt.navigation.rollToPoint(turn(start.heading, x - start.x, y - start.y));
+    });
     rolling = true;
     Promise.all(rolls).finally(() => { rolling = false; });
 
   },
 
 
-  /** Every locator sample of an attached Bolt lands on the plot. */
+  /** Every locator sample of an attached Bolt lands on the plan, counted from the Bolt's start. */
   attach (bolt: Bolt): () => void {
     return bolt.events.on('log', (entry: LogEntry) => {
       if (entry.type !== 'event' || entry.subtype !== 'sensordata') return;
       const locator = (entry.data as any)?.sensordata?.locator;
-      if (!locator) return;
+      const start   = starts[bolt.name];
+      if (!locator || !start) return;
       const color = Bolts.configFor(bolt.name).colors.plot;
-      Plotter.placeBolt(bolt.name, locator, color);
-      Plotter.render({ positionX: locator.positionX, positionY: locator.positionY }, color);
+      const p     = turn(start.heading, locator.positionX, locator.positionY);
+      const location = { positionX: start.x + p.x, positionY: start.y + p.y };
+      Plotter.placeBolt(bolt.name, location, color);
+      Plotter.render(location, color);
     });
   },
 
@@ -137,7 +156,6 @@ const Plotter = Factory.create('Plotter', {
     Logger.info(this, 'Reset');
     series = [];
     marker = [];
-    initMeta();
     Plotter.render();
 
   },
@@ -163,100 +181,6 @@ const Plotter = Factory.create('Plotter', {
           magMsd = 2.0;
 
       return magMsd * magPow;
-  },
-
-  plotDecoration (ctx: CanvasRenderingContext2D, meta: any) {
-
-    const scale    = meta.scale;
-    // the context is scaled to cm, so the font is fractional cm; rounding it made it 0
-    const fontSize = 12 / scale;
-    ctx.font       = `normal ${fontSize}px monospace`;
-
-    const offset = 1.05;
-    const offmax = (n: number) => n > 0 ? n * offset : n / offset;
-    const offmin = (n: number) => n > 0 ? n / offset : n * offset;
-
-    // plot data enclosing
-
-    ctx.lineWidth = 0.5 / scale;
-    ctx.setLineDash([5 / scale, 5 / scale]);
-
-    // as rect
-    const rx0 = offmin(meta.minx), ry0 = offmin(meta.miny), rx1 = offmax(meta.maxx), ry1 = offmax(meta.maxy);
-    ctx.strokeStyle = '#ddd'
-    ctx.fillStyle = '#fff';
-    ctx.fillRect(rx0, ry0, rx1 - rx0, ry1 - ry0);
-
-    // its size in cm along two edges, and the corner coordinates
-    ctx.setLineDash([]);
-    ctx.fillStyle = '#999';
-    ctx.textAlign = 'center';
-    ctx.fillText(`${(meta.maxx - meta.minx).toFixed(0)} cm`, (rx0 + rx1) / 2, ry1 + fontSize * 1.2);
-    ctx.save();
-    ctx.translate(rx0 - fontSize * 0.4, (ry0 + ry1) / 2);
-    ctx.rotate(-Math.PI / 2);
-    ctx.fillText(`${(meta.maxy - meta.miny).toFixed(0)} cm`, 0, 0);
-    ctx.restore();
-    ctx.textAlign = 'left';
-    ctx.fillText(`${meta.minx.toFixed(0)},${meta.miny.toFixed(0)}`, rx0 + 3 / scale, ry0 - 3 / scale);
-    ctx.textAlign = 'right';
-    ctx.fillText(`${meta.maxx.toFixed(0)},${meta.maxy.toFixed(0)}`, rx1 - 3 / scale, ry1 + fontSize);
-    ctx.setLineDash([5 / scale, 5 / scale]);
-
-
-    // as circle from origin
-    ctx.lineWidth = 0.2 / scale;
-    ctx.beginPath();
-    ctx.arc(0, 0, meta.axismax, 0, 2 * Math.PI, false);
-    ctx.strokeStyle = '#800';
-    ctx.stroke();
-
-    // ctx.fillStyle = '#888';
-    // ctx.textAlign = 'right';
-    // ctx.fillText( `${imax},${imax}`, imax -4/scale, imax -4/scale );
-
-
-    // plot data min/max point
-    // ctx.strokeStyle = '#0FF';
-    // ctx.fillStyle   = '#0FF';
-    // plot.fillRect(ctx, meta.minx, meta.miny, 6 / meta.scale);
-    // plot.fillRect(ctx, meta.maxx, meta.maxy, 6 / meta.scale);
-
-    // plot data center
-    // ctx.strokeStyle = '#00F'
-    // ctx.fillStyle   = '#00F';
-    // plot.fillRect(  ctx, meta.cx, meta.cy, 4 / meta.scale);
-    // plot.strokeRect(ctx, meta.cx, meta.cy, 4 / meta.scale);
-
-
-    ctx.setLineDash([]);
-
-    // annotate origin
-    ctx.fillStyle = '#888';
-    ctx.textAlign = 'left';
-    ctx.fillText('0,0', 8 / scale, -8 / scale );
-
-    // plot axis
-    ctx.strokeStyle = '#888'
-    ctx.lineWidth = 0.8 / scale;
-    plot.strokeLine(ctx, 0, 0,  meta.axismax, 0);
-    plot.strokeLine(ctx, 0, 0, 0,  meta.axismax);
-    plot.strokeLine(ctx, 0, 0, -meta.axismax, 0);
-    plot.strokeLine(ctx, 0, 0, 0, -meta.axismax);
-
-    // strike light square around origin
-    ctx.strokeStyle = '#ddd'
-    plot.strokeRect(ctx, 0, 0, 512);
-    plot.strokeRect(ctx, 0, 0, 256);
-    plot.strokeRect(ctx, 0, 0, 100);
-    plot.strokeRect(ctx, 0, 0, 50);
-    plot.strokeRect(ctx, 0, 0, 10);
-    plot.strokeRect(ctx, 0, 0, 5);
-    plot.strokeRect(ctx, 0, 0, 1);
-    plot.strokeRect(ctx, 0, 0, 0.5);
-    plot.strokeRect(ctx, 0, 0, 0.1);
-
-
   },
 
   plotData (ctx: CanvasRenderingContext2D, meta: any, data: any) {
@@ -290,33 +214,6 @@ const Plotter = Factory.create('Plotter', {
     })
   },
 
-  analyzeData (data: any) {
-
-    meta.length = data.length;
-
-    if (meta.length > 1) {
-
-      meta.maxx  = Math.max.apply(Math, data.map( (loc: any) => loc.positionX ));
-      meta.maxy  = Math.max.apply(Math, data.map( (loc: any) => loc.positionY ));
-      meta.minx  = Math.min.apply(Math, data.map( (loc: any) => loc.positionX ));
-      meta.miny  = Math.min.apply(Math, data.map( (loc: any) => loc.positionY ));
-
-      meta.cx = (meta.maxx + meta.minx) / 2;
-      meta.cy = (meta.maxy + meta.miny) / 2;
-
-      meta.max   = Math.max(meta.maxx, meta.maxy, meta.miny, meta.miny);
-      meta.min   = Math.min(meta.maxx, meta.maxy, meta.miny, meta.miny);
-
-      meta.axismax = Math.max(Math.hypot(meta.minx, meta.miny), Math.hypot(meta.maxx, meta.maxy));
-
-      meta.scale  = Math.min(width, height) / (meta.max - meta.min) / 1.05 / 2;
-      meta.transX = (width/2  - meta.cx * meta.scale );
-      meta.transY = (height/2 - meta.cy * meta.scale );
-
-    }
-
-  },
-
   placeBolt (name: string, locator: any, color: string) {
     bolts[name] = { locator, color };
   },
@@ -331,7 +228,14 @@ const Plotter = Factory.create('Plotter', {
     }
 
     const data = series.slice(-1000);
-    Plotter.analyzeData(data);
+
+    // auto zoom: the points and both partition ends are on the canvas, a tenth of their extent free on every side (chosen)
+    const xs = [...partitionEnds, ...data].map((p: any) => p.positionX);
+    const ys = [...partitionEnds, ...data].map((p: any) => p.positionY);
+    const minx = Math.min(...xs), maxx = Math.max(...xs), miny = Math.min(...ys), maxy = Math.max(...ys);
+    meta.scale  = Math.min(width / (maxx - minx), height / (maxy - miny)) / 1.2;
+    meta.transX = width  / 2 - (minx + maxx) / 2 * meta.scale;
+    meta.transY = height / 2 - (miny + maxy) / 2 * meta.scale;
 
     const t0 = Date.now();
 
@@ -342,7 +246,7 @@ const Plotter = Factory.create('Plotter', {
     ctx.translate(meta.transX, meta.transY);
     ctx.scale(meta.scale, meta.scale);
 
-    Plotter.plotDecoration(ctx, meta);
+    if (plan.complete && plan.naturalWidth) ctx.drawImage(plan, 0, 0, SHEET.width, SHEET.height);
     Plotter.plotMarker(ctx, meta);
     Plotter.plotData(ctx, meta, data);
     Plotter.plotBolts(ctx, meta);
