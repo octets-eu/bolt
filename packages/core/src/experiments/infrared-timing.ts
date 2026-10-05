@@ -77,20 +77,20 @@ export interface Beat {
 
 /**
  * Learn the beat a Bolt sends on from the listen notifies `reader` gets on
- * `channel`, and follow it: 20 notifies give the phase (those more than
+ * any of `channels` (a ladder sends its levels on one beat), and follow it: 20 notifies give the phase (those more than
  * `offBeatMs` from their own mean are left out), every later notify within
  * `offBeatMs` of the beat moves it by a fifth of its error. Null when 20
  * notifies do not come within 10 s. Holds the infrared stream and re-arms
  * the one-shot listen after every notify.
  */
-export async function trackBeat (reader: Bolt, channel: number, offBeatMs = 25): Promise<Beat | null> {
+export async function trackBeat (reader: Bolt, channels: readonly number[], offBeatMs = 25): Promise<Beat | null> {
   const learn: number[] = [];
   const counts = { onBeat: 0, offBeat: 0 };
   let phase: number | null = null;
 
   const release = await reader.sensors.infrared.subscribe(({ payload }) => {
     const t = performance.now();
-    if (payload[0] === channel) {
+    if (channels.includes(payload[0] ?? 255)) {
       if (phase === null) learn.push(t);
       else {
         const error = offBeat(t, phase);
@@ -209,7 +209,7 @@ export async function timedReads (
     }
   })();
 
-  const beat = await trackBeat(reader, channel);
+  const beat = await trackBeat(reader, [channel]);
   if (beat === null) {
     sending = false;
     await sent;
