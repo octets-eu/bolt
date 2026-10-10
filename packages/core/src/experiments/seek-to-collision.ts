@@ -42,7 +42,7 @@ export interface SeekResult {
 }
 
 export interface SeekToCollisionResult {
-  reason: 'collision' | 'obstacle' | 'time' | 'stopped' | 'error';
+  reason: 'collision' | 'time' | 'stopped' | 'error';
   seconds: number;
   /** Milliseconds between the two collision reports; null unless the reason is 'collision'. */
   gapMs: number | null;
@@ -416,11 +416,13 @@ export async function seek (seeker: Bolt): Promise<SeekResult> {
 
 /**
  * Run the experiment: `sender` sends the ladder, `seeker` seeks, until both
- * report a collision at the same moment, the seeker alone reports one
- * ('obstacle': whatever it hit, the sender is at least a metre off),
- * `seconds` have passed, or a fullstop (STOP, space) reaches either. A hit
- * that fires no collision report ends nothing: that is for STOP. When one
- * of the two fails, the other is stopped as well. A step of the seeker:
+ * report a collision within `windowMs` of each other, `seconds` have
+ * passed, or a fullstop (STOP, space) reaches either. Both detectors run at
+ * the most sensitive setting that fires on nothing at rest: the tag is the
+ * coincidence, not the strength. A report by one Bolt alone ends nothing:
+ * the seeker bumps the floor in every hard turn (run 3, 2026-10-10), and a
+ * hit that fires no report is for STOP. When one of the two fails, the
+ * other is stopped as well. A step of the seeker:
  * `seekToCollision.in` with the names, seconds and method, `.out` with the
  * result; `seekToCollision constants` holds the window and thresholds.
  */
@@ -430,10 +432,9 @@ export function seekToCollision (seeker: Bolt, sender: Bolt, seconds = 60, metho
 
 async function run (seeker: Bolt, sender: Bolt, seconds: number, method: SeekMethod): Promise<SeekToCollisionResult> {
 
-  const windowMs   = 300;  // both reports within this are one contact; chosen
-  const turnMs     = 1200; // a seeker report within this after one of its standing turns is the turn itself, not a hit (run 3, 2026-10-10); chosen
-  // the standing sender should report a touch; the seeker at 40 reported the floor in a hard turn (run 3), so 80; chosen
-  const thresholds = { seeker: { xThreshold: 80, yThreshold: 80 }, sender: { xThreshold: 20, yThreshold: 20 } };
+  const windowMs   = 300;  // both reports within this are one contact; hand bumps reached both Bolts in the same 100 ms (2026-10-10); chosen
+  // 20 is the lowest that fires on nothing at rest (2026-09-23); a hand bump gives 20 to 34 on it
+  const thresholds = { seeker: { xThreshold: 20, yThreshold: 20 }, sender: { xThreshold: 20, yThreshold: 20 } };
 
   const t0 = seeker.now();
   let reason = null as SeekToCollisionResult['reason'] | null;
@@ -446,18 +447,9 @@ async function run (seeker: Bolt, sender: Bolt, seconds: number, method: SeekMet
   };
 
   const hit = { seeker: -Infinity, sender: -Infinity };
-  let turnedAt = -Infinity;
   const onHit = (who: keyof typeof hit) => (): void => {
-    if (who === 'seeker' && seeker.now() - turnedAt < turnMs) {
-      seeker.log('info', 'seekToCollision: seeker collision report within a standing turn, disregarded');
-      return;
-    }
     hit[who] = seeker.now();
     if (Math.abs(hit.seeker - hit.sender) <= windowMs) end('collision');
-    // the seeker alone hit something else, unless the sender's report follows
-    else if (who === 'seeker') setTimeout(() => {
-      if (!(Math.abs(hit.seeker - hit.sender) <= windowMs)) end('obstacle');
-    }, windowMs);
   };
   const offSeeker = await seeker.sensors.collision.subscribe(onHit('seeker'), thresholds.seeker);
   const offSender = await sender.sensors.collision.subscribe(onHit('sender'), thresholds.sender);
@@ -468,9 +460,9 @@ async function run (seeker: Bolt, sender: Bolt, seconds: number, method: SeekMet
   }));
   const timer = setTimeout(() => end('time'), seconds * 1000);
 
-  seeker.log('info', `seekToCollision constants ${JSON.stringify({ ladder: LADDER, windowMs, turnMs, thresholds })}`);
+  seeker.log('info', `seekToCollision constants ${JSON.stringify({ ladder: LADDER, windowMs, thresholds })}`);
   const sending = sender.experiments.sendLadder();
-  const seeking = method === 'edge' ? seekEdge(seeker, () => { turnedAt = seeker.now(); }) : seek(seeker);
+  const seeking = method === 'edge' ? seekEdge(seeker) : seek(seeker);
   sending.catch(() => end('error'));
   seeking.catch(() => end('error'));
   await ended;

@@ -33,14 +33,19 @@ import { wait } from '../helpers/utils';
  *
  * A leg cut short carries the range: the sender crosses the edge zone,
  * about 20 degrees, while the ball rolls the leg at `edge` off it, so the
- * distance is about sin(edge) / 0.35 = `rangeFactor` times the leg. When
- * `dashAfter` legs in a row were cut short and the last was `dashLegCm` or
- * less, under about 50 cm, the ball turns to face the sender and rolls
- * straight `rangeFactor` times the last leg and a ball more; the collision
- * ends the run, or the ball stops and tacks on. It faces the bisector of
- * the two last leg ends, one each side: the sender slides out before a leg
- * ends, so the aim from one side is biased outward, and the two biases
- * cancel.
+ * distance is about sin(edge) / 0.35 = `rangeFactor` times the leg. Short
+ * legs count only once a full leg has been rolled: right after the start
+ * the first legs are cut because the servo has not settled, not because
+ * the sender is near (runs 4 and 5). When `dashAfter` legs in a row were
+ * cut short and the last was `dashLegCm` or less, under about 50 cm, the
+ * ball turns to face the sender and rolls straight `rangeFactor` times the
+ * last leg and a ball more; the collision ends the run. It faces the
+ * bisector of the two last leg ends, one each side: the sender slides out
+ * before a leg ends, so the aim from one side is biased outward, and the
+ * two biases cancel. A dash that ends without a collision has missed by its
+ * aim, 10 degrees either way: the ball backs up the dash along its line,
+ * faces the sender again, holds it at the edge and tacks on, so the next
+ * two short legs give a fresh bisector and a fresh throw.
  *
  * A sender behind sounds the same as one ahead. The turns the rule orders
  * while rolling could tell them apart (approaching, every leg turns toward
@@ -82,12 +87,7 @@ export interface SeekEdgeResult {
   events: number;
 }
 
-/**
- * `onStandingTurn` is called before every standing turn, a tack or the turn
- * into a dash: a hard turn out of rolling trips the collision detector
- * on the floor (run 3), so a referee can disregard reports right after.
- */
-export async function seekEdge (seeker: Bolt, onStandingTurn: () => void = () => {}): Promise<SeekEdgeResult> {
+export async function seekEdge (seeker: Bolt): Promise<SeekEdgeResult> {
 
   const ctx: Context = seeker;
   const { actuators, sensors, status } = seeker;
@@ -220,7 +220,7 @@ export async function seekEdge (seeker: Bolt, onStandingTurn: () => void = () =>
   }
 
   // rolling: legs on one edge, a tack through the sender to the other, a dash when the legs have become short
-  let legFrom: Point = { ...status.position }, silentRun = 0, shortRun = 0;
+  let legFrom: Point = { ...status.position }, silentRun = 0, shortRun = 0, fullLegs = 0;
   while (!s.aborted) {
     await motor.roll(speed, mod360(target));
     const said = await round();
@@ -231,14 +231,13 @@ export async function seekEdge (seeker: Bolt, onStandingTurn: () => void = () =>
     let rule: string = said;
 
     const legLen = distance(legFrom, status.position);
-    const short = silentRun >= slidOut && legLen >= minLegCm && legLen < legCm;
+    const short = silentRun >= slidOut && legLen >= minLegCm && legLen < legCm && fullLegs > 0;
     if (short || legLen >= legCm) {
       legs.push(side * legNet);
       if (legs.length > legWindow) legs.shift();
       legEnd[side] = heading();
       shortRun = short ? shortRun + 1 : 0;
-      if (short) result.shortLegs++;
-      onStandingTurn();
+      if (short) result.shortLegs++; else fullLegs++;
       if (shortRun >= dashAfter && legLen <= dashLegCm) {
         // near: face the sender, the bisector of the two last leg ends when both sides have one, and roll the range the last leg gave
         const run = Math.min(dashMax, rangeFactor * legLen + ball);
@@ -255,14 +254,30 @@ export async function seekEdge (seeker: Bolt, onStandingTurn: () => void = () =>
           await motor.roll(dashSpeed, mod360(target));
           await round();
         }
-        onStandingTurn();
         await motor.roll(0, mod360(target));
         await wait(turnMs);
+        result.dashes++;
+        if (!s.aborted) {
+          // missed: back up the dash along its line, then face the sender and hold it at the edge again
+          record('dash back', { run: Math.round(run) });
+          const back: Point = { ...status.position };
+          target += 180;
+          await motor.roll(0, mod360(target));
+          await wait(tackMs);
+          while (!s.aborted && distance(back, status.position) < run) {
+            await motor.roll(dashSpeed, mod360(target));
+            await round();
+          }
+          await motor.roll(0, mod360(target));
+          await wait(turnMs);
+          target += 180 - side * edge;
+          await motor.roll(0, mod360(target));
+          await wait(tackMs);
+        }
         legs.length = 0;
         delete legEnd[1];
         delete legEnd[-1];
         shortRun = 0;
-        result.dashes++;
         rule = 'dash end';
       } else {
         // through the sender to the other edge
