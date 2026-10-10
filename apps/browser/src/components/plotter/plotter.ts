@@ -138,26 +138,34 @@ const Plotter = Factory.create('Plotter', {
   },
 
 
-  /** Every locator sample of an attached Bolt lands on the plan, counted from the Bolt's start. */
+  /** Every locator sample of an attached Bolt lands on the plan, counted from the Bolt's start; the sample's yaw gives the nose. */
   attach (bolt: Bolt): () => void {
     return bolt.events.on('log', (entry: LogEntry) => {
       if (entry.type !== 'event' || entry.subtype !== 'sensordata') return;
       const locator = (entry.data as any)?.sensordata?.locator;
+      const yaw: number | undefined = (entry.data as any)?.sensordata?.angles?.yaw;
       const start   = starts[bolt.name];
       if (!locator || !start) return;
       const color = Bolts.configFor(bolt.name).colors.plot;
       const p     = turn(start.heading, locator.positionX, locator.positionY);
       const location = { positionX: start.x + p.x, positionY: start.y + p.y };
-      Plotter.placeBolt(bolt.name, location, color);
+      // the sheet's heading, clockwise from its top: the start's plus the measured one, which is -yaw
+      Plotter.placeBolt(bolt.name, location, color, yaw === undefined ? null : start.heading - yaw);
       Plotter.render(location, color);
     });
   },
 
+  /** Tracks and markers go; every connected Bolt is drawn on its start point facing its start heading, where a reset puts it by definition. */
   reset () {
 
     Logger.info(this, 'Reset');
     series = [];
     marker = [];
+    bolts  = {};
+    Bolts.forEach((bolt: Bolt) => {
+      const start = starts[bolt.name];
+      if (bolt.connected && start) Plotter.placeBolt(bolt.name, { positionX: start.x, positionY: start.y }, Bolts.configFor(bolt.name).colors.plot, start.heading);
+    });
     Plotter.render();
 
   },
@@ -200,12 +208,21 @@ const Plotter = Factory.create('Plotter', {
 
   },
 
+  /** A dot per Bolt and a nose the way it faces, from half the radius to twice it. */
   plotBolts (ctx: CanvasRenderingContext2D, meta: any) {
 
     Object.keys(bolts).forEach( key => {
-      const loc = bolts[key].locator;
-      const col = bolts[key].color;
-      plot.circle(ctx, loc.positionX, loc.positionY, 8 / meta.scale, col);
+      const { locator: loc, color: col, heading } = bolts[key];
+      const r = 8 / meta.scale;
+      plot.circle(ctx, loc.positionX, loc.positionY, r, col);
+      if (heading === null) return;
+      const a = heading * Math.PI / 180, dx = Math.sin(a), dy = -Math.cos(a);
+      ctx.beginPath();
+      ctx.moveTo(loc.positionX + dx * r / 2, loc.positionY + dy * r / 2);
+      ctx.lineTo(loc.positionX + dx * r * 2, loc.positionY + dy * r * 2);
+      ctx.lineWidth = 3 / meta.scale;
+      ctx.strokeStyle = col;
+      ctx.stroke();
     })
 
   },
@@ -216,8 +233,8 @@ const Plotter = Factory.create('Plotter', {
     })
   },
 
-  placeBolt (name: string, locator: any, color: string) {
-    bolts[name] = { locator, color };
+  placeBolt (name: string, locator: any, color: string, heading: number | null = null) {
+    bolts[name] = { locator, color, heading };
   },
 
 
