@@ -53,9 +53,14 @@ import { wait } from '../helpers/utils';
  * but no turn is made on them: in runs 1 to 4 the sender was never behind
  * and every half turn ordered on that reading was wrong.
  *
- * The carrier is the weakest level heard in the last `history` rounds. A
- * round with no notify says nothing; standing it turns the ball a step, to
- * find anything.
+ * The carrier is the weakest level heard in at least `carrierShare` of the
+ * last `history` rounds, else the weakest heard at all. The rule needs a
+ * level heard most of the time inside the lobe: at 1.5 m strength 4 is
+ * heard in one round of four even dead ahead, so silent is the majority
+ * everywhere and the ball turns toward the sender's side without end, a
+ * circle (run 6); strength 8 there is heard in 95 % inside and about 10 %
+ * abeam, the edge strength 4 has at 80 cm. A round with no notify says
+ * nothing; standing it turns the ball a step, to find anything.
  *
  * Runs 1 and 2 (2026-10-10, 1.5 m, green seeking, one edge held for the
  * whole approach, a spiral) found the edge and came to 54 and 82 cm; both
@@ -101,6 +106,7 @@ export async function seekEdge (seeker: Bolt): Promise<SeekEdgeResult> {
   const turnMs     = 600;   // a step's turn and its swing, standing; chosen
   const tackMs     = 1000;  // a 130 or 180 degree turn and its swing; chosen
   const history    = 10;    // rounds the carrier looks back; 6 let it move up at the edge (run 2); chosen
+  const carrierShare = 0.4; // share of those rounds a level must be heard in to carry; chosen
   const legCm      = 40;    // chosen
   const slidOut    = 2;     // silent rounds in a row that end a leg; chosen
   const minLegCm   = 10;    // a leg shorter than this is not cut, a 6 cm leg was noise (run 4); chosen
@@ -158,12 +164,15 @@ export async function seekEdge (seeker: Bolt): Promise<SeekEdgeResult> {
   const release = await sensors.motion.subscribe(null);
   await motor.stabilize(StabilizationIndex.full);
   await ctx.events.once('sensordata', { timeoutMs: 1000 });
-  ctx.log('info', `edge start ${JSON.stringify({ ladder: LADDER, roundMs, edge, step, seekStep, turnMs, tackMs, history, legCm, slidOut, minLegCm, rangeFactor, dashAfter, dashLegCm, dashSpeed, ball, dashMax, legWindow, speed, cells })}`);
+  ctx.log('info', `edge start ${JSON.stringify({ ladder: LADDER, roundMs, edge, step, seekStep, turnMs, tackMs, history, carrierShare, legCm, slidOut, minLegCm, rangeFactor, dashAfter, dashLegCm, dashSpeed, ball, dashMax, legWindow, speed, cells })}`);
 
-  /** The weakest level heard in the past rounds, else null. */
+  /** The weakest level heard in `carrierShare` of the past rounds, else the weakest heard at all, else null. */
   const carrier = (): number | null => {
-    const level = LADDER.findIndex((_, k) => past.some(r => (r[k] ?? 0) > 0));
-    return level >= 0 ? level : null;
+    const rounds = LADDER.map((_, k) => past.filter(r => (r[k] ?? 0) > 0).length);
+    const firm = rounds.findIndex(n => n >= carrierShare * history);
+    if (firm >= 0) return firm;
+    const any = rounds.findIndex(n => n > 0);
+    return any >= 0 ? any : null;
   };
 
   /** One round of listening: what the carrier said. */
