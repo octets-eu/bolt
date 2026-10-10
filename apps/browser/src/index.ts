@@ -11,6 +11,7 @@ import { tracker } from './tracking/tracker';
 import { Debug } from './debug/debug';
 import { archiveSessions } from './archive';
 import { fatal } from './fatal';
+import './reload';
 
 // any error ends the session, see fatal.ts
 window.addEventListener('error', (e) => fatal(e.error ?? e.message));
