@@ -138,15 +138,21 @@ const Plotter = Factory.create('Plotter', {
   },
 
 
-  /** Every locator sample of an attached Bolt lands on the plan, counted from the Bolt's start; the sample's yaw gives the nose. */
+  /** Every locator sample of an attached Bolt lands on the plan, counted from the Bolt's start; the sample's yaw gives the nose. A reset of the Bolt alone puts its dot on the start, as the Reset button does for all. */
   attach (bolt: Bolt): () => void {
     return bolt.events.on('log', (entry: LogEntry) => {
+      const start = starts[bolt.name];
+      if (!start) return;
+      const color = Bolts.configFor(bolt.name).colors.plot;
+      if (entry.type === 'info' && entry.subtype === 'reset.out') {
+        Plotter.placeBolt(bolt.name, { positionX: start.x, positionY: start.y }, color, start.heading);
+        Plotter.render();
+        return;
+      }
       if (entry.type !== 'event' || entry.subtype !== 'sensordata') return;
       const locator = (entry.data as any)?.sensordata?.locator;
       const yaw: number | undefined = (entry.data as any)?.sensordata?.angles?.yaw;
-      const start   = starts[bolt.name];
-      if (!locator || !start) return;
-      const color = Bolts.configFor(bolt.name).colors.plot;
+      if (!locator) return;
       const p     = turn(start.heading, locator.positionX, locator.positionY);
       const location = { positionX: start.x + p.x, positionY: start.y + p.y };
       // the sheet's heading, clockwise from its top: the start's plus the measured one, which is -yaw

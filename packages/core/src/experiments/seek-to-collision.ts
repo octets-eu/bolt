@@ -6,6 +6,8 @@ import { angleDistance, distance, headingTo, mod360 } from '../helpers/math';
 import type { Point } from '../helpers/math';
 import { StabilizationIndex } from '../protocol/constants';
 import { wait } from '../helpers/utils';
+import { seekEdge } from './seek-edge';
+import type { SeekEdgeResult } from './seek-edge';
 
 /**
  * seekToCollision: one Bolt sends an infrared ladder, the other finds it and
@@ -20,7 +22,7 @@ import { wait } from '../helpers/utils';
  * stronger ones also arrive from the side (pass-by.ts, 2026-10-05). The
  * strengths are chosen.
  */
-const LADDER = [4, 8, 16];
+export const LADDER = [4, 8, 16];
 
 export interface SeekResult {
   /** Ladder rounds listened to. */
@@ -46,8 +48,11 @@ export interface SeekToCollisionResult {
   gapMs: number | null;
   /** Frames the sender sent; null when it failed. */
   frames: number | null;
-  seek: SeekResult | null;
+  seek: SeekResult | SeekEdgeResult | null;
 }
+
+/** Which seeker: `belief` steers at the likeliest direction (`seek`), `edge` holds the sender on the edge of its hearing (seek-edge.ts). */
+export type SeekMethod = 'belief' | 'edge';
 
 /** Send the ladder, level after level, until fullstop. Returns the frames sent. */
 export async function sendLadder (ctx: Context, actuators: Actuators): Promise<number> {
@@ -416,18 +421,19 @@ export async function seek (seeker: Bolt): Promise<SeekResult> {
  * `seconds` have passed, or a fullstop (STOP, space) reaches either. A hit
  * that fires no collision report ends nothing: that is for STOP. When one
  * of the two fails, the other is stopped as well. A step of the seeker:
- * `seekToCollision.in` with the names and seconds, `.out` with the result;
- * `seekToCollision constants` holds the window and thresholds.
+ * `seekToCollision.in` with the names, seconds and method, `.out` with the
+ * result; `seekToCollision constants` holds the window and thresholds.
  */
-export function seekToCollision (seeker: Bolt, sender: Bolt, seconds = 60): Promise<SeekToCollisionResult> {
-  return seeker.run('seekToCollision', () => run(seeker, sender, seconds), { seeker: seeker.name, sender: sender.name, seconds });
+export function seekToCollision (seeker: Bolt, sender: Bolt, seconds = 60, method: SeekMethod = 'edge'): Promise<SeekToCollisionResult> {
+  return seeker.run('seekToCollision', () => run(seeker, sender, seconds, method), { seeker: seeker.name, sender: sender.name, seconds, method });
 }
 
-async function run (seeker: Bolt, sender: Bolt, seconds: number): Promise<SeekToCollisionResult> {
+async function run (seeker: Bolt, sender: Bolt, seconds: number, method: SeekMethod): Promise<SeekToCollisionResult> {
 
   const windowMs   = 300;  // both reports within this are one contact; chosen
-  // the standing sender should report a touch; the rolling seeker at 40 reports wall bumps and the ramp lip (2026-09-17); chosen
-  const thresholds = { seeker: { xThreshold: 40, yThreshold: 40 }, sender: { xThreshold: 20, yThreshold: 20 } };
+  const turnMs     = 1200; // a seeker report within this after one of its standing turns is the turn itself, not a hit (run 3, 2026-10-10); chosen
+  // the standing sender should report a touch; the seeker at 40 reported the floor in a hard turn (run 3), so 80; chosen
+  const thresholds = { seeker: { xThreshold: 80, yThreshold: 80 }, sender: { xThreshold: 20, yThreshold: 20 } };
 
   const t0 = seeker.now();
   let reason = null as SeekToCollisionResult['reason'] | null;
@@ -440,7 +446,12 @@ async function run (seeker: Bolt, sender: Bolt, seconds: number): Promise<SeekTo
   };
 
   const hit = { seeker: -Infinity, sender: -Infinity };
+  let turnedAt = -Infinity;
   const onHit = (who: keyof typeof hit) => (): void => {
+    if (who === 'seeker' && seeker.now() - turnedAt < turnMs) {
+      seeker.log('info', 'seekToCollision: seeker collision report within a standing turn, disregarded');
+      return;
+    }
     hit[who] = seeker.now();
     if (Math.abs(hit.seeker - hit.sender) <= windowMs) end('collision');
     // the seeker alone hit something else, unless the sender's report follows
@@ -457,9 +468,9 @@ async function run (seeker: Bolt, sender: Bolt, seconds: number): Promise<SeekTo
   }));
   const timer = setTimeout(() => end('time'), seconds * 1000);
 
-  seeker.log('info', `seekToCollision constants ${JSON.stringify({ ladder: LADDER, windowMs, thresholds })}`);
+  seeker.log('info', `seekToCollision constants ${JSON.stringify({ ladder: LADDER, windowMs, turnMs, thresholds })}`);
   const sending = sender.experiments.sendLadder();
-  const seeking = seek(seeker);
+  const seeking = method === 'edge' ? seekEdge(seeker, () => { turnedAt = seeker.now(); }) : seek(seeker);
   sending.catch(() => end('error'));
   seeking.catch(() => end('error'));
   await ended;
