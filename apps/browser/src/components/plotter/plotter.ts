@@ -3,6 +3,7 @@ import Factory   from '../factory';
 import { Logger } from '../logger/logger';
 import { Bolt, LogEntry } from '@bolt/core';
 import { Bolts } from '../../bolts';
+import { session } from '../../session';
 
 
 let series = [] as any;
@@ -89,8 +90,9 @@ const Plotter = Factory.create('Plotter', {
 
   meta () { return meta },
 
-  /** The canvas fills its host and follows every change of the host's size. */
+  /** The canvas fills its host and follows every change of the host's size. The start poses go into the session file once, as `starts`: a script needs them to put both Bolts in one frame. */
   oncreate ( vnode: any ) {
+    session.note('*', 'info', `starts ${JSON.stringify(starts)}`);
     vnode.dom.appendChild(cvs);
     vnode.state.resize = new ResizeObserver(([entry]) => {
       if (!entry) return;
