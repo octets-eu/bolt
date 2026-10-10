@@ -11,7 +11,8 @@ import { wait } from '../helpers/utils';
  * listen notifies per strength and per `binCm` of the line. `from` and `to`
  * are in the roller's locator frame; a frame and a notify are put where the
  * locator stands at that moment. Ends after the last leg or on a fullstop
- * of either Bolt.
+ * of either Bolt. A step of the roller: `passBy.in` with the arguments,
+ * `passBy leg n` per leg, `.out` with the result.
  *
  * Two runs on 2026-10-05, SB-9129 sending and facing the line, SB-11DF
  * rolling a 3 m line that passes it at 72 cm, four legs, about 11 cm/s.
@@ -53,7 +54,11 @@ export interface PassByResult {
   legs: PassByLeg[];
 }
 
-export async function passBy (roller: Bolt, sender: Bolt, from: Point, to: Point, passes = 4, cmPerSec = 10, ladder: readonly number[] = [4, 8, 16], binCm = 10): Promise<PassByResult> {
+export function passBy (roller: Bolt, sender: Bolt, from: Point, to: Point, passes = 4, cmPerSec = 10, ladder: readonly number[] = [4, 8, 16], binCm = 10): Promise<PassByResult> {
+  return roller.run('passBy', () => run(roller, sender, from, to, passes, cmPerSec, ladder, binCm), { roller: roller.name, sender: sender.name, from, to, passes, cmPerSec, ladder, binCm });
+}
+
+async function run (roller: Bolt, sender: Bolt, from: Point, to: Point, passes: number, cmPerSec: number, ladder: readonly number[], binCm: number): Promise<PassByResult> {
 
   const s = roller.motion, stop = sender.motion;
   const t0 = roller.now();
@@ -83,8 +88,6 @@ export async function passBy (roller: Bolt, sender: Bolt, from: Point, to: Point
     if (leg) leg.seconds[k] = (leg.seconds[k] ?? 0) + (t - last) / 1000;
     last = t;
   });
-
-  roller.log('info', `passBy start ${JSON.stringify({ roller: roller.name, sender: sender.name, from, to, passes, cmPerSec, ladder, binCm })}`);
 
   let sending = true;
   const sent = (async (): Promise<boolean> => {
@@ -133,6 +136,5 @@ export async function passBy (roller: Bolt, sender: Bolt, from: Point, to: Point
     binCm,
     legs,
   };
-  roller.log('info', `passBy end ${JSON.stringify({ reason: result.reason, seconds: result.seconds, frames, legs: legs.length })}`);
   return result;
 }

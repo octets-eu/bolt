@@ -25,3 +25,19 @@ export function range (start: number, end?: number, step = 1): number[] {
 export function clamp (value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
 }
+
+/**
+ * `value` as JSON for one log line. A class instance stands as its `name`
+ * when it has one (a Bolt), else as its class name (an Infrared); functions
+ * are dropped. Plain objects and arrays are written out.
+ */
+export function describe (value: unknown): string {
+  return JSON.stringify(value, (_key, v: unknown) => {
+    if (typeof v === 'function') return undefined;
+    if (typeof v !== 'object' || v === null || Array.isArray(v)) return v;
+    const proto: unknown = Object.getPrototypeOf(v);
+    if (proto === Object.prototype || proto === null) return v;
+    const { name } = v as { name?: unknown };
+    return typeof name === 'string' ? name : (proto as { constructor: { name: string } }).constructor.name;
+  }) ?? 'undefined';
+}

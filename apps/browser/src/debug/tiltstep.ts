@@ -58,14 +58,16 @@ export function evaluateTiltStep (messages: TMessage[]): TiltRun[] {
   const last = (t: number) => samples.filter(s => s.t <= t).at(-1);
   const runs: TiltRun[] = [];
   let config = '';
-  const marks = messages.filter(m => /^tiltStep/.test(text(m)));
+  const marks = messages.filter(m => /^(experiments\.)?tiltStep/.test(text(m)));
   marks.forEach((mark, k) => {
     const line = text(mark);
-    if (/^tiltStep: \d/.test(line)) { config = line.slice('tiltStep: '.length); return; }
+    // the arguments: v 2 `experiments.tiltStep.in [runs, speed, stepMs, brake, brakeValue]`, v 1 `tiltStep: <prose>`
+    const call = mark.v >= 2 ? /^experiments\.tiltStep\.in (.*)$/.exec(line) : /^tiltStep: (\d.*)$/.exec(line);
+    if (call) { config = call[1] ?? ''; return; }
     const step = /^tiltStep (\d+): step heading (\d+)/.exec(line);
     if (!step) return;
     const brakeMark = marks.slice(k + 1).find(m => text(m) === `tiltStep ${step[1]}: brake`);
-    const endMark = marks.slice(k + 1).find(m => /^tiltStep( \d+: step|: done|: \d)/.test(text(m)));
+    const endMark = marks.slice(k + 1).find(m => /^tiltStep( \d+: step|: done|: \d)|^experiments\.tiltStep\.(in|out)/.test(text(m)));
     if (!brakeMark || !endMark) return;
     const stepCmd = commands.find(m => m.t >= mark.t && ((m.data as { payload?: number[] }).payload?.[0] ?? 0) > 0)?.t ?? mark.t;
     const brakeCmd = commands.find(m => m.t >= brakeMark.t)?.t ?? brakeMark.t;

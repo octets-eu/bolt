@@ -3,7 +3,14 @@
  * after the header: what a Bolt reported, and where the camera saw it.
  */
 
-export const PROTOCOL_VERSION = 1;
+/**
+ * Bumped when a record's shape changes or a text line that a script parses
+ * changes; readers branch on `v`, never on dates or guessed shapes.
+ * 1: the first format. 2 (2026-10-10): a step logs `<name>.in` with its
+ * arguments as JSON and `<name>.out` with the milliseconds and its result;
+ * `tiltStep: <prose>` became `experiments.tiltStep.in [...]`.
+ */
+export const PROTOCOL_VERSION = 2;
 
 export interface IEnvelope {
   v: typeof PROTOCOL_VERSION;

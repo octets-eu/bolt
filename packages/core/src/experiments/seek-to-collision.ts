@@ -415,10 +415,15 @@ export async function seek (seeker: Bolt): Promise<SeekResult> {
  * ('obstacle': whatever it hit, the sender is at least a metre off),
  * `seconds` have passed, or a fullstop (STOP, space) reaches either. A hit
  * that fires no collision report ends nothing: that is for STOP. When one
- * of the two fails, the other is stopped as well. Logs `seekToCollision start` and `seekToCollision end`
- * with the result.
+ * of the two fails, the other is stopped as well. A step of the seeker:
+ * `seekToCollision.in` with the names and seconds, `.out` with the result;
+ * `seekToCollision constants` holds the window and thresholds.
  */
-export async function seekToCollision (seeker: Bolt, sender: Bolt, seconds = 60): Promise<SeekToCollisionResult> {
+export function seekToCollision (seeker: Bolt, sender: Bolt, seconds = 60): Promise<SeekToCollisionResult> {
+  return seeker.run('seekToCollision', () => run(seeker, sender, seconds), { seeker: seeker.name, sender: sender.name, seconds });
+}
+
+async function run (seeker: Bolt, sender: Bolt, seconds: number): Promise<SeekToCollisionResult> {
 
   const windowMs   = 300;  // both reports within this are one contact; chosen
   // the standing sender should report a touch; the rolling seeker at 40 reports wall bumps and the ramp lip (2026-09-17); chosen
@@ -452,7 +457,7 @@ export async function seekToCollision (seeker: Bolt, sender: Bolt, seconds = 60)
   }));
   const timer = setTimeout(() => end('time'), seconds * 1000);
 
-  seeker.log('info', `seekToCollision start ${JSON.stringify({ seeker: seeker.name, sender: sender.name, seconds, ladder: LADDER, windowMs, thresholds })}`);
+  seeker.log('info', `seekToCollision constants ${JSON.stringify({ ladder: LADDER, windowMs, thresholds })}`);
   const sending = sender.experiments.sendLadder();
   const seeking = seek(seeker);
   sending.catch(() => end('error'));
@@ -471,7 +476,6 @@ export async function seekToCollision (seeker: Bolt, sender: Bolt, seconds = 60)
     frames: frames.status === 'fulfilled' ? frames.value : null,
     seek: sought.status === 'fulfilled' ? sought.value : null,
   };
-  seeker.log('info', `seekToCollision end ${JSON.stringify(result)}`);
   await offSeeker();
   await offSender();
   return result;

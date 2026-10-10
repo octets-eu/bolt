@@ -2,6 +2,7 @@ import type { Actuators } from '../actuators/actuators';
 import type { Context } from '../context';
 import type { Communication } from '../communication/communication';
 import { mod360 } from '../helpers/math';
+import { describe } from '../helpers/utils';
 import type { Navigation } from '../navigation/navigation';
 import { StabilizationIndex } from '../protocol/constants';
 import type { Sensors } from '../sensors/sensors';
@@ -204,18 +205,20 @@ export class Lifecycle {
   }
 
   /**
-   * One step: `<name>.in`, `fn`, `<name>.out`. Steps nest, e.g. a roll runs
-   * a rollToPoint. An error passes through untouched and leaves the step
-   * in `running`, for `fail` to name.
+   * One step: `<name>.in <params>`, `fn`, `<name>.out <ms> ms <result>`,
+   * params and result as JSON (`describe`), left out when undefined. Steps
+   * nest, e.g. a roll runs a rollToPoint. An error passes through untouched
+   * and leaves the step in `running`, for `fail` to name.
    */
-  async run<T> (name: string, fn: () => Promise<T>): Promise<T> {
+  async run<T> (name: string, fn: () => Promise<T>, params?: unknown): Promise<T> {
     this.running.push(name);
     const depth = this.running.length;
-    this.ctx.log('info', `${name}.in`);
+    const t0 = this.ctx.now();
+    this.ctx.log('info', `${name}.in${params === undefined ? '' : ` ${describe(params)}`}`);
     this.ctx.events.emit('step', { name, depth, phase: 'in' });
     const result = await fn();
     this.running.pop();
-    this.ctx.log('info', `${name}.out`);
+    this.ctx.log('info', `${name}.out ${this.ctx.now() - t0} ms${result === undefined ? '' : ` ${describe(result)}`}`);
     this.ctx.events.emit('step', { name, depth, phase: 'out' });
     return result;
   }

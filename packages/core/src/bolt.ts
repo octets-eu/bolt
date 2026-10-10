@@ -100,8 +100,8 @@ export class Bolt implements Context {
     this.events.emit('change', undefined);
   }
 
-  run<T> (name: string, fn: () => Promise<T>): Promise<T> {
-    return this.lifecycle.run(name, fn);
+  run<T> (name: string, fn: () => Promise<T>, params?: unknown): Promise<T> {
+    return this.lifecycle.run(name, fn, params);
   }
 
   /** console.log arguments that print the name in the Bolt's colour. */

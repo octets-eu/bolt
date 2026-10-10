@@ -2,6 +2,7 @@ import type { Actuators } from '../actuators/actuators';
 import type { Infrared } from '../actuators/infrared';
 import type { Communication } from '../communication/communication';
 import type { Context } from '../context';
+import { log } from '../lifecycle/log';
 import type { Navigation } from '../navigation/navigation';
 import type { Sensors } from '../sensors/sensors';
 import { range, wait, whenAborted } from '../helpers/utils';
@@ -18,10 +19,13 @@ import { sendLadder } from './seek-to-collision';
  * console as `bolt.experiments.hop(90)`. A function stays here while it is
  * tried and measured and moves into its folder when it qualifies. A
  * fullstop ends every one that moves the ball, like a navigation step.
+ * Every call is a step: `experiments.<name>.in` with the arguments and
+ * `.out` with the result land in the log (`log` decorator).
  */
 export class Experiments {
 
-  private readonly ctx:       Context;
+  readonly logName = 'experiments';
+  readonly ctx:               Context;
   private readonly actuators: Actuators;
   private readonly sensors:   Sensors;
   private readonly navigation: Navigation;
@@ -40,6 +44,7 @@ export class Experiments {
    * over `seconds`, and the mean. A steady lamp or a window contributes
    * nothing to the amplitude; a lighthouse blinking at `hz` does.
    */
+  @log
   async lighthouse (hz: number = 2, seconds: number = 2) {
     const t0 = performance.now();
     const samples: { t: number, lux: number }[] = [];
@@ -60,7 +65,6 @@ export class Experiments {
     const amplitude = 2 * Math.hypot(re, im) / n;
     const phase = Math.atan2(im, re);
     const result = { hz, n, rate: Math.round(n / seconds), mean: Math.round(mean * 100) / 100, amplitude: Math.round(amplitude * 100) / 100, phase: Math.round(phase * 100) / 100 };
-    this.ctx.log('info', `lighthouse ${hz} Hz: amplitude ${result.amplitude} lux, mean ${result.mean} lux, ${n} samples`);
     return result;
   }
 
@@ -71,6 +75,7 @@ export class Experiments {
    * charge at `speed`, keep rolling `graceMs` after the lip shows up on the
    * accelerometer or the collision detector, stop on `timeoutMs` regardless.
    */
+  @log
   async hop (heading: number, speed: number = 110, graceMs: number = 250, retreatCm: number = 20, timeoutMs: number = 1200) {
     const { status } = this.ctx;
     const s = this.ctx.motion;
@@ -133,11 +138,11 @@ export class Experiments {
     await release();
     await wait(500);
     const result = { heading, speed, graceMs, retreated, charged: Math.round(dist(pos(), charged)), reason, lipAtMs: lipAt, maxAccelDeviation: Math.round(maxDev * 100) / 100, baselineG: Math.round(baseline * 100) / 100 };
-    this.ctx.log('info', `hop ${heading}° @${speed}: ${reason}${lipAt !== null ? ` lip at ${lipAt} ms` : ''}, charged ${result.charged} cm`);
     return result;
   }
 
   /** Rotate in place and take a lock-in reading per heading; the lobe of amplitudes points at the lighthouse. */
+  @log
   async sweep (hz: number = 2, steps: number = 12, seconds: number = 1.5) {
     const s = this.ctx.motion;
     const start = this.ctx.status.heading || 0;
@@ -152,7 +157,6 @@ export class Experiments {
     }
     if (!s.aborted) await this.actuators.motor.roll(0, start);
     const best = rows.reduce<typeof rows[number] | null>((m, r) => !m || r.amplitude > m.amplitude ? r : m, null);
-    if (best) this.ctx.log('info', `sweep ${hz} Hz: best heading ${best.heading} with ${best.amplitude} lux`);
     return { best, rows };
   }
 
@@ -162,6 +166,7 @@ export class Experiments {
    * heading 0 and 180 so the ball swings about its start. Aim first, heading
    * 0 along a free line. Only drives and marks: the samples and commands land
    * in the session file between `tiltStep n: step` and `tiltStep n: brake`,
+   * after `experiments.tiltStep.in` with the arguments,
    * where the evaluation finds tilt, its rise, the braking and the latency.
    * `brake`: roll0 lets the firmware slow down; reverse drives backward on
    * the same heading at `brakeValue` until the ball is slow, then roll 0 (the
@@ -170,12 +175,12 @@ export class Experiments {
    * ms, one roll per 50 ms; rawBrake sends raw mode 3, undocumented (the
    * documented modes are 0 to 2), until still.
    */
+  @log
   async tiltStep (runs = 10, speed = 150, stepMs = 400, brake: 'roll0' | 'reverse' | 'ramp' | 'rawBrake' = 'roll0', brakeValue = 150): Promise<void> {
     const s = this.ctx.motion;
     const motor = this.actuators.motor;
     const release = await this.sensors.motion.subscribe(null);
     await motor.stabilize(StabilizationIndex.full);
-    this.ctx.log('info', `tiltStep: ${runs} runs at ${speed} for ${stepMs} ms, brake ${brake}${brake === 'reverse' || brake === 'ramp' ? ` ${brakeValue}` : ''}`);
     for (let i = 1; i <= runs && !s.aborted; i++) {
       const heading = i % 2 ? 0 : 180;
       await motor.roll(0, heading);  // turn in place, then settle
@@ -219,7 +224,6 @@ export class Experiments {
     }
     await motor.stabilize(StabilizationIndex.none);
     await release();
-    this.ctx.log('info', 'tiltStep: done');
   }
 
   /** Drive models per ground, learned by rollToPointAdaptive, for the session. */
@@ -231,6 +235,7 @@ export class Experiments {
    * stop is timed by the predicted stopping distance, see landing.ts.
    * `ground` picks the model, since speeds and slip differ on mat and floor.
    */
+  @log
   async rollToPointAdaptive (target: Point, ground: 'mat' | 'floor' = 'mat', vCruise = 60): Promise<LandingResult> {
     const model = (this.models[ground] ??= new DriveModel(ground === 'floor' ? 0.6 : 0.5));
     const freezeCm    = 5;   // closer than this the heading stays: locator noise would swing it
@@ -274,13 +279,11 @@ export class Experiments {
     const way = distance(start, target) || 1;
     const alongCm = ((at.x - target.x) * (target.x - start.x) + (at.y - target.y) * (target.y - start.y)) / way;
     const result: LandingResult = { reason, errorCm: distance(at, target), timeMs: this.ctx.now() - t0, commands, alongCm, stop: decided, model: { b: model.b, tauS: model.tauS } };
-    this.ctx.log('info', `rollToPointAdaptive: ${reason}, ${result.errorCm.toFixed(1)} cm off (${alongCm.toFixed(1)} along), ${result.timeMs} ms, ${commands} commands`
-      + (decided ? `; stop at ${decided.v.toFixed(0)} cm/s ${decided.d.toFixed(1)} cm out, predicted ${decided.predicted.toFixed(1)}, coasted ${decided.coast.toFixed(1)}` : '')
-      + `; b ${model.b.toFixed(0)}, tau ${model.tauS.toFixed(2)} s`);
     return result;
   }
 
   /** `times` random points on a circle of `radius` around the locator origin, by rollToPoint. */
+  @log
   async circleAround (times: number, radius: number): Promise<void> {
     const s = this.ctx.motion;
     for (const _ of range(times)) {
@@ -291,6 +294,7 @@ export class Experiments {
   }
 
   /** Twenty random points on a 35 cm circle, then home. */
+  @log
   async action (): Promise<void> {
     const s = this.ctx.motion;
     await this.circleAround(20, 35);
@@ -298,13 +302,12 @@ export class Experiments {
   }
 
   /** Home, twenty points, home. */
+  @log
   async stress (): Promise<void> {
     const s = this.ctx.motion;
-    this.ctx.log('info', 'stress.in');
     await this.navigation.rollToPoint({ x: 0, y: 0 });
     if (!s.aborted) await this.circleAround(20, 35);
     if (!s.aborted) await this.navigation.rollToPoint({ x: 0, y: 0 });
-    this.ctx.log('info', 'stress.out');
   }
 
   /**
@@ -319,6 +322,7 @@ export class Experiments {
    * research/infrared-external-device.md, "Bolt to Bolt, 4 m apart"
    * (2026-10-02).
    */
+  @log
   async calibrateInfraredLadder (sender: Infrared, ladder = [1, 2, 4, 8, 16, 32], stepCm = 50, minutes = 2) {
     const { status } = this.ctx;
     const s = this.ctx.motion;
@@ -389,11 +393,11 @@ export class Experiments {
     await release();
     await offCollision();
     await offInfrared();
-    this.ctx.log('info', `calibrateInfraredLadder: ${reason} after ${Math.round((Date.now() - t0) / 1000)} s, ${rows.length} positions`);
     return { reason, rows };
   }
 
   /** Send the infrared ladder until fullstop; see seek-to-collision.ts. */
+  @log
   async sendLadder (): Promise<number> {
     return sendLadder(this.ctx, this.actuators);
   }
@@ -405,6 +409,7 @@ export class Experiments {
    * research/infrared-external-device.md, "Bolt to Bolt, 4 m apart"
    * (2026-10-02). Not written yet.
    */
+  @log
   async hideAndSeek (strength = 16): Promise<void> {
     this.ctx.log('info', `hideAndSeek: strength ${strength}, not written yet`);
   }
