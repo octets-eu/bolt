@@ -71,6 +71,13 @@ export class Stream<T, O = undefined> {
     if (release) await release();
   }
 
+  /** Drop every hold, the manual one included, and switch the hardware off. A holder's later release finds nothing and does nothing. */
+  async dropAll (): Promise<void> {
+    this.manual = null;
+    this.holds.clear();
+    await this.apply();
+  }
+
   /** Send the current setting again, e.g. after a sleep wiped it. Nothing held means nothing to send: sleep left it off. */
   reapply (): Promise<void> {
     this.appliedKey = null;

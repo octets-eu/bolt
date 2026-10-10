@@ -194,13 +194,16 @@ export class Lifecycle {
    * stopping a rotate(720): off came to rest within 90 ms in 6 of 6, the roll
    * turned on 105 and 122 degrees for 350 and 455 ms in 2 of 6; stopping a
    * drive at speed 70: off 1.1 to 3.1 cm after, the roll 2.4 to 4.2 cm.
-   * Stabilization is off afterwards, as after every step.
+   * Stabilization is off afterwards, as after every step. The motion stream
+   * is switched off whoever held it: a hold taken from the console or by an
+   * aborted step would keep it running past the UI's own toggle.
    */
   async fullstop (): Promise<void> {
     this.ctx.log('info', 'Fullstop');
     this.ctx.abortMotion();
     this.ctx.events.emit('fullstop', undefined);
     await this.actuators.motor.off();
+    await this.sensors.motion.dropAll();
     await this.communication.blinkChar('S', 5);
   }
 
