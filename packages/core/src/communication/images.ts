@@ -46,6 +46,18 @@ export const IMAGES = {
     [0,0,0,1,1,0,0,0],
   ] as Image,
 
+  /** '?' pointing front: a sweep found no direction. */
+  'lost': [
+    [0,0,0,1,1,0,0,0],
+    [0,0,0,0,0,0,0,0],
+    [0,0,0,1,1,0,0,0],
+    [0,0,0,1,1,0,0,0],
+    [0,0,0,0,1,1,0,0],
+    [0,0,0,0,0,1,1,0],
+    [0,1,1,0,0,1,1,0],
+    [0,0,1,1,1,1,0,0],
+  ] as Image,
+
   /** '!' pointing front, flashed on a collision or gyro max. */
   'collision': [
     [0,0,0,1,1,0,0,0],

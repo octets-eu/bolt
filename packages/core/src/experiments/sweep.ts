@@ -10,18 +10,24 @@ import { wait, whenAborted } from '../helpers/utils';
  * sweep: the sender's direction from a standing turn.
  *
  * The seeker turns through `span` degrees in steps of `step`, stands one
- * ladder round at each heading and counts the frames per level. The
- * carrier is the weakest level heard at two headings or more. It is heard
- * with the sender within about 60 degrees of the fore-aft axis, either end,
- * and not abeam (seek-edge runs 1 to 8 at 1.0 to 1.6 m: strength 4 in 36 %
- * of the rounds ahead, 6 % abeam, 73 % behind), so the headings where it
- * was heard form an arc and the arc's centre is the sender's axis. Only
- * frames count. A dropped frame is a gap in the arc, bridged when it is a
- * single heading, never a wrong edge; the standing start of seekEdge, which
- * declared the edge on the first silence, did so inside the lobe in 5 of 8
- * runs. A 360 sweep hears the sender twice, through the front and through
- * the back; the longer arc is taken and the two are not joined round the
- * end of the sweep.
+ * ladder round at each heading and counts the frames per level. A level
+ * that is just arriving is heard with the sender within about 60 degrees
+ * of the fore-aft axis, either end, and not abeam (seek-edge runs 1 to 8 at
+ * 1.0 to 1.6 m: strength 4 in 36 % of the rounds ahead, 6 % abeam, 73 %
+ * behind), so the headings where it was heard form an arc and the arc's
+ * centre is the sender's axis. The carrier is the weakest level with such
+ * a lobe inside the sweep: heard at `lobeMin` headings or more and silent
+ * at `quietMin` or more. A level heard at fewer headings is noise at that
+ * range (trial 5 of 2026-10-11, 4 m: strength 8 at three headings gave an
+ * axis 60 degrees off, strength 16 at ten of thirteen had the lobe); one
+ * heard nearly everywhere has no edge in the sweep. Without one, the
+ * weakest level heard at two headings serves, and an arc under `arcMin`
+ * headings gives no direction at all. Only frames count. A dropped frame
+ * is a gap in the arc, bridged when it is a single heading, never a wrong
+ * edge; the standing start of seekEdge, which declared the edge on the
+ * first silence, did so inside the lobe in 5 of 8 runs. A 360 sweep hears
+ * the sender twice, through the front and through the back; the longer arc
+ * is taken and the two are not joined round the end of the sweep.
  *
  * Ahead or behind on the axis the notifies cannot say. The receivers can:
  * a read of them (0x22) names the pair that hears, and it lands in a frame
@@ -36,8 +42,8 @@ import { wait, whenAborted } from '../helpers/utils';
  * three hits, 44 to 115 degrees off the axis, all on the true end).
  * Without a hit the axis is taken as ahead.
  *
- * Standing only; the ball ends pointing at the direction found. Ends on
- * fullstop. Records `sweep start` with the constants, one `sweep` line per
+ * Standing only; the ball ends pointing at the direction found, or stays
+ * as it is when there is none. Ends on fullstop. Records `sweep start` with the constants, one `sweep` line per
  * heading with the frames and the hits, `sweep arc` with the carrier, the
  * arc, the votes and the direction, `sweep trial` with the result.
  */
@@ -87,10 +93,10 @@ interface Position {
  * fullstop; a step `sweep` of the seeker. A trial begins when the seeker has
  * reported a collision (picked up, set down) and then none for `quietMs`,
  * so it has been placed: it shows the 'i' (armed) and starts on the next
- * report, a tap by hand. It blinks
- * the cross while sweeping and shows the chevron when it points at the
- * direction found, stabilization off, so it can be picked up and placed
- * again. Returns the trials' results.
+ * report, a tap by hand. It blinks the cross while sweeping and shows the
+ * chevron when it points at the direction found, or the '?' when the sweep
+ * found none, stabilization off, so it can be picked up and placed again.
+ * Returns the trials' results.
  */
 export function sweep (seeker: Bolt, sender: Bolt, options: SweepOptions = {}): Promise<SweepResult[]> {
   return seeker.run('sweep', () => trials(seeker, sender, options), { seeker: seeker.name, sender: sender.name, ...options });
@@ -129,7 +135,7 @@ async function trials (seeker: Bolt, sender: Bolt, options: SweepOptions): Promi
       await matrix.animate('blink', ['tracking', 'infra-listen']);
       const result = await standing(seeker, options);
       results.push(result);
-      await matrix.animate('show', ['cruising']);
+      await matrix.animate('show', [result.heading === null ? 'lost' : 'cruising']);
       seeker.log('info', `sweep trial ${JSON.stringify({ n: results.length, ...result })}`);
       // the next trial waits for the seeker to be handled again
       handled = false;
@@ -155,6 +161,9 @@ async function standing (seeker: Bolt, { span = 180, step = 15, reads = 3 }: Swe
   const offBeatMs = 25;    // a notify further off the beat is no correction of it; infrared-timing
   const msBefore  = 45;    // a volley's centre before the expected notify; infrared-timing run 5
   const stepMs    = 6;     // between the reads of a volley; infrared-timing run 5
+  const lobeMin   = 4;     // headings a carrier is heard at, at least: a lobe of 120 degrees is 9 of 13, half of them at 50 % heard; chosen
+  const quietMin  = 3;     // headings it is silent at, at least: an edge inside the sweep; chosen
+  const arcMin    = 3;     // headings an arc needs to give a direction; two gave 60 degrees off (trial 5); chosen
   const names = ['FL', 'FR', 'BR', 'BL'];
   const corner: Record<string, number> = { FL: -45, FR: 45, BR: 135, BL: -135 };
 
@@ -216,7 +225,7 @@ async function standing (seeker: Bolt, { span = 180, step = 15, reads = 3 }: Swe
   const start = await pose(null, turnMs);
   const count = span >= 360 ? Math.round(360 / step) : Math.floor(span / step) + 1;
   const first = span >= 360 ? start : start - span / 2;
-  ctx.log('info', `sweep start ${JSON.stringify({ ladder: LADDER, span, step, count, start, roundMs, turnMs, firstMs, offBeatMs, msBefore, reads, stepMs })}`);
+  ctx.log('info', `sweep start ${JSON.stringify({ ladder: LADDER, span, step, count, start, roundMs, turnMs, firstMs, offBeatMs, msBefore, reads, stepMs, lobeMin, quietMin, arcMin })}`);
 
   const lead = msBefore + stepMs * (reads - 1) / 2;
   const next = (t: number): number => {
@@ -251,10 +260,10 @@ async function standing (seeker: Bolt, { span = 180, step = 15, reads = 3 }: Swe
     ctx.log('info', `sweep ${JSON.stringify({ n, ...position })}`);
   }
 
-  // the carrier: the weakest level heard at two headings or more, else at one
+  // the carrier: the weakest level with a lobe inside the sweep, else the weakest heard at two headings
   const heardAt = LADDER.map((_, k) => positions.filter(p => (p.frames[k] ?? 0) > 0).length);
-  let level = heardAt.findIndex(n => n >= 2);
-  if (level < 0) level = heardAt.findIndex(n => n > 0);
+  let level = heardAt.findIndex(n => n >= lobeMin && positions.length - n >= quietMin);
+  if (level < 0) level = heardAt.findIndex(n => n >= 2);
 
   // the arc: the longest run of headings with the carrier heard, one silent heading inside bridged
   let arc: { from: Position, to: Position, headings: number } | null = null;
@@ -268,6 +277,7 @@ async function standing (seeker: Bolt, { span = 180, step = 15, reads = 3 }: Swe
       if (from && to && (arc === null || j - i + 1 > arc.headings)) arc = { from, to, headings: j - i + 1 };
       i = j;
     }
+    if (arc !== null && arc.headings < arcMin) arc = null;
   }
   const axis = arc === null ? null : mod360(arc.from.heading + angleDistance(arc.from.heading, arc.to.heading) / 2);
 
