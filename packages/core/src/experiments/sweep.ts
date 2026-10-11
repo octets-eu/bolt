@@ -80,8 +80,9 @@ interface Position {
 /**
  * `sender` sends the ladder while `seeker` sweeps, trial after trial, until
  * fullstop; a step `sweep` of the seeker. A trial begins when the seeker has
- * had no collision report for `quietMs`, so it has been placed: it shows
- * the 'i' (armed) and starts on the next report, a tap by hand. It blinks
+ * reported a collision (picked up, set down) and then none for `quietMs`,
+ * so it has been placed: it shows the 'i' (armed) and starts on the next
+ * report, a tap by hand. It blinks
  * the cross while sweeping and shows the chevron when it points at the
  * direction found, stabilization off, so it can be picked up and placed
  * again. Returns the trials' results.
@@ -98,10 +99,11 @@ async function trials (seeker: Bolt, sender: Bolt, options: SweepOptions): Promi
   const s = seeker.motion;
   const { matrix } = seeker.actuators;
   const results: SweepResult[] = [];
-  let lastHit = -Infinity, armed = false;
+  let lastHit = -Infinity, handled = false, armed = false;
   let tapped = (): void => {};
   const offCollision = await seeker.sensors.collision.subscribe(() => {
     lastHit = seeker.now();
+    handled = true;
     if (armed) tapped();
   }, tap);
   const sending = sender.experiments.sendLadder();
@@ -109,7 +111,8 @@ async function trials (seeker: Bolt, sender: Bolt, options: SweepOptions): Promi
 
   try {
     while (!s.aborted) {
-      while (!s.aborted && seeker.now() - lastHit < quietMs) await Promise.race([wait(quietMs - (seeker.now() - lastHit)), aborted]);
+      // placed: a report (picked up, set down) and then quiet
+      while (!s.aborted && (!handled || seeker.now() - lastHit < quietMs)) await Promise.race([wait(handled ? quietMs - (seeker.now() - lastHit) : 200), aborted]);
       if (s.aborted) break;
       const hit = new Promise<void>((resolve) => { tapped = resolve; });
       armed = true;
@@ -123,8 +126,8 @@ async function trials (seeker: Bolt, sender: Bolt, options: SweepOptions): Promi
       results.push(result);
       await matrix.animate('show', ['cruising']);
       seeker.log('info', `sweep trial ${JSON.stringify({ n: results.length, ...result })}`);
-      // the turn to the direction and the stop may have reported: the quiet time starts now
-      lastHit = seeker.now();
+      // the next trial waits for the seeker to be handled again
+      handled = false;
     }
   } finally {
     await offCollision();
