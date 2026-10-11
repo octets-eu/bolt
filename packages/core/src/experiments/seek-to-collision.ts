@@ -16,13 +16,18 @@ import type { SeekEdgeResult } from './seek-edge';
  *
  * The ladder: channel k carries strength LADDER[k], weakest first, one frame
  * per 200 ms (a Bolt emits no faster, 2026-10-01), so each level comes round
- * every 0.6 s. The channel of a listen notify says which level got through.
+ * every 0.8 s. The channel of a listen notify says which level got through.
  * The weakest level that arrives carries the direction: it is heard with the
  * sender ahead or behind and falls silent with the sender abeam, while
  * stronger ones also arrive from the side (pass-by.ts, 2026-10-05). The
- * strengths are chosen.
+ * strengths are chosen: 4 has that quiet side at 60 to 90 cm and none under
+ * 60 cm, where it is heard all round (seek-edge runs 5 and 7, 2026-10-10);
+ * 2 at 80 cm was heard facing 9 of 11 and side-on 0 of 15, so it is the
+ * level for the last half metre.
  */
-export const LADDER = [4, 8, 16];
+export const LADDER = [2, 4, 8, 16];
+/** One ladder round and the notify's scatter: every level's frame falls into it. */
+export const ROUND_MS = LADDER.length * 200 + 50;
 
 export interface SeekResult {
   /** Ladder rounds listened to. */
@@ -132,7 +137,7 @@ export async function seek (seeker: Bolt): Promise<SeekResult> {
   const { actuators, sensors } = seeker;
 
   const cells      = 72;    // directions of the belief, 5 degrees each
-  const roundMs    = 650;   // one ladder round of 615 ms and the notify's scatter: every level's frame falls into it
+  const roundMs    = ROUND_MS;
   const windowMs   = 3000;  // a level counts as arriving this long after it was heard; chosen
   const forget     = 0.02;  // share of the belief returned to "anywhere" per decision; chosen
   const sureWithin = 20;    // degrees round the likeliest direction that count as it

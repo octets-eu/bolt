@@ -1,6 +1,6 @@
 import type { Bolt } from '../bolt';
 import type { Context } from '../context';
-import { LADDER } from './seek-to-collision';
+import { LADDER, ROUND_MS } from './seek-to-collision';
 import { angleDistance, distance, mod360 } from '../helpers/math';
 import type { Point } from '../helpers/math';
 import { StabilizationIndex } from '../protocol/constants';
@@ -99,7 +99,7 @@ export async function seekEdge (seeker: Bolt): Promise<SeekEdgeResult> {
   const { motor } = actuators;
   const s = ctx.motion;
 
-  const roundMs    = 650;   // one ladder round of 615 ms and the notify's scatter
+  const roundMs    = ROUND_MS;
   const edge       = 65;    // degrees off the nose the sender is held at, where the pass-by runs put the lobe edge; chosen
   const step       = 10;    // degrees per verdict; chosen
   const seekStep   = 15;    // degrees per round with no notify, standing; chosen
