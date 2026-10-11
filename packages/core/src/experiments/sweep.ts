@@ -14,20 +14,18 @@ import { wait, whenAborted } from '../helpers/utils';
  * that is just arriving is heard with the sender within about 60 degrees
  * of the fore-aft axis, either end, and not abeam (seek-edge runs 1 to 8 at
  * 1.0 to 1.6 m: strength 4 in 36 % of the rounds ahead, 6 % abeam, 73 %
- * behind), so the headings where it was heard form an arc and the arc's
- * centre is the sender's axis. The carrier is the weakest level with such
- * a lobe inside the sweep: heard at `lobeMin` headings or more and silent
- * at `quietMin` or more. A level heard at fewer headings is noise at that
- * range (trial 5 of 2026-10-11, 4 m: strength 8 at three headings gave an
- * axis 60 degrees off, strength 16 at ten of thirteen had the lobe); one
- * heard nearly everywhere has no edge in the sweep. Without one, the
- * weakest level heard at two headings serves, and an arc under `arcMin`
- * headings gives no direction at all. Only frames count. A dropped frame
- * is a gap in the arc, bridged when it is a single heading, never a wrong
- * edge; the standing start of seekEdge, which declared the edge on the
- * first silence, did so inside the lobe in 5 of 8 runs. A 360 sweep hears
- * the sender twice, through the front and through the back; the longer arc
- * is taken and the two are not joined round the end of the sweep.
+ * behind). The axis is the direction whose two lobes, `half` degrees each
+ * side of it and of its opposite, fit the heard and silent headings best,
+ * summed over every level heard at `heardMin` headings or more and silent
+ * at `silentMin` or more: a level heard everywhere or nowhere says nothing.
+ * A frame outside the lobes counts twice as much against a candidate as a
+ * silence inside, which dropped frames give at every level. So a level at
+ * the edge of its range (strength 8 at 2 m, three on-axis headings) and a
+ * level with a shallow quiet side (strength 16 there, silent at two
+ * neighbouring headings) both tell, and one silence never decides: the
+ * standing start of seekEdge, which declared the edge on the first
+ * silence, did so inside the lobe in 5 of 8 runs. A 360 sweep fits both
+ * lobes at once.
  *
  * Ahead or behind on the axis the notifies cannot say. The receivers can:
  * a read of them (0x22) names the pair that hears, and it lands in a frame
@@ -43,9 +41,10 @@ import { wait, whenAborted } from '../helpers/utils';
  * Without a hit the axis is taken as ahead.
  *
  * Standing only; the ball ends pointing at the direction found, or stays
- * as it is when there is none. Ends on fullstop. Records `sweep start` with the constants, one `sweep` line per
- * heading with the frames and the hits, `sweep arc` with the carrier, the
- * arc, the votes and the direction, `sweep trial` with the result.
+ * as it is when there is none. Ends on fullstop. Records `sweep start`
+ * with the constants, one `sweep` line per heading with the frames and the
+ * hits, `sweep axis` with the levels used, the fit, the votes and the
+ * direction, `sweep trial` with the result.
  */
 export interface SweepOptions {
   /** Degrees swept, centred on the heading at the start; 360 goes once round from it. */
@@ -61,11 +60,11 @@ export interface SweepResult {
   positions: number;
   /** Frames heard per ladder level over the sweep. */
   levels: number[];
-  /** The level the arc was taken from, as a strength; null when nothing was heard. */
-  carrier: number | null;
-  /** Headings in the arc. */
-  arc: number;
-  /** Centre of the arc, a heading; null without a carrier. */
+  /** Levels the fit used, as strengths: heard at some headings and silent at others. */
+  used: number[];
+  /** Score of the best fit, one point per heading and level at most. */
+  fit: number;
+  /** The axis the fit gave, a heading; null when no level was usable. */
   axis: number | null;
   /** Hits that put the sender at the axis's near end, and at its far end. */
   front: number;
@@ -161,9 +160,9 @@ async function standing (seeker: Bolt, { span = 180, step = 15, reads = 3 }: Swe
   const offBeatMs = 25;    // a notify further off the beat is no correction of it; infrared-timing
   const msBefore  = 45;    // a volley's centre before the expected notify; infrared-timing run 5
   const stepMs    = 6;     // between the reads of a volley; infrared-timing run 5
-  const lobeMin   = 4;     // headings a carrier is heard at, at least: a lobe of 120 degrees is 9 of 13, half of them at 50 % heard; chosen
-  const quietMin  = 3;     // headings it is silent at, at least: an edge inside the sweep; chosen
-  const arcMin    = 3;     // headings an arc needs to give a direction; two gave 60 degrees off (trial 5); chosen
+  const half      = 60;    // half-width of a lobe, degrees; the pass-by runs and seek-edge runs 1 to 8
+  const heardMin  = 3;     // headings a level is heard at, at least, to be fitted; fewer is a stray frame; chosen
+  const silentMin = 2;     // headings it is silent at, at least; strength 16 at 2 m had two; chosen
   const names = ['FL', 'FR', 'BR', 'BL'];
   const corner: Record<string, number> = { FL: -45, FR: 45, BR: 135, BL: -135 };
 
@@ -225,7 +224,7 @@ async function standing (seeker: Bolt, { span = 180, step = 15, reads = 3 }: Swe
   const start = await pose(null, turnMs);
   const count = span >= 360 ? Math.round(360 / step) : Math.floor(span / step) + 1;
   const first = span >= 360 ? start : start - span / 2;
-  ctx.log('info', `sweep start ${JSON.stringify({ ladder: LADDER, span, step, count, start, roundMs, turnMs, firstMs, offBeatMs, msBefore, reads, stepMs, lobeMin, quietMin, arcMin })}`);
+  ctx.log('info', `sweep start ${JSON.stringify({ ladder: LADDER, span, step, count, start, roundMs, turnMs, firstMs, offBeatMs, msBefore, reads, stepMs, half, heardMin, silentMin })}`);
 
   const lead = msBefore + stepMs * (reads - 1) / 2;
   const next = (t: number): number => {
@@ -260,26 +259,24 @@ async function standing (seeker: Bolt, { span = 180, step = 15, reads = 3 }: Swe
     ctx.log('info', `sweep ${JSON.stringify({ n, ...position })}`);
   }
 
-  // the carrier: the weakest level with a lobe inside the sweep, else the weakest heard at two headings
+  // the axis: the fit of two lobes to the heard and silent headings, over the levels heard at some and silent at others; the axis is a line, so candidates run to 180
   const heardAt = LADDER.map((_, k) => positions.filter(p => (p.frames[k] ?? 0) > 0).length);
-  let level = heardAt.findIndex(n => n >= lobeMin && positions.length - n >= quietMin);
-  if (level < 0) level = heardAt.findIndex(n => n >= 2);
-
-  // the arc: the longest run of headings with the carrier heard, one silent heading inside bridged
-  let arc: { from: Position, to: Position, headings: number } | null = null;
-  if (level >= 0) {
-    const flags = positions.map(p => (p.frames[level] ?? 0) > 0);
-    for (let i = 0; i < flags.length; i++) {
-      if (!flags[i]) continue;
-      let j = i;
-      while (j + 1 < flags.length && (flags[j + 1] || flags[j + 2])) j++;
-      const from = positions[i], to = positions[j];
-      if (from && to && (arc === null || j - i + 1 > arc.headings)) arc = { from, to, headings: j - i + 1 };
-      i = j;
+  const used = LADDER.map((_, k) => k).filter(k => (heardAt[k] ?? 0) >= heardMin && positions.length - (heardAt[k] ?? 0) >= silentMin);
+  let axis: number | null = null, fit = -Infinity;
+  if (used.length) {
+    for (let d = 0; d < 180; d++) {
+      let score = 0;
+      for (const p of positions) {
+        const off = Math.abs(angleDistance(d, p.heading));
+        const inside = off <= half || off >= 180 - half;
+        for (const k of used) score += (p.frames[k] ?? 0) > 0 ? (inside ? 1 : -2) : (inside ? -0.5 : 1);
+      }
+      if (score > fit) {
+        fit = score;
+        axis = d;
+      }
     }
-    if (arc !== null && arc.headings < arcMin) arc = null;
   }
-  const axis = arc === null ? null : mod360(arc.from.heading + angleDistance(arc.from.heading, arc.to.heading) / 2);
 
   // the vote: the corners that heard put the sender within a quadrant of the heading plus their mean; the nearer end of the axis takes the hit
   let front = 0, back = 0;
@@ -304,11 +301,7 @@ async function standing (seeker: Bolt, { span = 180, step = 15, reads = 3 }: Swe
   }
   const known = front > back ? 'front' : back > front ? 'back' : null;
   const direction = axis === null ? null : known === 'back' ? mod360(axis + 180) : axis;
-  ctx.log('info', `sweep arc ${JSON.stringify({
-    carrier: level >= 0 ? LADDER[level] : null, heardAt,
-    arc: arc === null ? null : { from: arc.from.heading, to: arc.to.heading, headings: arc.headings },
-    axis, bearings, front, back, known, direction,
-  })}`);
+  ctx.log('info', `sweep axis ${JSON.stringify({ heardAt, used: used.map(k => LADDER[k]), axis, fit, bearings, front, back, known, direction })}`);
 
   if (direction !== null && !s.aborted) {
     await motor.roll(0, direction);
@@ -321,8 +314,7 @@ async function standing (seeker: Bolt, { span = 180, step = 15, reads = 3 }: Swe
 
   return {
     positions: positions.length, levels,
-    carrier: level >= 0 ? LADDER[level] ?? null : null,
-    arc: arc === null ? 0 : arc.headings, axis,
+    used: used.map(k => LADDER[k] ?? 0), fit: used.length ? fit : 0, axis,
     front, back, known,
     heading: direction, volleys, hits,
     beat: phase === null ? null : beat,
