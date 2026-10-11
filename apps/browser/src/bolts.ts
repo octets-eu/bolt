@@ -2,7 +2,7 @@
 
 import m from 'mithril';
 
-import { Bolt, BoltConfig, NotConnectedError, passBy, seekToCollision } from '@bolt/core';
+import { Bolt, BoltConfig, NotConnectedError, passBy, seekToCollision, sweep } from '@bolt/core';
 import type { SeekMethod } from '@bolt/core';
 import { WebBleTransport, isBluetoothAvailable, onAvailabilityChanged, getPermittedBolts, requestBolt, waitForAdvertisement } from '@bolt/web-ble';
 
@@ -79,6 +79,13 @@ class bolts {
     const a = this.get(seeker), b = this.get(sender);
     if (!a || !b) throw new NotConnectedError(a ? sender : seeker);
     return seekToCollision(a, b, seconds, method);
+  }
+
+  /** The sweep experiment: `seeker` stands and turns through `span` degrees in steps of `step` while `sender` sends the ladder; see @bolt/core experiments/sweep.ts. */
+  public sweep ({ seeker, sender, span = 180, step = 15 }: { seeker: string, sender: string, span?: number, step?: number }) {
+    const a = this.get(seeker), b = this.get(sender);
+    if (!a || !b) throw new NotConnectedError(a ? sender : seeker);
+    return sweep(a, b, { span, step });
   }
 
   /** The passBy experiment with two connected Bolts by name; see @bolt/core experiments/pass-by.ts. */

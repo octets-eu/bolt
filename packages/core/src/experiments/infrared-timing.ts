@@ -40,18 +40,18 @@ import { wait } from '../helpers/utils';
  */
 
 /** The sender's beat, fitted to 417 notifies (2026-10-04). */
-const PERIOD_MS = 200.44;
+export const PERIOD_MS = 200.44;
 
 const READ = { name: 'infraredReadings', device: DeviceId.sensor, id: SensorCommand.getInfraredReadings, target: Target.st, data: [] } as const;
 
 /** Signed distance of `t` from the nearest beat instant `phase + k * PERIOD_MS`, ms. */
-function offBeat (t: number, phase: number): number {
+export function offBeat (t: number, phase: number): number {
   const d = (((t - phase) % PERIOD_MS) + PERIOD_MS) % PERIOD_MS;
   return d > PERIOD_MS / 2 ? d - PERIOD_MS : d;
 }
 
 /** Circular mean of `times` on the beat, as a phase in 0..PERIOD_MS. */
-function meanPhase (times: readonly number[]): number {
+export function meanPhase (times: readonly number[]): number {
   let x = 0, y = 0;
   for (const t of times) {
     const a = 2 * Math.PI * (t % PERIOD_MS) / PERIOD_MS;

@@ -54,3 +54,5 @@ export { Experiments } from './experiments/experiments';
 export { seekToCollision } from './experiments/seek-to-collision';
 export type { SeekMethod } from './experiments/seek-to-collision';
 export { passBy } from './experiments/pass-by';
+export { sweep } from './experiments/sweep';
+export type { SweepOptions, SweepResult } from './experiments/sweep';
