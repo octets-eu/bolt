@@ -7,6 +7,8 @@ import { reach } from './reach';
 import type { ReachResult } from './reach';
 import { lockOn } from './lock-on';
 import type { LockOnResult } from './lock-on';
+import { sweep } from './sweep';
+import type { SweepOptions, SweepResult } from './sweep';
 import { log } from '../lifecycle/log';
 
 /**
@@ -40,6 +42,12 @@ export class Behavior {
   @log
   async lockOn (channel: number): Promise<LockOnResult> {
     return lockOn(this.ctx, this.actuators, this.sensors, this.communication, channel);
+  }
+
+  /** Where the Bolt that sends the ladder is, from a standing turn; see sweep.ts. */
+  @log
+  async sweep (options: SweepOptions = {}): Promise<SweepResult> {
+    return sweep(this.ctx, this.actuators, this.sensors, this.communication, options);
   }
 
 }

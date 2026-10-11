@@ -12,7 +12,6 @@ import type { Point } from '../helpers/math';
 import { DriveModel, stoppingDistance, stopNow, targetSpeed } from './landing';
 import type { LandingResult } from './landing';
 import { sampleLoop } from './sample-loop';
-import { sendLadder } from './seek-to-collision';
 
 /**
  * Experiments: functions under test, a work log in code, run from the
@@ -396,10 +395,10 @@ export class Experiments {
     return { reason, rows };
   }
 
-  /** Send the infrared ladder until fullstop; see seek-to-collision.ts. */
+  /** Send the infrared ladder until fullstop, from the console; see Communication.sendLadder. */
   @log
   async sendLadder (): Promise<number> {
-    return sendLadder(this.ctx, this.actuators);
+    return this.communication.sendLadder();
   }
 
   /**

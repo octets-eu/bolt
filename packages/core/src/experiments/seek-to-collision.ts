@@ -1,7 +1,7 @@
-import type { Actuators } from '../actuators/actuators';
 import type { Bolt } from '../bolt';
 import type { Context } from '../context';
-import { trackBeat, volleyReader } from './infrared-timing';
+import { readVolley, trackBeat } from '../behavior/beat';
+import { LADDER, ROUND_MS } from '../communication/communication';
 import { angleDistance, distance, headingTo, mod360 } from '../helpers/math';
 import type { Point } from '../helpers/math';
 import { StabilizationIndex } from '../protocol/constants';
@@ -10,24 +10,11 @@ import { seekEdge } from './seek-edge';
 import type { SeekEdgeResult } from './seek-edge';
 
 /**
- * seekToCollision: one Bolt sends an infrared ladder, the other finds it and
- * drives into it. `sendLadder` is the sender, `seek` the seeker,
- * `seekToCollision` starts both and ends them.
- *
- * The ladder: channel k carries strength LADDER[k], weakest first, one frame
- * per 200 ms (a Bolt emits no faster, 2026-10-01), so each level comes round
- * every 0.8 s. The channel of a listen notify says which level got through.
- * The weakest level that arrives carries the direction: it is heard with the
- * sender ahead or behind and falls silent with the sender abeam, while
- * stronger ones also arrive from the side (pass-by.ts, 2026-10-05). The
- * strengths are chosen: 4 has that quiet side at 60 to 90 cm and none under
- * 60 cm, where it is heard all round (seek-edge runs 5 and 7, 2026-10-10);
- * 2 at 80 cm was heard facing 9 of 11 and side-on 0 of 15, so it is the
- * level for the last half metre.
+ * seekToCollision: one Bolt sends the infrared ladder
+ * (Communication.sendLadder), the other finds it and drives into it. `seek`
+ * is the first seeker, seekEdge the second; `seekToCollision` starts both
+ * Bolts and ends them.
  */
-export const LADDER = [2, 4, 8, 16];
-/** One ladder round and the notify's scatter: every level's frame falls into it. */
-export const ROUND_MS = LADDER.length * 200 + 50;
 
 export interface SeekResult {
   /** Ladder rounds listened to. */
@@ -58,22 +45,6 @@ export interface SeekToCollisionResult {
 
 /** Which seeker: `belief` steers at the likeliest direction (`seek`), `edge` holds the sender on the edge of its hearing (seek-edge.ts). */
 export type SeekMethod = 'belief' | 'edge';
-
-/** Send the ladder, level after level, until fullstop. Returns the frames sent. */
-export async function sendLadder (ctx: Context, actuators: Actuators): Promise<number> {
-  const s = ctx.motion;
-  let frames = 0;
-  while (!s.aborted) {
-    for (const [channel, strength] of LADDER.entries()) {
-      if (s.aborted) break;
-      const t = ctx.now();
-      await actuators.infrared.send(channel, strength);
-      frames++;
-      await wait(Math.max(0, 200 - (ctx.now() - t)));
-    }
-  }
-  return frames;
-}
 
 /**
  * Find the Bolt that sends the ladder and roll into it, until fullstop.
@@ -248,8 +219,7 @@ export async function seek (seeker: Bolt): Promise<SeekResult> {
     })}`);
   };
 
-  // listen is one-shot: the beat tracker re-arms it after every notify, this listener only while there is none
-  let rearm = false;
+  // listen is one-shot: the beat tracker holds the stream and re-arms it after every notify
   const offInfrared = await sensors.infrared.subscribe(({ payload }) => {
     const channel = payload[0] ?? 255;
     if (channel < LADDER.length) {
@@ -257,7 +227,6 @@ export async function seek (seeker: Bolt): Promise<SeekResult> {
       heardRound[channel] = true;
       eventsPerLevel[channel] = (eventsPerLevel[channel] ?? 0) + 1;
     }
-    if (rearm) void sensors.listenInfrared(true);
   });
   const release = await sensors.motion.subscribe(null);
   await motor.stabilize(StabilizationIndex.full);
@@ -265,15 +234,7 @@ export async function seek (seeker: Bolt): Promise<SeekResult> {
   ctx.log('info', `seek start ${JSON.stringify({ ladder: LADDER, cells, roundMs, windowMs, forget, sureWithin, otherHalf, trendCm, sweepStep, turnMs, sweepMs, speed, slowSpeed, nearEqual, bigTurn, bigTurnMs, checkBeats, checkBy })}`);
 
   // the sender's beat is learned from the notifies while the sweep stands; without it there is no check
-  const learning = trackBeat(seeker, LADDER.map((_, channel) => channel));
-  // not learned: the tracker has let go of the listen, this listener takes it over
-  void learning.then((learned) => {
-    if (learned !== null) return;
-    rearm = true;
-    void sensors.listenInfrared(true);
-  });
-  let beat = null as Awaited<typeof learning>;
-  let volley = null as Awaited<ReturnType<typeof volleyReader>> | null;
+  const beat = await trackBeat(sensors, LADDER.map((_, channel) => channel));
 
   /**
    * Standing: reads of the four receivers on every beat, `checkBeats` of
@@ -281,11 +242,12 @@ export async function seek (seeker: Bolt): Promise<SeekResult> {
    * right, back right, back left. Logs every reply as `seek reads`.
    */
   const listen = async (why: string): Promise<boolean[][]> => {
-    if (beat === null || volley === null) return [];
-    const lead = 45 + 6;   // three reads 6 ms apart, centred 45 ms before the expected notify (infrared-timing.ts)
+    const lead = 45 + 6;   // three reads 6 ms apart, centred 45 ms before the expected notify (behavior/beat.ts)
     const beats: boolean[][] = [], raw: (readonly number[] | null)[][] = [];
     for (let k = 0; k < checkBeats && !s.aborted; k++) {
-      const replies = await volley.read(beat.next(performance.now() + lead + 12) - lead, 3, 6);
+      const at = beat.next(performance.now() + lead + 12);
+      if (at === null) break;
+      const replies = await readVolley(seeker, at - lead, 3, 6);
       raw.push(replies);
       beats.push([0, 1, 2, 3].map(i => replies.some(r => r !== null && (r[i] ?? 255) < LADDER.length)));
     }
@@ -309,7 +271,7 @@ export async function seek (seeker: Bolt): Promise<SeekResult> {
    * three at most.
    */
   const check = async (h: number): Promise<string> => {
-    if (beat === null) return 'no beat';
+    if (beat.next(performance.now()) === null) return 'no beat';
     const [front, back] = versus(await listen('front against back'), [0, 1], [2, 3]);
     checks++;
     if (Math.abs(front - back) >= checkBy) {
@@ -339,9 +301,7 @@ export async function seek (seeker: Bolt): Promise<SeekResult> {
     record('sweep', stop.h, stop.levels);
   }
 
-  beat = await learning;
-  if (beat === null) ctx.log('warn', 'seek: the beat was not learned, no checks');
-  else volley = await volleyReader(seeker);
+  if (beat.next(performance.now()) === null) ctx.log('warn', 'seek: the beat is not learned yet, no checks until it is');
 
   // roll, steering at the likeliest direction
   // where the weakest arriving level last changed
@@ -412,8 +372,7 @@ export async function seek (seeker: Bolt): Promise<SeekResult> {
 
   await motor.stop();
   await motor.stabilize(StabilizationIndex.none);
-  volley?.release();
-  await beat?.release();
+  await beat.release();
   await release();
   await offInfrared();
   return { rounds, heard: heardRounds, silent: silentRounds, trends, checks, decided, passes, events: eventsPerLevel.reduce((a, n) => a + n, 0) };
@@ -466,7 +425,7 @@ async function run (seeker: Bolt, sender: Bolt, seconds: number, method: SeekMet
   const timer = setTimeout(() => end('time'), seconds * 1000);
 
   seeker.log('info', `seekToCollision constants ${JSON.stringify({ ladder: LADDER, windowMs, thresholds })}`);
-  const sending = sender.experiments.sendLadder();
+  const sending = sender.communication.sendLadder();
   const seeking = method === 'edge' ? seekEdge(seeker) : seek(seeker);
   sending.catch(() => end('error'));
   seeking.catch(() => end('error'));

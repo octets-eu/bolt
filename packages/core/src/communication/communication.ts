@@ -8,6 +8,21 @@ import { range, wait, whenAborted } from '../helpers/utils';
 /** What shows on the matrix, by who sets it. */
 export type Slot = 'motor' | 'infrared' | 'mark';
 
+/**
+ * The infrared ladder a Bolt sends to be found: channel k carries strength
+ * LADDER[k], weakest first, one frame per 200 ms (a Bolt emits no faster,
+ * 2026-10-01), so each level comes round every 0.85 s and the channel of a
+ * listen notify says which level got through. The level that is just
+ * arriving at the seeker's distance is heard with the sender ahead or
+ * behind and falls silent with it abeam, stronger ones arrive all round
+ * (pass-by 2026-10-05, seek-edge runs and sweep trials 2026-10-10/11): 2 up
+ * to about 80 cm, 4 at 0.6 to 1.0 m, 8 at 1.0 to 1.7 m, 16 beyond that to
+ * 4 m. The strengths are chosen; the emitters go to 255.
+ */
+export const LADDER = [2, 4, 8, 16];
+/** One ladder round and the notify's scatter: every level's frame falls into it. */
+export const ROUND_MS = LADDER.length * 200 + 50;
+
 export interface BroadcastOptions {
   /** Infrared codes to send in turn, default all eight. */
   codes?:    readonly number[] | undefined;
@@ -88,6 +103,22 @@ export class Communication {
     this.slots[slot] = image;
     const names = [this.slots.motor, this.slots.infrared].filter((n): n is ImageName => n !== null);
     await this.actuators.matrix.animate(names.length === 2 ? 'blink' : 'show', names, this.slots.mark);
+  }
+
+  /** Send the ladder, level after level, until fullstop. Returns the frames sent. */
+  async sendLadder (): Promise<number> {
+    const s = this.ctx.motion;
+    let frames = 0;
+    while (!s.aborted) {
+      for (const [channel, strength] of LADDER.entries()) {
+        if (s.aborted) break;
+        const t = this.ctx.now();
+        await this.actuators.infrared.send(channel, strength);
+        frames++;
+        await wait(Math.max(0, 200 - (this.ctx.now() - t)));
+      }
+    }
+    return frames;
   }
 
   /** Emit infrared codes in turn so another Bolt listening on any channel hears this one. */

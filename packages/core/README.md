@@ -7,6 +7,7 @@ The Sphero BOLT driver. Pure TypeScript, strict: no DOM, no Bluetooth, no UI.
 
 ```
 experiments/                   functions under test, a work log in code; what qualifies moves into its folder
+behavior/                      closed loops over the Bolt's own senses, motor only: reach, lockOn, sweep
 lifecycle/  navigation/  communication/  calibration/   sequences, waits, sensor feedback
 sensors/   actuators/                              exactly one packet per call
 protocol/  transport  queue  receiver  packet  payloads  bytes, sequence numbers, acks, decoded values
@@ -20,6 +21,9 @@ Rules that keep the layers honest:
 
 - A bottom-layer function sends one packet and returns its ack. Anything with
   a second packet, a wait or a sensor read in it lives one layer up.
+  `Queue.fire` is the one write past the serial lane: without response,
+  under its own sequence number, for reads that must land milliseconds
+  apart (behavior/beat.ts).
 - Layer three modules may use each other, but only downwards or sideways:
   navigation may call calibration, calibration may call sensors and
   actuators, nothing calls navigation from below.

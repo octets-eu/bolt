@@ -1,6 +1,6 @@
 import type { Bolt } from '../bolt';
 import type { Context } from '../context';
-import { LADDER, ROUND_MS } from './seek-to-collision';
+import { LADDER, ROUND_MS } from '../communication/communication';
 import { angleDistance, distance, mod360 } from '../helpers/math';
 import type { Point } from '../helpers/math';
 import { StabilizationIndex } from '../protocol/constants';
