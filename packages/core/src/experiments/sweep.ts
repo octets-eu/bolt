@@ -188,13 +188,28 @@ async function standing (seeker: Bolt, { span = 180, step = 15 }: SweepOptions):
     void sensors.listenInfrared(true);
   });
   await sensors.listenInfrared(true);
-  const release = await sensors.motion.subscribe(null);
   await motor.stabilize(StabilizationIndex.full);
-  await ctx.events.once('sensordata', { timeoutMs: 1000 });
   const volley = await volleyReader(seeker);
 
+  /**
+   * Turn to `target` and give it `ms`, with the motion stream held only
+   * that long; the heading at the end. During a round the stream is off:
+   * its 18 packets a second share the link with the notifies and the
+   * reads, and in trial 1 the notifies scattered 25 ms around the beat,
+   * in clusters 15 to 20 ms apart, against 97 % within 25 ms without a
+   * stream (2026-10-04); 1 hit in 51 volleys.
+   */
+  const pose = async (target: number | null, ms: number): Promise<number> => {
+    const release = await sensors.motion.subscribe(null);
+    if (target !== null) await motor.roll(0, target);
+    await wait(ms);
+    const at = heading();
+    await release();
+    return at;
+  };
+
   const t0 = ctx.now();
-  const start = heading();
+  const start = await pose(null, turnMs);
   const count = span >= 360 ? Math.round(360 / step) : Math.floor(span / step) + 1;
   const first = span >= 360 ? start : start - span / 2;
   ctx.log('info', `sweep start ${JSON.stringify({ ladder: LADDER, span, step, count, start, roundMs, turnMs, firstMs, offBeatMs, msBefore, reads, stepMs, nearAxis })}`);
@@ -208,9 +223,7 @@ async function standing (seeker: Bolt, { span = 180, step = 15 }: SweepOptions):
 
   for (let n = 0; n < count && !s.aborted; n++) {
     const target = mod360(first + n * step);
-    await motor.roll(0, target);
-    await wait(n === 0 ? firstMs : turnMs);
-    const position: Position = { target, heading: heading(), frames: [], volleys: 0, hits: [] };
+    const position: Position = { target, heading: await pose(target, n === 0 ? firstMs : turnMs), frames: [], volleys: 0, hits: [] };
     heardRound.fill(0);
     const tr = performance.now();
     while (performance.now() - tr < roundMs && !s.aborted) {
@@ -284,7 +297,6 @@ async function standing (seeker: Bolt, { span = 180, step = 15 }: SweepOptions):
   await motor.stop();
   await motor.stabilize(StabilizationIndex.none);
   volley.release();
-  await release();
   await offInfrared();
 
   return {
