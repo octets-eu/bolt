@@ -28,10 +28,13 @@ import { wait, whenAborted } from '../helpers/utils';
  * when it is timed to the sender's beat (2026-10-04, 80 cm: three reads per
  * beat caught 43 % of the frames, the front pair in 39 of 40 hits facing;
  * 2026-10-05: 1 beat in 10 at 1.5 m). The beat is learned from the notifies
- * while the sweep turns, then a volley is read on every beat. Hits at
- * headings within `nearAxis` of the axis vote front against back, the
- * weakest level with a decided vote counts. Without a hit the axis is taken
- * as ahead.
+ * while the sweep turns, then a volley is read on every beat. The receivers
+ * sit at the corners, 45 degrees off the nose in front and 135 behind, so
+ * a hit puts the sender within a quadrant of the heading plus the mean of
+ * the corners that heard; the end of the axis nearer to that takes the
+ * hit, and the end with more hits is the direction (trial 3, 2026-10-11:
+ * three hits, 44 to 115 degrees off the axis, all on the true end).
+ * Without a hit the axis is taken as ahead.
  *
  * Standing only; the ball ends pointing at the direction found. Ends on
  * fullstop. Records `sweep start` with the constants, one `sweep` line per
@@ -43,6 +46,8 @@ export interface SweepOptions {
   span?: number;
   /** Degrees between headings. */
   step?: number;
+  /** Reads of the receivers per beat; 0 listens only, to measure the notifies' timing without them. */
+  reads?: number;
 }
 
 export interface SweepResult {
@@ -56,7 +61,7 @@ export interface SweepResult {
   arc: number;
   /** Centre of the arc, a heading; null without a carrier. */
   axis: number | null;
-  /** Hits near the axis on the front pair and on the back pair, of the level that decided. */
+  /** Hits that put the sender at the axis's near end, and at its far end. */
   front: number;
   back: number;
   known: 'front' | 'back' | null;
@@ -137,7 +142,7 @@ async function trials (seeker: Bolt, sender: Bolt, options: SweepOptions): Promi
   return results;
 }
 
-async function standing (seeker: Bolt, { span = 180, step = 15 }: SweepOptions): Promise<SweepResult> {
+async function standing (seeker: Bolt, { span = 180, step = 15, reads = 3 }: SweepOptions): Promise<SweepResult> {
 
   const ctx: Context = seeker;
   const { actuators, sensors, status } = seeker;
@@ -149,10 +154,9 @@ async function standing (seeker: Bolt, { span = 180, step = 15 }: SweepOptions):
   const firstMs   = 1000;  // the turn to the first heading and the one to the direction found, up to 180 degrees
   const offBeatMs = 25;    // a notify further off the beat is no correction of it; infrared-timing
   const msBefore  = 45;    // a volley's centre before the expected notify; infrared-timing run 5
-  const reads     = 3;     // reads per volley, and their spacing
-  const stepMs    = 6;
-  const nearAxis  = 40;    // a hit votes when its heading is within this of the axis; chosen
+  const stepMs    = 6;     // between the reads of a volley; infrared-timing run 5
   const names = ['FL', 'FR', 'BR', 'BL'];
+  const corner: Record<string, number> = { FL: -45, FR: 45, BR: 135, BL: -135 };
 
   const heading = (): number => mod360(-(status.angles?.yaw ?? 0));
   const heardRound = LADDER.map(() => 0);
@@ -212,7 +216,7 @@ async function standing (seeker: Bolt, { span = 180, step = 15 }: SweepOptions):
   const start = await pose(null, turnMs);
   const count = span >= 360 ? Math.round(360 / step) : Math.floor(span / step) + 1;
   const first = span >= 360 ? start : start - span / 2;
-  ctx.log('info', `sweep start ${JSON.stringify({ ladder: LADDER, span, step, count, start, roundMs, turnMs, firstMs, offBeatMs, msBefore, reads, stepMs, nearAxis })}`);
+  ctx.log('info', `sweep start ${JSON.stringify({ ladder: LADDER, span, step, count, start, roundMs, turnMs, firstMs, offBeatMs, msBefore, reads, stepMs })}`);
 
   const lead = msBefore + stepMs * (reads - 1) / 2;
   const next = (t: number): number => {
@@ -227,7 +231,7 @@ async function standing (seeker: Bolt, { span = 180, step = 15 }: SweepOptions):
     heardRound.fill(0);
     const tr = performance.now();
     while (performance.now() - tr < roundMs && !s.aborted) {
-      if (phase === null) {
+      if (reads === 0 || phase === null) {
         await wait(50);
         continue;
       }
@@ -267,27 +271,33 @@ async function standing (seeker: Bolt, { span = 180, step = 15 }: SweepOptions):
   }
   const axis = arc === null ? null : mod360(arc.from.heading + angleDistance(arc.from.heading, arc.to.heading) / 2);
 
-  // the vote: hits near the axis, front pair against back pair, the weakest level that is not tied
-  const votes = LADDER.map(() => ({ front: 0, back: 0 }));
+  // the vote: the corners that heard put the sender within a quadrant of the heading plus their mean; the nearer end of the axis takes the hit
+  let front = 0, back = 0;
+  const bearings: number[] = [];
   if (axis !== null) {
     for (const p of positions) {
-      if (Math.abs(angleDistance(axis, p.heading)) > nearAxis) continue;
       for (const hit of p.hits) {
-        const v = votes[hit.channel];
-        if (!v) continue;
-        const front = hit.rx.includes('F'), back = hit.rx.includes('B');
-        if (front && !back) v.front++;
-        else if (back && !front) v.back++;
+        let sx = 0, sy = 0;
+        for (const r of hit.rx.split('+')) {
+          const a = (corner[r] ?? 0) * Math.PI / 180;
+          sx += Math.cos(a);
+          sy += Math.sin(a);
+        }
+        // opposite corners or all four say no side
+        if (Math.hypot(sx, sy) < 0.5) continue;
+        const bearing = mod360(p.heading + Math.atan2(sy, sx) * 180 / Math.PI);
+        bearings.push(Math.round(bearing));
+        if (Math.abs(angleDistance(axis, bearing)) < 90) front++;
+        else back++;
       }
     }
   }
-  const decided = votes.find(v => v.front !== v.back) ?? null;
-  const known = decided === null ? null : decided.front > decided.back ? 'front' : 'back';
+  const known = front > back ? 'front' : back > front ? 'back' : null;
   const direction = axis === null ? null : known === 'back' ? mod360(axis + 180) : axis;
   ctx.log('info', `sweep arc ${JSON.stringify({
     carrier: level >= 0 ? LADDER[level] : null, heardAt,
     arc: arc === null ? null : { from: arc.from.heading, to: arc.to.heading, headings: arc.headings },
-    axis, votes, known, direction,
+    axis, bearings, front, back, known, direction,
   })}`);
 
   if (direction !== null && !s.aborted) {
@@ -303,7 +313,7 @@ async function standing (seeker: Bolt, { span = 180, step = 15 }: SweepOptions):
     positions: positions.length, levels,
     carrier: level >= 0 ? LADDER[level] ?? null : null,
     arc: arc === null ? 0 : arc.headings, axis,
-    front: decided?.front ?? 0, back: decided?.back ?? 0, known,
+    front, back, known,
     heading: direction, volleys, hits,
     beat: phase === null ? null : beat,
     seconds: Math.round((ctx.now() - t0) / 100) / 10,

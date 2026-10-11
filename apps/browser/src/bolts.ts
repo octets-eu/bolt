@@ -82,10 +82,10 @@ class bolts {
   }
 
   /** The sweep experiment: `seeker` stands and turns through `span` degrees in steps of `step` while `sender` sends the ladder; see @bolt/core experiments/sweep.ts. */
-  public sweep ({ seeker, sender, span = 180, step = 15 }: { seeker: string, sender: string, span?: number, step?: number }) {
+  public sweep ({ seeker, sender, span = 180, step = 15, reads = 3 }: { seeker: string, sender: string, span?: number, step?: number, reads?: number }) {
     const a = this.get(seeker), b = this.get(sender);
     if (!a || !b) throw new NotConnectedError(a ? sender : seeker);
-    return sweep(a, b, { span, step });
+    return sweep(a, b, { span, step, reads });
   }
 
   /** The passBy experiment with two connected Bolts by name; see @bolt/core experiments/pass-by.ts. */
