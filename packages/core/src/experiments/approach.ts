@@ -49,6 +49,10 @@ export interface ApproachResult {
  *   close, back off `backCm` along the last direction and sweep again.
  *   `shortMax` short sweeps without the band give up.
  *
+ * A sweep that finds the axis but no end (`axis`) is resolved by the last
+ * direction known: the end nearer to it. The first sweep has none and an
+ * `axis` there counts as nothing.
+ *
  * Logs `approach start` with the constants and one `approach` line per
  * round, leg, sweep and rule, with the heading and the locator position.
  */
@@ -111,10 +115,16 @@ export async function approach (seeker: Bolt, referee: Referee, options: Approac
     ctx.log('info', `approach ${JSON.stringify({ n: records++, rule, heading: Math.round(heading()), at: [Math.round(status.position.x), Math.round(status.position.y)], ...extra })}`);
   };
 
+  let lastDirection: number | null = null;
+
+  /** A sweep on `range`; an axis without an end takes the end nearer to the last direction. */
   const sweepOn = async (range: 'long' | 'short'): Promise<SweepResult> => {
     await stand();
     const r = await behavior.sweep({ referee, range, ...options });
     result.sweeps++;
+    if (r.reason === 'axis' && r.axis !== null) {
+      r.heading = lastDirection === null ? null : Math.abs(angleDistance(lastDirection, r.axis)) <= 90 ? r.axis : mod360(r.axis + 180);
+    }
     record('sweep', { range, reason: r.reason, direction: r.heading, used: r.used, hits: r.hits });
     return r;
   };
@@ -148,7 +158,7 @@ export async function approach (seeker: Bolt, referee: Referee, options: Approac
       return result;
     }
     let side = 1, target = sweep.heading - side * edge;
-    let lastDirection = sweep.heading;
+    lastDirection = sweep.heading;
     carrierLevel = carrierOf(sweep);
     await roll();
     await motor.roll(0, mod360(target));
@@ -229,7 +239,7 @@ export async function approach (seeker: Bolt, referee: Referee, options: Approac
         await seeker.navigation.roll(stretchCm, sweep.heading);
       } else {
         record('back off', { direction: lastDirection, cm: backCm });
-        await seeker.navigation.roll(backCm, mod360(lastDirection + 180));
+        await seeker.navigation.roll(backCm, mod360((lastDirection ?? 0) + 180));
       }
     }
     if (!s.aborted) result.reason = 'nothing';
