@@ -2,7 +2,7 @@
 
 import m from 'mithril';
 
-import { Bolt, BoltConfig, NotConnectedError, passBy, seekToCollision, sweepTrials } from '@bolt/core';
+import { Bolt, BoltConfig, NotConnectedError, passBy, seekToCollision, sweepTest, sweepTrials } from '@bolt/core';
 import type { SeekMethod } from '@bolt/core';
 import { WebBleTransport, isBluetoothAvailable, onAvailabilityChanged, getPermittedBolts, requestBolt, waitForAdvertisement } from '@bolt/web-ble';
 
@@ -86,6 +86,23 @@ class bolts {
     const a = this.get(seeker), b = this.get(sender);
     if (!a || !b) throw new NotConnectedError(a ? sender : seeker);
     return sweepTrials(a, b, { span, step, reads });
+  }
+
+  /**
+   * The sweep behavior judged by the locator: both Bolts on their reference points, the seeker walks
+   * `stepCm` a trial up or down the sheet, turns at random and sweeps, until a sweep is off by more
+   * than `tolerance` degrees or finds nothing; see @bolt/core experiments/sweep-test.ts.
+   */
+  public sweepTest ({ seeker, sender, direction = 'up', stepCm = 25, tolerance = 30, span = 180, step = 15, reads = 3 }: { seeker: string, sender: string, direction?: 'up' | 'down', stepCm?: number, tolerance?: number, span?: number, step?: number, reads?: number }) {
+    const a = this.get(seeker), b = this.get(sender);
+    if (!a || !b) throw new NotConnectedError(a ? sender : seeker);
+    const home = Plotter.startOf(seeker), mark = Plotter.startOf(sender);
+    if (!home || !mark) throw new Error(`no start on the sheet for ${home ? sender : seeker}`);
+    const at = Plotter.toLocator(seeker, mark.x, mark.y)!;
+    // up is -y on the sheet; a unit sheet vector turned into the seeker's frame, as a heading
+    const v = Plotter.toLocator(seeker, home.x, home.y + (direction === 'up' ? -1 : 1))!;
+    const heading = (Math.atan2(v.x, v.y) * 180 / Math.PI + 360) % 360;
+    return sweepTest(a, b, { at, direction: Math.round(heading), stepCm, tolerance, span, step, reads });
   }
 
   /** The passBy experiment with two connected Bolts by name; see @bolt/core experiments/pass-by.ts. */

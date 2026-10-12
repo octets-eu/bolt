@@ -129,8 +129,8 @@ const Plotter = Factory.create('Plotter', {
     // one roll at a time; SPACE ends it, then the next click counts
     if (rolling) return;
     const rolls = Bolts.map((bolt: Bolt) => {
-      const start = starts[bolt.name];
-      return bolt.connected && start && bolt.navigation.rollToPoint(turn(start.heading, x - start.x, y - start.y));
+      const target = Plotter.toLocator(bolt.name, x, y);
+      return bolt.connected && target && bolt.navigation.rollToPoint(target);
     });
     rolling = true;
     Promise.all(rolls).finally(() => { rolling = false; });
@@ -139,6 +139,18 @@ const Plotter = Factory.create('Plotter', {
 
 
   /** Every locator sample of an attached Bolt lands on the plan, counted from the Bolt's start; the sample's yaw gives the nose. A reset of the Bolt alone puts its dot on the start, as the Reset button does for all. */
+  /** A sheet point in the locator frame of the Bolt `name`, or null without a start for it. */
+  toLocator (name: string, x: number, y: number): { x: number, y: number } | null {
+    const start = starts[name];
+    return start ? turn(start.heading, x - start.x, y - start.y) : null;
+  },
+
+  /** Where the Bolt `name` stands at its reset, on the sheet. */
+  startOf (name: string): { x: number, y: number } | null {
+    const start = starts[name];
+    return start ? { x: start.x, y: start.y } : null;
+  },
+
   attach (bolt: Bolt): () => void {
     return bolt.events.on('log', (entry: LogEntry) => {
       const start = starts[bolt.name];
