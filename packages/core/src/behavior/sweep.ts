@@ -1,6 +1,9 @@
 import type { Actuators } from '../actuators/actuators';
 import type { Communication } from '../communication/communication';
-import { LADDER, ROUND_MS } from '../communication/communication';
+import type { LadderRange } from '../communication/communication';
+import type { LadderAuthority } from '../referee/referee';
+import { negotiateLadder } from './negotiate-ladder';
+import type { NegotiateResult } from './negotiate-ladder';
 import type { Context } from '../context';
 import type { Sensors } from '../sensors/sensors';
 import { angleDistance, mod360 } from '../helpers/math';
@@ -10,6 +13,10 @@ import { readVolley, trackBeat } from './beat';
 import type { Beat } from './beat';
 
 export interface SweepOptions {
+  /** Whom to ask for the ladder before listening. */
+  referee: LadderAuthority;
+  /** The ladder to sweep on. */
+  range?: LadderRange | undefined;
   /** Degrees swept, centred on the heading at the start; 360 goes once round from it. */
   span?: number | undefined;
   /** Degrees between headings. */
@@ -25,6 +32,9 @@ export interface SweepResult {
    * headings and silent at others, the sender is out of reach or on top.
    */
   reason: 'direction' | 'axis' | 'nothing' | 'aborted';
+  /** The ladder swept on, and whether a frame of it confirmed the switch before the sweep. */
+  range: LadderRange;
+  negotiated: NegotiateResult['reason'];
   /** The direction found, a heading; null for nothing and aborted. */
   heading: number | null;
   axis: number | null;
@@ -43,15 +53,16 @@ export interface SweepResult {
   seconds: number;
 }
 
-interface Hit { channel: number; receivers: number[] }
+interface Hit { level: number; receivers: number[] }
 interface Position { target: number; heading: number; frames: number[]; volleys: number; hits: Hit[] }
 
 /**
- * Where another Bolt is, from a standing turn. The other Bolt sends the
- * ladder (Communication.sendLadder); this one turns through `span` degrees
- * in steps of `step`, stands one ladder round at each heading and counts
- * the frames per level. Motor commands only, its own loop. The record is
- * Behaviour.md in the vault.
+ * Where another Bolt is, from a standing turn. The other Bolt sends a
+ * ladder (Communication.sendLadder), negotiated first with the referee
+ * (negotiate-ladder.ts) so it holds for the sweep; this one turns through
+ * `span` degrees in steps of `step`, stands one ladder round at each
+ * heading and counts the frames per level. Motor commands only, its own
+ * loop. The record is Behaviour.md in the vault.
  *
  * - A level that is just arriving is heard with the sender within `half`
  *   degrees of the fore-aft axis, either end, and not abeam. A stronger
@@ -84,9 +95,10 @@ interface Position { target: number; heading: number; frames: number[]; volleys:
  * heading with the frames and the hits, `sweep axis` with the fit and the
  * vote.
  */
-export async function sweep (ctx: Context, actuators: Actuators, sensors: Sensors, communication: Communication, { span = 180, step = 15, reads = 3 }: SweepOptions = {}): Promise<SweepResult> {
+export async function sweep (ctx: Context, actuators: Actuators, sensors: Sensors, communication: Communication, { referee, range = 'long', span = 180, step = 15, reads = 3 }: SweepOptions): Promise<SweepResult> {
 
-  const roundMs   = ROUND_MS;
+  const { ladder, reason: negotiated } = await negotiateLadder(ctx, sensors, referee, range);
+  const roundMs   = ladder.roundMs;
   const turnMs    = 600;    // a step's turn and its swing; as in seekEdge
   const firstMs   = 1000;   // the turn to the first heading and the one to the direction found, up to 180 degrees
   const msBefore  = 45;     // a volley's centre before the expected notify; infrared-timing run 5
@@ -104,16 +116,17 @@ export async function sweep (ctx: Context, actuators: Actuators, sensors: Sensor
   const t0 = ctx.now();
   const heading = (): number => mod360(-(status.angles?.yaw ?? 0));
 
-  const heardRound = LADDER.map(() => 0);
-  const levels = LADDER.map(() => 0);
+  const heardRound = ladder.channels.map(() => 0);
+  const levels = ladder.channels.map(() => 0);
   const positions: Position[] = [];
   let volleys = 0, hits = 0;
 
-  const beat = await trackBeat(sensors, LADDER.map((_, channel) => channel), (channel) => {
-    heardRound[channel] = (heardRound[channel] ?? 0) + 1;
-    levels[channel] = (levels[channel] ?? 0) + 1;
+  const beat = await trackBeat(sensors, ladder.channels, (channel) => {
+    const k = ladder.channels.indexOf(channel);
+    heardRound[k] = (heardRound[k] ?? 0) + 1;
+    levels[k] = (levels[k] ?? 0) + 1;
   });
-  await communication.state('infrared', 'tracking');
+  await communication.state('infrared', range === 'short' ? 'tracking-short' : 'tracking');
   await motor.stabilize(StabilizationIndex.full);
 
   /** Turn to `target` and give it `ms`, the motion stream held that long; the heading at the end. */
@@ -130,7 +143,7 @@ export async function sweep (ctx: Context, actuators: Actuators, sensors: Sensor
   const count = span >= 360 ? Math.round(360 / step) : Math.floor(span / step) + 1;
   const first = span >= 360 ? start : start - span / 2;
   const lead = msBefore + stepMs * (reads - 1) / 2;
-  ctx.log('info', `sweep start ${JSON.stringify({ ladder: LADDER, span, step, reads, count, start: Math.round(start), roundMs, turnMs, firstMs, msBefore, stepMs, half, heardMin, silentMin })}`);
+  ctx.log('info', `sweep start ${JSON.stringify({ ladder: ladder.strengths, range, negotiated, span, step, reads, count, start: Math.round(start), roundMs, turnMs, firstMs, msBefore, stepMs, half, heardMin, silentMin })}`);
 
   for (let n = 0; n < count && !s.aborted; n++) {
     const target = mod360(first + n * step);
@@ -147,8 +160,8 @@ export async function sweep (ctx: Context, actuators: Actuators, sensors: Sensor
       position.volleys++;
       for (const payload of payloads) {
         if (payload === null) continue;
-        for (const channel of new Set(payload.filter(c => c < LADDER.length))) {
-          position.hits.push({ channel, receivers: corners.map((_, i) => i).filter(i => payload[i] === channel) });
+        for (const channel of new Set(payload.filter(c => ladder.channels.includes(c)))) {
+          position.hits.push({ level: ladder.channels.indexOf(channel), receivers: corners.map((_, i) => i).filter(i => payload[i] === channel) });
         }
       }
     }
@@ -158,14 +171,14 @@ export async function sweep (ctx: Context, actuators: Actuators, sensors: Sensor
     positions.push(position);
     ctx.log('info', `sweep ${JSON.stringify({
       n, target: Math.round(target), heading: Math.round(position.heading), frames: position.frames, volleys: position.volleys,
-      hits: position.hits.map(h => `${LADDER[h.channel]}:${h.receivers.map(i => names[i]).join('+')}`),
+      hits: position.hits.map(h => `${ladder.strengths[h.level]}:${h.receivers.map(i => names[i]).join('+')}`),
     })}`);
   }
 
   // the axis: the fit of two lobes to the heard and silent headings over the levels heard at some and silent at others;
   // an axis is a line, so the candidates run to 180 and the ones that score alike are averaged on a 180 degree circle
-  const heardAt = LADDER.map((_, k) => positions.filter(p => (p.frames[k] ?? 0) > 0).length);
-  const used = LADDER.map((_, k) => k).filter(k => (heardAt[k] ?? 0) >= heardMin && positions.length - (heardAt[k] ?? 0) >= silentMin);
+  const heardAt = ladder.channels.map((_, k) => positions.filter(p => (p.frames[k] ?? 0) > 0).length);
+  const used = ladder.channels.map((_, k) => k).filter(k => (heardAt[k] ?? 0) >= heardMin && positions.length - (heardAt[k] ?? 0) >= silentMin);
   let axis: number | null = null, fit = 0;
   if (used.length && !s.aborted) {
     const best: number[] = [];
@@ -213,7 +226,7 @@ export async function sweep (ctx: Context, actuators: Actuators, sensors: Sensor
   }
   const reason: SweepResult['reason'] = s.aborted ? 'aborted' : axis === null ? 'nothing' : front === back ? 'axis' : 'direction';
   const direction = axis === null || s.aborted ? null : back > front ? mod360(axis + 180) : axis;
-  ctx.log('info', `sweep axis ${JSON.stringify({ heardAt, used: used.map(k => LADDER[k]), fit, axis, bearings, front, back, reason, heading: direction })}`);
+  ctx.log('info', `sweep axis ${JSON.stringify({ heardAt, used: used.map(k => ladder.strengths[k]), fit, axis, bearings, front, back, reason, heading: direction })}`);
 
   if (direction !== null) {
     await motor.roll(0, direction);
@@ -225,8 +238,8 @@ export async function sweep (ctx: Context, actuators: Actuators, sensors: Sensor
   await beat.release();
 
   return {
-    reason, heading: direction, axis,
-    used: used.map(k => LADDER[k] ?? 0), fit, front, back,
+    reason, range, negotiated, heading: direction, axis,
+    used: used.map(k => ladder.strengths[k] ?? 0), fit, front, back,
     positions: positions.length, levels, volleys, hits, beat: beat.counts,
     seconds: Math.round((ctx.now() - t0) / 100) / 10,
   };

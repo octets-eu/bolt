@@ -1,10 +1,10 @@
-import type { Bolt } from '../bolt';
-import type { SweepOptions, SweepResult } from '../behavior/sweep';
+import type { Referee } from '../referee/referee';
+import type { SweepOptions, SweepResult } from './sweep';
 import { angleDistance, distance, headingTo, mod360 } from '../helpers/math';
 import type { Point } from '../helpers/math';
 import { wait } from '../helpers/utils';
 
-export interface SweepTestOptions extends SweepOptions {
+export interface SweepTestOptions extends Omit<SweepOptions, 'referee'> {
   /** Where the sender stands, in the seeker's locator frame, cm; the reference points of the floor plan. */
   at: Point;
   /** The walk's direction, a heading in the seeker's locator frame. */
@@ -39,7 +39,7 @@ export interface SweepTestResult {
 /**
  * The sweep behavior judged by the locator instead of the eye: both Bolts
  * start on their reference points, hard reset there, so the sender's
- * position is known in the seeker's frame; the sender sends the ladder. A
+ * position is known in the seeker's frame; the referee runs the ladder. A
  * trial: the seeker rolls `stepCm` along `direction`, turns by a random
  * angle, sweeps, and the sweep's heading is compared with the bearing to
  * the sender from the locator's position. Within `tolerance` the next
@@ -48,21 +48,23 @@ export interface SweepTestResult {
  * drifts with yaw and the locator's dead reckoning, more with every step;
  * the position and heading are in the record for a check against the floor.
  */
-export function sweepTest (seeker: Bolt, sender: Bolt, options: SweepTestOptions): Promise<SweepTestResult> {
-  return seeker.run('sweepTest', () => walk(seeker, sender, options), { seeker: seeker.name, sender: sender.name, ...options });
+export function sweepTest (referee: Referee, options: SweepTestOptions): Promise<SweepTestResult> {
+  const { seeker, sender } = referee;
+  return seeker.run('sweepTest', () => walk(referee, options), { seeker: seeker.name, sender: sender.name, ...options });
 }
 
-async function walk (seeker: Bolt, sender: Bolt, { at: target, direction, stepCm, tolerance, ...sweep }: SweepTestOptions): Promise<SweepTestResult> {
+async function walk (referee: Referee, { at: target, direction, stepCm, tolerance, ...sweep }: SweepTestOptions): Promise<SweepTestResult> {
 
   const showMs = 2000;  // the chevron at the direction found, for the eye, before the next step
 
+  const { seeker, sender } = referee;
   const s = seeker.motion;
   const { status, communication } = seeker;
   const trials: SweepTestTrial[] = [];
   let reason: SweepTestResult['reason'] = 'aborted';
 
   await Promise.all([seeker.lifecycle.reset(), sender.lifecycle.reset()]);
-  const sending = sender.communication.sendLadder();
+  referee.start();
 
   try {
     while (!s.aborted) {
@@ -73,7 +75,7 @@ async function walk (seeker: Bolt, sender: Bolt, { at: target, direction, stepCm
       if (s.aborted) break;
       await communication.state('motor', null);
       const heading = status.heading;
-      const result = await seeker.behavior.sweep(sweep);
+      const result = await seeker.behavior.sweep({ referee, ...sweep });
       if (s.aborted) break;
       const position = { ...status.position };
       const bearing = Math.round(headingTo(position, target));
@@ -94,8 +96,7 @@ async function walk (seeker: Bolt, sender: Bolt, { at: target, direction, stepCm
     }
   } finally {
     await communication.state('motor', null);
-    sender.abortMotion();
-    await sending.catch(() => undefined);
+    await referee.end();
   }
   return { reason, trials };
 }

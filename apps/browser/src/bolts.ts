@@ -2,7 +2,8 @@
 
 import m from 'mithril';
 
-import { Bolt, BoltConfig, NotConnectedError, passBy, seekToCollision, sweepTest, sweepTrials } from '@bolt/core';
+import { Bolt, BoltConfig, NotConnectedError, Referee, passBy, seekToCollision, sweepTest, sweepTrials } from '@bolt/core';
+import type { LadderRange } from '@bolt/core';
 import type { SeekMethod } from '@bolt/core';
 import { WebBleTransport, isBluetoothAvailable, onAvailabilityChanged, getPermittedBolts, requestBolt, waitForAdvertisement } from '@bolt/web-ble';
 
@@ -82,10 +83,10 @@ class bolts {
   }
 
   /** The floor test of the sweep behavior: `seeker` sweeps trial after trial, armed by a tap, while `sender` sends the ladder; see @bolt/core experiments/sweep-trials.ts. */
-  public sweepTrials ({ seeker, sender, span = 180, step = 15, reads = 3 }: { seeker: string, sender: string, span?: number, step?: number, reads?: number }) {
+  public sweepTrials ({ seeker, sender, range = 'long', span = 180, step = 15, reads = 5 }: { seeker: string, sender: string, range?: LadderRange, span?: number, step?: number, reads?: number }) {
     const a = this.get(seeker), b = this.get(sender);
     if (!a || !b) throw new NotConnectedError(a ? sender : seeker);
-    return sweepTrials(a, b, { span, step, reads });
+    return sweepTrials(new Referee(a, b), { range, span, step, reads });
   }
 
   /**
@@ -93,7 +94,7 @@ class bolts {
    * `stepCm` a trial up or down the sheet, turns at random and sweeps, until a sweep is off by more
    * than `tolerance` degrees or finds nothing; see @bolt/core behavior/sweep-test.ts.
    */
-  public sweepTest ({ seeker, sender, direction = 'up', stepCm = 25, tolerance = 30, span = 180, step = 15, reads = 3 }: { seeker: string, sender: string, direction?: 'up' | 'down', stepCm?: number, tolerance?: number, span?: number, step?: number, reads?: number }) {
+  public sweepTest ({ seeker, sender, direction = 'up', stepCm = 25, tolerance = 30, range = 'long', span = 180, step = 15, reads = 5 }: { seeker: string, sender: string, direction?: 'up' | 'down', stepCm?: number, tolerance?: number, range?: LadderRange, span?: number, step?: number, reads?: number }) {
     const a = this.get(seeker), b = this.get(sender);
     if (!a || !b) throw new NotConnectedError(a ? sender : seeker);
     const home = Plotter.startOf(seeker), mark = Plotter.startOf(sender);
@@ -102,7 +103,7 @@ class bolts {
     // up is -y on the sheet; a unit sheet vector turned into the seeker's frame, as a heading
     const v = Plotter.toLocator(seeker, home.x, home.y + (direction === 'up' ? -1 : 1))!;
     const heading = (Math.atan2(v.x, v.y) * 180 / Math.PI + 360) % 360;
-    return sweepTest(a, b, { at, direction: Math.round(heading), stepCm, tolerance, span, step, reads });
+    return sweepTest(new Referee(a, b), { at, direction: Math.round(heading), stepCm, tolerance, range, span, step, reads });
   }
 
   /** The passBy experiment with two connected Bolts by name; see @bolt/core experiments/pass-by.ts. */

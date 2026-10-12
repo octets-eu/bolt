@@ -1,6 +1,6 @@
 import type { Actuators } from '../actuators/actuators';
 import type { Context } from '../context';
-import { BLACK } from './images';
+import { BLACK, SENDING } from './images';
 import type { Color } from '../config';
 import type { Image, ImageName } from './images';
 import { range, wait, whenAborted } from '../helpers/utils';
@@ -8,20 +8,34 @@ import { range, wait, whenAborted } from '../helpers/utils';
 /** What shows on the matrix, by who sets it. */
 export type Slot = 'motor' | 'infrared' | 'mark';
 
+export type LadderRange = 'long' | 'short';
+
+/** A ladder: channel k carries strength k; the channels name the ladder, so a frame says which ladder and which level it is. */
+export interface Ladder {
+  readonly range:     LadderRange;
+  readonly channels:  readonly number[];
+  readonly strengths: readonly number[];
+  /** One round and the notify's scatter: every level's frame falls into it. */
+  readonly roundMs:   number;
+}
+
 /**
- * The infrared ladder a Bolt sends to be found: channel k carries strength
- * LADDER[k], weakest first, one frame per 200 ms (a Bolt emits no faster,
- * 2026-10-01), so each level comes round every 0.85 s and the channel of a
- * listen notify says which level got through. The level that is just
+ * The infrared ladders a Bolt sends to be found, one frame per 200 ms (a
+ * Bolt emits no faster), weakest level first. The level that is just
  * arriving at the seeker's distance is heard with the sender ahead or
- * behind and falls silent with it abeam, stronger ones arrive all round
- * (pass-by 2026-10-05, seek-edge runs and sweep trials 2026-10-10/11): 2 up
- * to about 80 cm, 4 at 0.6 to 1.0 m, 8 at 1.0 to 1.7 m, 16 beyond that to
- * 4 m. The strengths are chosen; the emitters go to 255.
+ * behind and falls silent with it abeam, stronger ones arrive all round.
+ * The long ladder covers the room, the short one the last stretch, where
+ * the long one's weakest level is heard all round. Each sends on channels
+ * of its own, so the seeker tells them apart by the frames. The strengths
+ * are chosen; the emitters go to 255.
  */
-export const LADDER = [2, 4, 8, 16];
-/** One ladder round and the notify's scatter: every level's frame falls into it. */
-export const ROUND_MS = LADDER.length * 200 + 50;
+export const LADDERS: { readonly [range in LadderRange]: Ladder } = {
+  long:  { range: 'long',  channels: [0, 1, 2, 3], strengths: [2, 4, 8, 16], roundMs: 4 * 200 + 50 },
+  short: { range: 'short', channels: [4, 5, 6],    strengths: [1, 2, 4],     roundMs: 3 * 200 + 50 },
+};
+/** The long ladder's strengths and round, for the experiments written against the one ladder. */
+export const LADDER = LADDERS.long.strengths;
+export const ROUND_MS = LADDERS.long.roundMs;
 
 export interface BroadcastOptions {
   /** Infrared codes to send in turn, default all eight. */
@@ -41,7 +55,8 @@ export class Communication {
 
   private readonly ctx:       Context;
   private readonly actuators: Actuators;
-  private readonly slots: { [slot in Slot]: ImageName | null } = { motor: null, infrared: null, mark: null };
+  private readonly slots: { [slot in Slot]: ImageName | readonly ImageName[] | null } = { motor: null, infrared: null, mark: null };
+  private ladder: Ladder = LADDERS.long;
 
   constructor (ctx: Context, actuators: Actuators) {
     this.ctx       = ctx;
@@ -96,27 +111,41 @@ export class Communication {
   /**
    * One slot of what the matrix shows; each caller sets only its own. motor
    * and infrared blink with each other when both are set, one alone is
-   * held; mark is laid over both and does not blink. A collision flash
-   * stays on top and drops back onto the result.
+   * held; a sequence in either runs alone; mark is laid over all and does
+   * not blink. A collision flash stays on top and drops back onto the result.
    */
-  async state (slot: Slot, image: ImageName | null): Promise<void> {
+  async state (slot: Slot, image: ImageName | readonly ImageName[] | null): Promise<void> {
     this.slots[slot] = image;
-    const names = [this.slots.motor, this.slots.infrared].filter((n): n is ImageName => n !== null);
-    await this.actuators.matrix.animate(names.length === 2 ? 'blink' : 'show', names, this.slots.mark);
+    const names = (v: ImageName | readonly ImageName[] | null): ImageName[] => v === null ? [] : typeof v === 'string' ? [v] : [...v];
+    const motor = names(this.slots.motor), infrared = names(this.slots.infrared);
+    const shown = infrared.length > 1 ? infrared : motor.length > 1 ? motor : [...motor, ...infrared];
+    await this.actuators.matrix.animate(shown.length > 1 ? 'blink' : 'show', shown, names(this.slots.mark)[0] ?? null);
   }
 
-  /** Send the ladder, level after level, until fullstop. Returns the frames sent. */
-  async sendLadder (): Promise<number> {
+  /** The ladder sent from the next round on, shown as the turning 'i', sparse for the short one. */
+  async switchLadder (range: LadderRange): Promise<void> {
+    this.ladder = LADDERS[range];
+    await this.state('infrared', SENDING[range]);
+  }
+
+  /** Send the ladder, level after level, until fullstop; `switchLadder` changes it on the way. Returns the frames sent. */
+  async sendLadder (range: LadderRange = 'long'): Promise<number> {
     const s = this.ctx.motion;
     let frames = 0;
-    while (!s.aborted) {
-      for (const [channel, strength] of LADDER.entries()) {
-        if (s.aborted) break;
-        const t = this.ctx.now();
-        await this.actuators.infrared.send(channel, strength);
-        frames++;
-        await wait(Math.max(0, 200 - (this.ctx.now() - t)));
+    await this.switchLadder(range);
+    try {
+      while (!s.aborted) {
+        const { channels, strengths } = this.ladder;
+        for (const [k, channel] of channels.entries()) {
+          if (s.aborted) break;
+          const t = this.ctx.now();
+          await this.actuators.infrared.send(channel, strengths[k] ?? 0);
+          frames++;
+          await wait(Math.max(0, 200 - (this.ctx.now() - t)));
+        }
       }
+    } finally {
+      await this.state('infrared', null);
     }
     return frames;
   }

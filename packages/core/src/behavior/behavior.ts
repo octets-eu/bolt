@@ -8,6 +8,10 @@ import type { ReachResult } from './reach';
 import { lockOn } from './lock-on';
 import type { LockOnResult } from './lock-on';
 import { sweep } from './sweep';
+import { negotiateLadder } from './negotiate-ladder';
+import type { NegotiateResult } from './negotiate-ladder';
+import type { LadderRange } from '../communication/communication';
+import type { LadderAuthority } from '../referee/referee';
 import type { SweepOptions, SweepResult } from './sweep';
 import { log } from '../lifecycle/log';
 
@@ -44,9 +48,15 @@ export class Behavior {
     return lockOn(this.ctx, this.actuators, this.sensors, this.communication, channel);
   }
 
+  /** Ask the referee for a ladder and wait for its first frame; see negotiate-ladder.ts. */
+  @log
+  async negotiateLadder (referee: LadderAuthority, range: LadderRange = 'long'): Promise<NegotiateResult> {
+    return negotiateLadder(this.ctx, this.sensors, referee, range);
+  }
+
   /** Where the Bolt that sends the ladder is, from a standing turn; see sweep.ts. */
   @log
-  async sweep (options: SweepOptions = {}): Promise<SweepResult> {
+  async sweep (options: SweepOptions): Promise<SweepResult> {
     return sweep(this.ctx, this.actuators, this.sensors, this.communication, options);
   }
 

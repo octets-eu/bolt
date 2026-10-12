@@ -1,4 +1,4 @@
-import type { Bolt } from '../bolt';
+import type { Referee } from '../referee/referee';
 import type { SweepOptions, SweepResult } from '../behavior/sweep';
 import { wait, whenAborted } from '../helpers/utils';
 
@@ -13,12 +13,14 @@ import { wait, whenAborted } from '../helpers/utils';
  * up and placed again. The judge is the eye: whether the chevron points at
  * the sender. Each trial is logged as `sweepTrials` with its result.
  */
-export function sweepTrials (seeker: Bolt, sender: Bolt, options: SweepOptions = {}): Promise<SweepResult[]> {
-  return seeker.run('sweepTrials', () => trials(seeker, sender, options), { seeker: seeker.name, sender: sender.name, ...options });
+export function sweepTrials (referee: Referee, options: Omit<SweepOptions, 'referee'> = {}): Promise<SweepResult[]> {
+  const { seeker, sender } = referee;
+  return seeker.run('sweepTrials', () => trials(referee, options), { seeker: seeker.name, sender: sender.name, ...options });
 }
 
-async function trials (seeker: Bolt, sender: Bolt, options: SweepOptions): Promise<SweepResult[]> {
+async function trials (referee: Referee, options: Omit<SweepOptions, 'referee'>): Promise<SweepResult[]> {
 
+  const { seeker } = referee;
   const quietMs = 3000;  // no collision report for this long: the seeker stands where it was placed; chosen
   const tap = { xThreshold: 20, yThreshold: 20 };  // a hand's tap gives 20 to 34 (2026-10-10)
 
@@ -32,7 +34,7 @@ async function trials (seeker: Bolt, sender: Bolt, options: SweepOptions): Promi
     handled = true;
     if (armed) tapped();
   }, tap);
-  const sending = sender.communication.sendLadder();
+  referee.start();
   const aborted = whenAborted(s);
 
   try {
@@ -43,12 +45,12 @@ async function trials (seeker: Bolt, sender: Bolt, options: SweepOptions): Promi
       const hit = new Promise<void>((resolve) => { tapped = resolve; });
       armed = true;
       await communication.state('motor', null);
-      await communication.state('infrared', 'infra-listen');
+      await communication.state('infrared', options.range === 'short' ? 'infra-listen-short' : 'infra-listen');
       seeker.log('info', `sweepTrials armed ${results.length + 1}`);
       await Promise.race([hit, aborted]);
       armed = false;
       if (s.aborted) break;
-      const result = await seeker.behavior.sweep(options);
+      const result = await seeker.behavior.sweep({ referee, ...options });
       results.push(result);
       await communication.state('motor', result.heading === null ? 'lost' : 'cruising');
       seeker.log('info', `sweepTrials ${JSON.stringify({ n: results.length, ...result })}`);
@@ -58,8 +60,7 @@ async function trials (seeker: Bolt, sender: Bolt, options: SweepOptions): Promi
   } finally {
     await communication.state('motor', null);
     await offCollision();
-    sender.abortMotion();
-    await sending.catch(() => undefined);
+    await referee.end();
   }
   return results;
 }
