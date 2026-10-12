@@ -91,7 +91,7 @@ class bolts {
   /**
    * The sweep behavior judged by the locator: both Bolts on their reference points, the seeker walks
    * `stepCm` a trial up or down the sheet, turns at random and sweeps, until a sweep is off by more
-   * than `tolerance` degrees or finds nothing; see @bolt/core experiments/sweep-test.ts.
+   * than `tolerance` degrees or finds nothing; see @bolt/core behavior/sweep-test.ts.
    */
   public sweepTest ({ seeker, sender, direction = 'up', stepCm = 25, tolerance = 30, span = 180, step = 15, reads = 3 }: { seeker: string, sender: string, direction?: 'up' | 'down', stepCm?: number, tolerance?: number, span?: number, step?: number, reads?: number }) {
     const a = this.get(seeker), b = this.get(sender);
