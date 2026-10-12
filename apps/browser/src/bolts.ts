@@ -2,7 +2,7 @@
 
 import m from 'mithril';
 
-import { Bolt, BoltConfig, NotConnectedError, Referee, passBy, seekToCollision, sweepTest, sweepTrials } from '@bolt/core';
+import { Bolt, BoltConfig, NotConnectedError, Referee, approachTest, passBy, seekToCollision, sweepTest, sweepTrials } from '@bolt/core';
 import type { LadderRange } from '@bolt/core';
 import type { SeekMethod } from '@bolt/core';
 import { WebBleTransport, isBluetoothAvailable, onAvailabilityChanged, getPermittedBolts, requestBolt, waitForAdvertisement } from '@bolt/web-ble';
@@ -104,6 +104,18 @@ class bolts {
     const v = Plotter.toLocator(seeker, home.x, home.y + (direction === 'up' ? -1 : 1))!;
     const heading = (Math.atan2(v.x, v.y) * 180 / Math.PI + 360) % 360;
     return sweepTest(new Referee(a, b), { at, direction: Math.round(heading), stepCm, startCm, until, tolerance, range, span, step, reads });
+  }
+
+  /** The approach judged by the locator: both on their reference points, green walks `startCm` up the sheet, turns at random and approaches blue; see @bolt/core experiments/approach.ts. */
+  public approachTest ({ seeker, sender, startCm = 150, span = 180, step = 15, reads = 5 }: { seeker: string, sender: string, startCm?: number, span?: number, step?: number, reads?: number }) {
+    const a = this.get(seeker), b = this.get(sender);
+    if (!a || !b) throw new NotConnectedError(a ? sender : seeker);
+    const home = Plotter.startOf(seeker), mark = Plotter.startOf(sender);
+    if (!home || !mark) throw new Error(`no start on the sheet for ${home ? sender : seeker}`);
+    const at = Plotter.toLocator(seeker, mark.x, mark.y)!;
+    const v = Plotter.toLocator(seeker, home.x, home.y - 1)!;
+    const direction = Math.round((Math.atan2(v.x, v.y) * 180 / Math.PI + 360) % 360);
+    return approachTest(new Referee(a, b), { at, direction, startCm, span, step, reads });
   }
 
   /** The passBy experiment with two connected Bolts by name; see @bolt/core experiments/pass-by.ts. */

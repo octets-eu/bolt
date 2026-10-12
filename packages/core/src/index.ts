@@ -58,6 +58,8 @@ export { seekToCollision } from './experiments/seek-to-collision';
 export type { SeekMethod } from './experiments/seek-to-collision';
 export { passBy } from './experiments/pass-by';
 export { sweepTrials } from './experiments/sweep-trials';
+export { approach, approachTest } from './experiments/approach';
+export type { ApproachOptions, ApproachResult, ApproachTestOptions, ApproachTestResult } from './experiments/approach';
 export { sweepTest } from './behavior/sweep-test';
 export { Referee } from './referee/referee';
 export type { LadderAuthority } from './referee/referee';
