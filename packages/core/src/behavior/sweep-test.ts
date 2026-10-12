@@ -9,8 +9,11 @@ export interface SweepTestOptions extends Omit<SweepOptions, 'referee'> {
   at: Point;
   /** The walk's direction, a heading in the seeker's locator frame. */
   direction: number;
-  /** One step of the walk, cm. */
+  /** One step of the walk, cm; the first step is `startCm` when given. */
   stepCm: number;
+  startCm?: number | undefined;
+  /** What ends the walk besides a miss: a sweep that finds nothing (default), or a miss alone, for a measurement across the bands. */
+  until?: 'nothing' | 'miss' | undefined;
   /** A sweep is good when its heading is within this of the bearing to the sender, degrees. */
   tolerance: number;
 }
@@ -43,8 +46,8 @@ export interface SweepTestResult {
  * trial: the seeker rolls `stepCm` along `direction`, turns by a random
  * angle, sweeps, and the sweep's heading is compared with the bearing to
  * the sender from the locator's position. Within `tolerance` the next
- * trial follows; a miss, a sweep that finds nothing, or fullstop ends the
- * walk. Each trial is logged as `sweepTest` with its numbers. The truth
+ * trial follows; a miss, a sweep that finds nothing (unless `until` is
+ * 'miss'), or fullstop ends the walk. Each trial is logged as `sweepTest` with its numbers. The truth
  * drifts with yaw and the locator's dead reckoning, more with every step;
  * the position and heading are in the record for a check against the floor.
  */
@@ -53,7 +56,7 @@ export function sweepTest (referee: Referee, options: SweepTestOptions): Promise
   return seeker.run('sweepTest', () => walk(referee, options), { seeker: seeker.name, sender: sender.name, ...options });
 }
 
-async function walk (referee: Referee, { at: target, direction, stepCm, tolerance, ...sweep }: SweepTestOptions): Promise<SweepTestResult> {
+async function walk (referee: Referee, { at: target, direction, stepCm, startCm = stepCm, tolerance, until = 'nothing', ...sweep }: SweepTestOptions): Promise<SweepTestResult> {
 
   const showMs = 2000;  // the chevron at the direction found, for the eye, before the next step
 
@@ -69,7 +72,7 @@ async function walk (referee: Referee, { at: target, direction, stepCm, toleranc
   try {
     while (!s.aborted) {
       await communication.state('motor', 'cruising');
-      await seeker.navigation.roll(stepCm, direction);
+      await seeker.navigation.roll(trials.length ? stepCm : startCm, direction);
       if (s.aborted) break;
       await seeker.navigation.rotate(Math.round(Math.random() * 360));
       if (s.aborted) break;
@@ -89,7 +92,7 @@ async function walk (referee: Referee, { at: target, direction, stepCm, toleranc
       seeker.log('info', `sweepTest ${JSON.stringify({ ...trial, sweep: { reason: result.reason, heading: result.heading, used: result.used, hits: result.hits } })}`);
       await communication.state('motor', good ? 'cruising' : 'lost');
       await wait(showMs);
-      if (!good) {
+      if (error === null ? until === 'nothing' : !good) {
         reason = error === null ? 'nothing' : 'missed';
         break;
       }
