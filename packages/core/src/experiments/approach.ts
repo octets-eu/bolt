@@ -31,11 +31,15 @@ export interface ApproachResult {
  * then the ball turns through the sender to the other edge. Two rules are
  * new against seekEdge, whose standing start, belief and dash are gone:
  *
- * - Lost: a full leg in which the level that carried the previous leg was
- *   not heard once while stronger ones were, or `noneMax` rounds that say
- *   nothing. The ball stands, sweeps again on the long ladder and holds
- *   the new direction at the edge. The carrier of a leg is the weakest
- *   level heard in it, no window of rounds.
+ * - The carrier is the weakest level the sweep fitted, the one with a lobe
+ *   at this distance; a weaker level heard on the way takes over, since
+ *   the ball is nearer. The weakest level heard at all would not do: a
+ *   level heard all round says heard every round and turns the ball away
+ *   until the sender is behind.
+ * - Lost: a full leg in which the carrier was not heard once while
+ *   stronger levels were, or `noneMax` rounds that say nothing. The ball
+ *   stands, sweeps again on the long ladder and holds the new direction at
+ *   the edge.
  * - Near: a frame of the long ladder's weakest level, which does not reach
  *   far. The ball stands and sweeps on the short ladder, the referee
  *   switching the sender. The
@@ -86,6 +90,7 @@ export async function approach (seeker: Bolt, referee: Referee, options: Approac
       if (k >= 0) {
         heardRound[k] = (heardRound[k] ?? 0) + 1;
         legHeard[k] = (legHeard[k] ?? 0) + 1;
+        if (carrierLevel !== null && k < carrierLevel) carrierLevel = k;
       }
       void sensors.listenInfrared(true);
     });
@@ -114,13 +119,11 @@ export async function approach (seeker: Bolt, referee: Referee, options: Approac
     return r;
   };
 
-  // the carrier of the previous leg: the weakest level heard in it; null before the first leg and after a sweep
-  let prevCarrier: number | null = null;
-
-  /** The weakest level heard in the running leg, else the previous leg's carrier. */
-  const carrier = (): number | null => {
-    const k = legHeard.findIndex(n => n > 0);
-    return k >= 0 ? k : prevCarrier;
+  // the carrier: the weakest level the last sweep fitted, as an index into the long ladder; a weaker level heard takes over
+  let carrierLevel: number | null = null;
+  const carrierOf = (sweep: SweepResult): number | null => {
+    const k = long.strengths.indexOf(sweep.used[0] ?? -1);
+    return k >= 0 ? k : null;
   };
 
   /** One round of listening: what the carrier said. */
@@ -128,17 +131,11 @@ export async function approach (seeker: Bolt, referee: Referee, options: Approac
     heardRound.fill(0);
     await wait(long.roundMs);
     result.rounds++;
-    const c = carrier();
+    const c = carrierLevel;
     return c === null ? 'none'
       : (heardRound[c] ?? 0) > 0 ? 'heard'
       : heardRound.some((n, k) => k > c && n > 0) ? 'silent'
       : 'none';
-  };
-
-  /** A leg begins: its counts start, the carrier of the one before is kept. */
-  const newLeg = (afterSweep: boolean): void => {
-    prevCarrier = afterSweep ? null : carrier();
-    legHeard.fill(0);
   };
 
   ctx.log('info', `approach start ${JSON.stringify({ ladder: long.strengths, edge, step, turnMs, tackMs, legCm, slidOut, minLegCm, noneMax, speed, stretchCm, backCm, shortMax })}`);
@@ -152,10 +149,11 @@ export async function approach (seeker: Bolt, referee: Referee, options: Approac
     }
     let side = 1, target = sweep.heading - side * edge;
     let lastDirection = sweep.heading;
+    carrierLevel = carrierOf(sweep);
     await roll();
     await motor.roll(0, mod360(target));
     await wait(turnMs);
-    newLeg(true);
+    legHeard.fill(0);
 
     // the legs
     let legFrom: Point = { ...status.position }, legNet = 0, silentRun = 0, noneRun = 0;
@@ -163,7 +161,7 @@ export async function approach (seeker: Bolt, referee: Referee, options: Approac
     while (!s.aborted && !near) {
       await motor.roll(speed, mod360(target));
       const said = await round();
-      const c = carrier();
+      const c = carrierLevel;
       noneRun = said === 'none' ? noneRun + 1 : 0;
 
       if ((heardRound[0] ?? 0) > 0) {
@@ -179,9 +177,9 @@ export async function approach (seeker: Bolt, referee: Referee, options: Approac
       const legLen = distance(legFrom, status.position);
       const short = silentRun >= slidOut && legLen >= minLegCm && legLen < legCm;
       const full = legLen >= legCm;
-      const lost = noneRun >= noneMax || (full && prevCarrier !== null && (legHeard[prevCarrier] ?? 0) === 0 && legHeard.some((n, k) => k > prevCarrier! && n > 0));
+      const lost = noneRun >= noneMax || (full && c !== null && (legHeard[c] ?? 0) === 0 && legHeard.some((n, k) => k > c && n > 0));
       if (lost) {
-        record('lost', { carrier: c, prevCarrier, legHeard: [...legHeard], noneRun });
+        record('lost', { carrier: c, legHeard: [...legHeard], noneRun });
         sweep = await sweepOn('long');
         if (sweep.heading === null) {
           result.reason = s.aborted ? 'aborted' : 'nothing';
@@ -189,10 +187,11 @@ export async function approach (seeker: Bolt, referee: Referee, options: Approac
         }
         lastDirection = sweep.heading;
         target = sweep.heading - side * edge;
+        carrierLevel = carrierOf(sweep);
         await roll();
         await motor.roll(0, mod360(target));
         await wait(turnMs);
-        newLeg(true);
+        legHeard.fill(0);
         legFrom = { ...status.position };
         legNet = silentRun = noneRun = 0;
         continue;
@@ -206,7 +205,7 @@ export async function approach (seeker: Bolt, referee: Referee, options: Approac
         await motor.roll(0, mod360(target));
         await wait(tackMs);
         record(short ? 'tack short' : 'tack', { legLen: Math.round(legLen), legNet, carrier: c, legHeard: [...legHeard] });
-        newLeg(false);
+        legHeard.fill(0);
         legFrom = { ...status.position };
         legNet = silentRun = 0;
         continue;
