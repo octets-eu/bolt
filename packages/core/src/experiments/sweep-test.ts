@@ -2,6 +2,7 @@ import type { Bolt } from '../bolt';
 import type { SweepOptions, SweepResult } from '../behavior/sweep';
 import { angleDistance, distance, headingTo, mod360 } from '../helpers/math';
 import type { Point } from '../helpers/math';
+import { wait } from '../helpers/utils';
 
 export interface SweepTestOptions extends SweepOptions {
   /** Where the sender stands, in the seeker's locator frame, cm; the reference points of the floor plan. */
@@ -53,6 +54,8 @@ export function sweepTest (seeker: Bolt, sender: Bolt, options: SweepTestOptions
 
 async function walk (seeker: Bolt, sender: Bolt, { at: target, direction, stepCm, tolerance, ...sweep }: SweepTestOptions): Promise<SweepTestResult> {
 
+  const showMs = 2000;  // the chevron at the direction found, for the eye, before the next step
+
   const s = seeker.motion;
   const { status, communication } = seeker;
   const trials: SweepTestTrial[] = [];
@@ -83,6 +86,7 @@ async function walk (seeker: Bolt, sender: Bolt, { at: target, direction, stepCm
       trials.push(trial);
       seeker.log('info', `sweepTest ${JSON.stringify({ ...trial, sweep: { reason: result.reason, heading: result.heading, used: result.used, hits: result.hits } })}`);
       await communication.state('motor', good ? 'cruising' : 'lost');
+      await wait(showMs);
       if (!good) {
         reason = error === null ? 'nothing' : 'missed';
         break;
