@@ -50,39 +50,33 @@ interface Position { target: number; heading: number; frames: number[]; volleys:
  * Where another Bolt is, from a standing turn. The other Bolt sends the
  * ladder (Communication.sendLadder); this one turns through `span` degrees
  * in steps of `step`, stands one ladder round at each heading and counts
- * the frames per level. Motor commands only, its own loop. Measured basis:
- * the pass-by of 2026-10-05, the seek-edge runs of 2026-10-10/11 and the
- * sweep trials of 2026-10-11; the record is Behaviour.md in the vault.
+ * the frames per level. Motor commands only, its own loop. The record is
+ * Behaviour.md in the vault.
  *
- * - A level that is just arriving is heard with the sender within about 60
- *   degrees of the fore-aft axis, either end, and not abeam: at 1.0 to
- *   1.6 m strength 4 in 36 % of the rounds ahead, 6 % abeam, 73 % behind.
- *   A stronger level is heard all round, a weaker one not at all; which
- *   level is the one just arriving depends on the distance, see LADDER.
+ * - A level that is just arriving is heard with the sender within `half`
+ *   degrees of the fore-aft axis, either end, and not abeam. A stronger
+ *   level is heard all round, a weaker one not at all; which level is the
+ *   one just arriving depends on the distance, see LADDER.
  * - So the axis is the direction whose two lobes, `half` degrees each side
  *   of it and of its opposite, fit the heard and silent headings best,
  *   summed over every level heard at `heardMin` headings or more and silent
  *   at `silentMin` or more; a level heard everywhere or nowhere says
  *   nothing. A frame outside the lobes counts twice as much against a
- *   candidate as a silence inside, which dropped frames give at every level
- *   (strength 4 at 1.5 m arrives in 10 to 50 % of its rounds inside the
- *   lobe). Frames decide, a single silence never: the standing start of
- *   seekEdge, which declared the lobe's edge on the first silence, did so
- *   inside the lobe in 5 of 8 runs. Candidates that score alike are
- *   averaged, so the axis is finer than the `step` between headings.
+ *   candidate as a silence inside, which dropped frames give at every
+ *   level. Frames decide, a single silence never. Candidates that score
+ *   alike are averaged, so the axis is finer than the `step` between
+ *   headings.
  * - Ahead or behind on the axis the notifies cannot say: the rear lobe
- *   hears as well as the front one (85 % against 56 % at 1.3 m). The
- *   receivers can. A read of them lands in a frame when it is timed to the
- *   sender's beat (beat.ts), and the four sit at the corners, 45 degrees
- *   off the nose in front and 135 behind, so a hit puts the sender within a
- *   quadrant of the heading plus the mean of the corners that heard. The
- *   end of the axis nearer to that takes the hit; the end with more hits is
- *   the direction. Hits come 0 to 8 per sweep, more close in; without one
+ *   hears as well as the front one. The receivers can. A read of them
+ *   lands in a frame when it is timed to the sender's beat (beat.ts), and
+ *   the four sit at the corners, 45 degrees off the nose in front and 135
+ *   behind, so a hit puts the sender within a quadrant of the heading plus
+ *   the mean of the corners that heard. The end of the axis nearer to that
+ *   takes the hit; the end with more hits is the direction; without one
  *   the axis is taken as ahead.
  * - The motion stream runs only while the ball turns, the heading is read
- *   at the end of each turn. The notifies scatter 20 to 25 ms around the
- *   beat whatever the stream does, which caps the hits at 10 to 20 % of the
- *   volleys; the cause is open.
+ *   at the end of each turn. The notifies scatter around the beat whatever
+ *   the stream does, which caps the hits; the cause is open.
  *
  * Shows 'tracking' while it runs. Ends pointing at the direction found, or
  * where the sweep ended when there is none, stabilization off. Ends on
@@ -97,9 +91,9 @@ export async function sweep (ctx: Context, actuators: Actuators, sensors: Sensor
   const firstMs   = 1000;   // the turn to the first heading and the one to the direction found, up to 180 degrees
   const msBefore  = 45;     // a volley's centre before the expected notify; infrared-timing run 5
   const stepMs    = 6;      // between the reads of a volley; infrared-timing run 5
-  const half      = 60;     // half-width of a lobe, degrees; the pass-by and the seek-edge runs
+  const half      = 60;     // half-width of a lobe, degrees
   const heardMin  = 3;      // headings a level is heard at, at least, to be fitted; fewer is stray frames; chosen
-  const silentMin = 2;      // and silent at, at least; strength 16 at 2 m had two; chosen
+  const silentMin = 2;      // and silent at, at least; chosen
   /** Where the receivers sit, degrees off the nose: front left, front right, back right, back left. */
   const corners   = [-45, 45, 135, -135];
   const names     = ['FL', 'FR', 'BR', 'BL'];
