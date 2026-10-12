@@ -42,12 +42,12 @@ export interface ApproachResult {
  *   the edge.
  * - Near: a frame of the long ladder's weakest level, which does not reach
  *   far. The ball stands and sweeps on the short ladder, the referee
- *   switching the sender. The
- *   short ladder's weakest level fitted with a direction is the dash band:
- *   done, `heading` is the direction. A direction from stronger levels
- *   only: roll `stretchCm` along it and sweep again. No direction: too
- *   close, back off `backCm` along the last direction and sweep again.
- *   `shortMax` short sweeps without the band give up.
+ *   switching the sender. A
+ *   direction with the short ladder's weakest level arriving at all is the
+ *   dash band: done, `heading` is the direction. A direction without it:
+ *   roll `stretchCm` along it and sweep again. No direction: too close,
+ *   back off `backCm` along the last direction and sweep again. `shortMax`
+ *   short sweeps without the band give up.
  *
  * A sweep that finds the axis but no end (`axis`) is resolved by the last
  * direction known: the end nearer to it. The first sweep has none and an
@@ -228,7 +228,7 @@ export async function approach (seeker: Bolt, referee: Referee, options: Approac
     for (let n = 0; n < shortMax && !s.aborted; n++) {
       sweep = await sweepOn('short');
       if (s.aborted) break;
-      if (sweep.heading !== null && sweep.used.includes(LADDERS.short.strengths[0] ?? 1)) {
+      if (sweep.heading !== null && (sweep.levels[0] ?? 0) > 0) {
         result.reason = 'dash';
         result.heading = sweep.heading;
         return result;
