@@ -59,7 +59,7 @@ const silentMin = 2;      // and silent at, at least; chosen
 const endRounds = 10;     // ladder rounds the reads on the axis get before the sweep gives up; chosen
 const agree     = 2;      // hits on one side that decide the end; chosen
 /** Where the receivers sit, degrees off the nose: front left, front right, back right, back left. */
-const corners   = [-45, 45, 135, -135];
+export const corners = [-45, 45, 135, -135];
 const names     = ['FL', 'FR', 'BR', 'BL'];
 
 /**
@@ -274,7 +274,7 @@ function scoreAxis (d: number, positions: Position[], used: number[]): number {
  * landed; null when none landed, or the beat is not learned yet, in which
  * case it waits a moment.
  */
-async function readAtNextFrame (ctx: Context, beat: Beat, ladder: Ladder, reads: number): Promise<number[] | null> {
+export async function readAtNextFrame (ctx: Context, beat: Beat, ladder: Ladder, reads: number): Promise<number[] | null> {
 
   const lead = msBefore + stepMs * (reads - 1) / 2;
   const at = beat.next(performance.now() + lead + 12);

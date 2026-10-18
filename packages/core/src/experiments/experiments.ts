@@ -12,6 +12,8 @@ import type { Point } from '../helpers/math';
 import { DriveModel, stoppingDistance, stopNow, targetSpeed } from './landing';
 import type { LandingResult } from './landing';
 import { sampleLoop } from './sample-loop';
+import { cleverSweep } from './clever-sweep';
+import type { SweepOptions, SweepResult } from '../behavior/sweep';
 
 /**
  * Experiments: functions under test, a work log in code, run from the
@@ -43,6 +45,12 @@ export class Experiments {
    * over `seconds`, and the mean. A steady lamp or a window contributes
    * nothing to the amplitude; a lighthouse blinking at `hz` does.
    */
+  /** Where the Bolt that sends the ladder is, from a belief instead of a scan; see clever-sweep.ts. Same options and result as behavior.sweep. */
+  @log
+  async cleverSweep (options: SweepOptions): Promise<SweepResult> {
+    return cleverSweep(this.ctx, this.actuators, this.sensors, this.communication, options);
+  }
+
   @log
   async lighthouse (hz: number = 2, seconds: number = 2) {
     const t0 = performance.now();

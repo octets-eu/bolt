@@ -16,6 +16,8 @@ export interface SweepTestOptions extends Omit<SweepOptions, 'referee'> {
   until?: 'nothing' | 'miss' | undefined;
   /** A sweep is good when its heading is within this of the bearing to the sender, degrees. */
   tolerance: number;
+  /** Judge experiments.cleverSweep instead of behavior.sweep. */
+  clever?: boolean | undefined;
 }
 
 export interface SweepTestTrial {
@@ -56,7 +58,7 @@ export function sweepTest (referee: Referee, options: SweepTestOptions): Promise
   return seeker.run('sweepTest', () => walk(referee, options), { seeker: seeker.name, sender: sender.name, ...options });
 }
 
-async function walk (referee: Referee, { at: target, direction, stepCm, startCm = stepCm, tolerance, until = 'nothing', ...sweep }: SweepTestOptions): Promise<SweepTestResult> {
+async function walk (referee: Referee, { at: target, direction, stepCm, startCm = stepCm, tolerance, until = 'nothing', clever = false, ...sweep }: SweepTestOptions): Promise<SweepTestResult> {
 
   const showMs = 2000;  // the chevron at the direction found, for the eye, before the next step
 
@@ -78,7 +80,7 @@ async function walk (referee: Referee, { at: target, direction, stepCm, startCm 
       if (s.aborted) break;
       await communication.state('motor', null);
       const heading = status.heading;
-      const result = await seeker.behavior.sweep({ referee, ...sweep });
+      const result = clever ? await seeker.experiments.cleverSweep({ referee, ...sweep }) : await seeker.behavior.sweep({ referee, ...sweep });
       if (s.aborted) break;
       const position = { ...status.position };
       const bearing = Math.round(headingTo(position, target));

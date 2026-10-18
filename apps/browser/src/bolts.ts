@@ -94,7 +94,7 @@ class bolts {
    * `stepCm` a trial up or down the sheet, turns at random and sweeps, until a sweep is off by more
    * than `tolerance` degrees or finds nothing; see @bolt/core behavior/sweep-test.ts.
    */
-  public sweepTest ({ seeker, sender, direction = 'up', stepCm = 25, startCm = stepCm, until = 'nothing', tolerance = 30, range = 'long', span = 180, step = 15, reads = 5 }: { seeker: string, sender: string, direction?: 'up' | 'down', stepCm?: number, startCm?: number, until?: 'nothing' | 'miss', tolerance?: number, range?: LadderRange, span?: number, step?: number, reads?: number }) {
+  public sweepTest ({ seeker, sender, direction = 'up', stepCm = 25, startCm = stepCm, until = 'nothing', tolerance = 30, range = 'long', span = 180, step = 15, reads = 5, clever = false }: { seeker: string, sender: string, direction?: 'up' | 'down', stepCm?: number, startCm?: number, until?: 'nothing' | 'miss', tolerance?: number, range?: LadderRange, span?: number, step?: number, reads?: number, clever?: boolean }) {
     const a = this.get(seeker), b = this.get(sender);
     if (!a || !b) throw new NotConnectedError(a ? sender : seeker);
     const home = Plotter.startOf(seeker), mark = Plotter.startOf(sender);
@@ -103,7 +103,7 @@ class bolts {
     // up is -y on the sheet; a unit sheet vector turned into the seeker's frame, as a heading
     const v = Plotter.toLocator(seeker, home.x, home.y + (direction === 'up' ? -1 : 1))!;
     const heading = (Math.atan2(v.x, v.y) * 180 / Math.PI + 360) % 360;
-    return sweepTest(new Referee(a, b), { at, direction: Math.round(heading), stepCm, startCm, until, tolerance, range, span, step, reads });
+    return sweepTest(new Referee(a, b), { at, direction: Math.round(heading), stepCm, startCm, until, tolerance, range, span, step, reads, clever });
   }
 
   /** The approach judged by the locator: both on their reference points, green walks `startCm` up the sheet, turns at random and approaches blue; see @bolt/core experiments/approach.ts. */
