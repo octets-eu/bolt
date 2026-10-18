@@ -13,7 +13,7 @@ export function onAvailabilityChanged (listener: (available: boolean) => void) {
   });
 }
 
-/** Bolts this origin was granted before. Needs the persistent permissions backend, see research/setup.md. */
+/** Bolts this origin was granted before. Needs the persistent permissions backend, see docs/private/setup.md. */
 export async function getPermittedBolts (): Promise<BluetoothDevice[]> {
   if (!navigator.bluetooth?.getDevices) return [];
   const devices = await navigator.bluetooth.getDevices();

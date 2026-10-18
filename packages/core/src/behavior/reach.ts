@@ -17,7 +17,7 @@ export interface ReachResult {
 /**
  * Roll to a locator point; where something is in the way, find out whether
  * going on is possible and go over it if it is. Motor commands only, its own
- * loop. Measured basis in research/behaviors.md, reach (2026-09-23):
+ * loop. Measured basis in docs/archive/behaviors.md, reach (2026-09-23):
  *
  * - Contact at exploring speed shows as pitch above 30 degrees held, 8 of 8
  *   at the mat lip and a wall; the locator does not show it, at a wall the

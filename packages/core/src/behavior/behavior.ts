@@ -17,7 +17,7 @@ import { log } from '../lifecycle/log';
 
 /**
  * Behaviors: closed loops over the Bolt's own senses with a fixed setpoint and
- * a budget, each in its own file, see research/behaviors.md. They command the
+ * a budget, each in its own file, see docs/archive/behaviors.md. They command the
  * motor themselves and use no navigation step, and return a result with a
  * reason instead of throwing.
  */

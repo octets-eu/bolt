@@ -4,7 +4,7 @@ import { clamp } from '../helpers/utils';
  * Landing on a point: how fast the ball should be with `d` cm to go, and
  * when a stop lands it there. Pure physics over a DriveModel; the loop that
  * drives with it is `experiments.rollToPointAdaptive`. Measured values:
- * research/bolt.md, "Drive limits".
+ * docs/archive/bolt.md, "Drive limits".
  */
 
 /**

@@ -11,7 +11,7 @@ export interface LadderAuthority {
 /**
  * The referee of a round: holds the two Bolts in their roles, starts and
  * ends the sender's ladder, and switches it when the seeker asks, see
- * research/hide-and-seek.md. The tag rule still lives in seekToCollision.
+ * docs/archive/hide-and-seek.md. The tag rule still lives in seekToCollision.
  */
 export class Referee implements LadderAuthority {
 

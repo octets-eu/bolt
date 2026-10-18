@@ -7,7 +7,7 @@ import type { TPoint } from './homography';
  * white balance showed the white paper light blue, (116..172, 168..218,
  * 188..247), against the warm wood, (149, 121, 91); white walls and the
  * pillar are bluish too but touch the frame edge, stand upright or are too
- * flat; floor glare and the ball are ragged. See research/rig.md.
+ * flat; floor glare and the ball are ragged. See docs/private/rig.md.
  */
 export interface IPad {
   /** centre in frame pixels */

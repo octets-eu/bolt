@@ -49,8 +49,9 @@ Rules that keep the layers honest:
   before the reset is gone after it.
 - `calibration.north` spins for the firmware's north, verifies each spin by
   the yaw it swept, averages the spins into `northHeading` with
-  `northSpread`, and turns the ball to face it; the reset runs it on every
-  wake. Yaw is never reset: north is a heading.
+  `northSpread`, and turns the ball to face it. The reset does not run it:
+  north varies too much from spot to spot; it stays for the compass button.
+  Yaw is never reset: north is a heading.
 - Stabilization is on only while a navigation step drives and until the
   locator says still.
 
@@ -60,19 +61,13 @@ Everything the Bolt sends is a stream on `sensors` with one shape:
 `subscribe(listener, options)` holds it and returns a release; the first hold
 switches the hardware on, the last release off. Each navigation step holds
 `motion` for its whole step, and lifecycle holds battery, charger, gyro max, infrared and collision for
-the connection. The folder is frozen; `src/sensors/README.md` has the
-contract and the facts it rests on.
+the connection. `src/sensors/README.md` has the contract.
 
 ## Actuators
 
 One object per device on `actuators`: `motor`, `matrix`, `led`, `infrared`,
 `power`, one method per firmware command. The matrix hold is the one piece
-of arbitration. The folder is frozen; `src/actuators/README.md` has the
-contract and the facts it rests on.
+of arbitration. `src/actuators/README.md` has the contract.
 
-## Events
-
-`bolt.events` is a typed emitter, see `src/events/`. Notifications from the Bolt
-arrive as `awake`, `willsleep`, `didsleep`, `battery`, `charger`, `collision`,
-`compass`, `infrared`, `sensordata`, `scrolldone`. `log` carries every packet
-and info line for the session log; `change` says a UI may redraw.
+What the device does, the link, the commands, what it forgets in sleep, the
+sample, collisions, infrared, is in `docs/bolt-reference.md`.

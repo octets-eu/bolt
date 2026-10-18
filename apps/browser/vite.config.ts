@@ -21,7 +21,7 @@ const commitStamp: Plugin = {
   transformIndexHtml: () => [{ tag: 'script', children: `var __COMMIT__ = ${JSON.stringify(commit())};`, injectTo: 'head-prepend' }],
 };
 
-// Same certificate files the webpack dev server used; see research/setup.md.
+// Same certificate files the webpack dev server used; see docs/private/setup.md.
 // Port 8080 is kept on purpose: Web Bluetooth permissions are granted per origin.
 const certDir = resolve(import.meta.dirname, '../../Certificates/macos');
 

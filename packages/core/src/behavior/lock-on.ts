@@ -23,7 +23,7 @@ export interface LockOnResult {
 /**
  * Turn to face a Bolt that sends `channel` weakly, by the listen notify.
  * Motor commands only, its own loop. Measured basis in
- * research/infrared-external-device.md (2026-10-01):
+ * docs/archive/infrared-external-device.md (2026-10-01):
  *
  * - A Bolt emits at most one frame per 200 ms; 0x2a at strength 2 arrives
  *   at 50 cm 46 to 48 of 48, the notify fires for nearly every frame.

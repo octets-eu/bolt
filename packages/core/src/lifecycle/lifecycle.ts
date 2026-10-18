@@ -124,7 +124,7 @@ export class Lifecycle {
     await this.communication.log('frames');
     await this.communication.state('motor', 'resting');
     await this.sensors.reapply();
-    // no north: it varies by over 100 degrees between spots 25 cm apart (research/bolt.md);
+    // no north: it varies by over 100 degrees between spots 25 cm apart (docs/archive/bolt.md, Magnetometer);
     // calibration.north() stays for the compass button
 
     if (!hard) {
