@@ -8,7 +8,7 @@ npm run dev
 ```
 
 opens the app on `https://localhost:8080`. Pairing, certificates and the
-Chrome flags are in `research/setup.md`, the local research notes, which are not in the public repository.
+Chrome flags are in `docs/private/setup.md`, local notes outside the public repository.
 
 ## Layout
 

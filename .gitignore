@@ -5,6 +5,6 @@
 Certificates/
 node_modules/
 dist/
-research/
+docs/private/
 .env.local
 sessions/

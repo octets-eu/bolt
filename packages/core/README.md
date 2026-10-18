@@ -53,7 +53,6 @@ Rules that keep the layers honest:
   wake. Yaw is never reset: north is a heading.
 - Stabilization is on only while a navigation step drives and until the
   locator says still.
-  See research/bolt.md for the measurements behind this.
 
 ## Sensor streams
 
