@@ -49,10 +49,6 @@ export interface ApproachResult {
  *   back off `backCm` along the last direction and sweep again. `shortMax`
  *   short sweeps without the band give up.
  *
- * A sweep that finds the axis but no end (`axis`) is resolved by the last
- * direction known: the end nearer to it. The first sweep has none and an
- * `axis` there counts as nothing.
- *
  * Logs `approach start` with the constants and one `approach` line per
  * round, leg, sweep and rule, with the heading and the locator position.
  */
@@ -115,16 +111,13 @@ export async function approach (seeker: Bolt, referee: Referee, options: Approac
     ctx.log('info', `approach ${JSON.stringify({ n: records++, rule, heading: Math.round(heading()), at: [Math.round(status.position.x), Math.round(status.position.y)], ...extra })}`);
   };
 
-  let lastDirection: number | null = null;
+  let lastDirection: number | null;
 
-  /** A sweep on `range`; an axis without an end takes the end nearer to the last direction. */
+  /** A sweep on `range`, recorded. */
   const sweepOn = async (range: 'long' | 'short'): Promise<SweepResult> => {
     await stand();
     const r = await behavior.sweep({ referee, range, ...options });
     result.sweeps++;
-    if (r.reason === 'axis' && r.axis !== null) {
-      r.heading = lastDirection === null ? null : Math.abs(angleDistance(lastDirection, r.axis)) <= 90 ? r.axis : mod360(r.axis + 180);
-    }
     record('sweep', { range, reason: r.reason, direction: r.heading, used: r.used, hits: r.hits });
     return r;
   };
