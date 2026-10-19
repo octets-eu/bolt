@@ -41,7 +41,7 @@ export interface SweepResult {
   levels: number[];
   /** Reads that landed and named a side. */
   hits: number;
-  /** Reads that landed with all four corners hearing the weakest level: the sender is on top. */
+  /** Reads that landed with all four corners hearing one level: the sender is on top. */
   flooded: number;
   seconds: number;
 }
@@ -79,7 +79,7 @@ const edge   = 15;       // a lobe's edge is soft: hearing slides from inside to
 const exitWindow = 20;   // degrees either side of the mode that must hold `massMin` of the belief
 const massMin    = 0.9;
 const maxRounds  = 16;   // standing rounds before the sweep gives up; chosen
-const farRounds  = 32;   // the same while the likeliest carrier is the ladder's strongest level: far out a read lands once in ten rounds; chosen
+const farRounds  = 32;   // the same while the ladder's strongest level is the one likely carrier: far out a read lands once in ten rounds; chosen
 const restMs     = 2500; // the most a turn gets to come to rest
 const candidates = 24;   // headings considered for the next round, 15 degrees apart
 const msBefore   = 45;   // a volley's centre before the expected notify; infrared-timing run 5
@@ -97,7 +97,7 @@ const corners: readonly number[] = [-45, 45, 135, -135];
  * expected to narrow the posterior most, and listens again. It ends when
  * `massMin` of the belief lies within `exitWindow` degrees of the mode,
  * facing that heading, or after `maxRounds` rounds with nothing,
- * `farRounds` while the likeliest carrier is the ladder's strongest level.
+ * `farRounds` while the ladder's strongest level is the one likely carrier.
  *
  * - A frame is heard with the sender inside the lobe of its level and lost
  *   abeam, the lobe's edge soft over a band of `edge` degrees either side
@@ -126,6 +126,7 @@ const corners: readonly number[] = [-45, 45, 135, -135];
 export async function sweep (ctx: Context, actuators: Actuators, sensors: Sensors, communication: Communication, { referee, range = 'long', reads = 5, prior }: SweepOptions): Promise<SweepResult> {
 
   const t0 = ctx.now();
+  const s = ctx.motion;
   const { ladder, reason: negotiated } = await negotiateLadder(ctx, sensors, referee, range);
   const belief = emptyBelief(ladder.channels.length);
   if (prior !== undefined) observeHit(belief, prior);
@@ -149,18 +150,18 @@ export async function sweep (ctx: Context, actuators: Actuators, sensors: Sensor
   let next: number | null = null;
   let limit = maxRounds;
 
-  while (rounds < limit && heading === null && !ctx.motion.aborted) {
+  while (rounds < limit && heading === null && !s.aborted) {
 
-    const stood = await turnAndRest(ctx, actuators, next);
+    const stood = await turnAndRest(ctx, s, actuators, next);
     heardThisRound.fill(false);
     const framesBefore = [...levels];
-    await listenAndRead(ctx, beat, ladder, reads, belief, counts);
+    await listenAndRead(ctx, s, beat, ladder, reads, belief, counts);
     observeSilences(belief, heardThisRound, stood);
     rounds++;
     const p = posterior(belief);
     const { mode, mass } = summarize(p);
     const carrier = carrierProbabilities(belief, p);
-    limit = likeliest(carrier) === ladder.channels.length - 1 ? farRounds : maxRounds;
+    limit = onlyTheStrongest(carrier) ? farRounds : maxRounds;
     if (mass >= massMin) heading = mode;
     else next = nextHeading(belief, p);
     ctx.log('info', `sweep round ${JSON.stringify({
@@ -172,7 +173,7 @@ export async function sweep (ctx: Context, actuators: Actuators, sensors: Sensor
     })}`);
   }
 
-  if (heading !== null) await turnAndRest(ctx, actuators, heading);
+  if (heading !== null) await turnAndRest(ctx, s, actuators, heading);
   
   await actuators.motor.stop();
   await actuators.motor.stabilize(StabilizationIndex.none);
@@ -180,7 +181,7 @@ export async function sweep (ctx: Context, actuators: Actuators, sensors: Sensor
   await beat.release();
   await release();
 
-  const aborted = ctx.motion.aborted;
+  const aborted = s.aborted;
   const carrier = carrierProbabilities(belief, posterior(belief));
   const reason: SweepResult['reason'] = aborted ? 'aborted' : heading === null ? 'nothing' : 'direction';
   const seconds = Math.round((ctx.now() - t0) / 100) / 10;
@@ -198,11 +199,11 @@ export async function sweep (ctx: Context, actuators: Actuators, sensors: Sensor
 
 function zero (): number { return 0; }
 
-/** The index of the largest value. */
-function likeliest (values: readonly number[]): number {
-  let best = 0;
-  for (let k = 1; k < values.length; k++) if ((values[k] ?? 0) > (values[best] ?? 0)) best = k;
-  return best;
+/** Whether the ladder's strongest level is the one carrier the belief holds likely: far out, where the weaker ones do not arrive. */
+function onlyTheStrongest (carrier: readonly number[]): boolean {
+  const last = carrier.length - 1;
+  for (let k = 0; k < last; k++) if ((carrier[k] ?? 0) > 0.5) return false;
+  return (carrier[last] ?? 0) > 0.5;
 }
 function no (): boolean { return false; }
 function hundredths (v: number): number { return Math.round(v * 100) / 100; }
@@ -413,11 +414,11 @@ function binaryEntropy (q: number): number {
  * `restMs`. The firmware turns on a roll at speed 0 to the heading.
  * Returns the heading at rest.
  */
-async function turnAndRest (ctx: Context, actuators: Actuators, target: number | null): Promise<number> {
+async function turnAndRest (ctx: Context, s: AbortSignal, actuators: Actuators, target: number | null): Promise<number> {
   if (target !== null) await actuators.motor.roll(0, target);
   const t0 = performance.now();
   await wait(200);
-  while (performance.now() - t0 < restMs && !ctx.motion.aborted && !isStill(ctx)) await wait(50);
+  while (performance.now() - t0 < restMs && !s.aborted && !isStill(ctx)) await wait(50);
   return headingNow(ctx);
 }
 
@@ -432,15 +433,14 @@ function isStill (ctx: Context): boolean {
  * until the ladder round is over, and folds each read that landed into the
  * belief. The frames themselves arrive through the beat tracker. Counts
  * the reads that landed and named a side as hits, and the reads with all
- * four corners on the weakest level as flooded.
+ * four corners on one level as flooded.
  */
-async function listenAndRead (ctx: Context, beat: Beat, ladder: Ladder, reads: number, belief: Belief, counts: { hits: number; flooded: number }): Promise<void> {
+async function listenAndRead (ctx: Context, s: AbortSignal, beat: Beat, ladder: Ladder, reads: number, belief: Belief, counts: { hits: number; flooded: number }): Promise<void> {
   const t0 = performance.now();
-  const weakest = ladder.channels[0] ?? -1;
-  while (performance.now() - t0 < ladder.roundMs && !ctx.motion.aborted) {
+  while (performance.now() - t0 < ladder.roundMs && !s.aborted) {
     const payload = await readAtNextFrame(ctx, beat, ladder, reads);
     if (payload === null) continue;
-    if (payload.every(function isWeakest (channel: number): boolean { return channel === weakest; })) counts.flooded++;
+    if (payload.every(function same (channel: number): boolean { return channel === payload[0]; })) counts.flooded++;
     const receivers: number[] = [];
     for (let i = 0; i < corners.length; i++) if (ladder.channels.includes(payload[i] ?? -1)) receivers.push(i);
     const bearing = hitBearing(receivers, headingNow(ctx));
