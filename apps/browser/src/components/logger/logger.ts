@@ -30,8 +30,8 @@ function reduceSensorData (data: any): string {
 
 const cell = (cls: string, v: any) => m('td' + cls, v === undefined || v === null || v === '' ? ' ' : v);
 
-/** All nine columns, or only T, Bolt, Type and Name; toggled by the Logger label, wide after every reload. */
-let wide = true;
+/** All nine columns, or only T, Bolt, Type and Name; toggled by the Logger label, narrow after every reload. */
+let wide = false;
 const NARROW = 4;
 
 /** A cell over the remaining `span` columns, or one column when narrow. */
