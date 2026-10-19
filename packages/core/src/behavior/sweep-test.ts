@@ -14,6 +14,8 @@ export interface SweepTestOptions extends Omit<SweepOptions, 'referee'> {
   startCm?: number | undefined;
   /** What ends the walk besides a miss: a sweep that finds nothing (default), or a miss alone, for a measurement across the bands. */
   until?: 'nothing' | 'miss' | undefined;
+  /** The walk also ends after this many trials. */
+  trials?: number | undefined;
   /** A sweep is good when its heading is within this of the bearing to the sender, degrees. */
   tolerance: number;
   /** Judge experiments.cleverSweep instead of behavior.sweep. */
@@ -36,8 +38,8 @@ export interface SweepTestTrial {
 }
 
 export interface SweepTestResult {
-  /** missed: a sweep's heading was off by more than the tolerance; nothing: a sweep found nothing. */
-  reason: 'missed' | 'nothing' | 'aborted';
+  /** missed: a sweep's heading was off by more than the tolerance; nothing: a sweep found nothing; done: the trials asked for. */
+  reason: 'missed' | 'nothing' | 'done' | 'aborted';
   trials: SweepTestTrial[];
 }
 
@@ -49,7 +51,7 @@ export interface SweepTestResult {
  * angle, sweeps, and the sweep's heading is compared with the bearing to
  * the sender from the locator's position. Within `tolerance` the next
  * trial follows; a miss, a sweep that finds nothing (unless `until` is
- * 'miss'), or fullstop ends the walk. Each trial is logged as `sweepTest` with its numbers. The truth
+ * 'miss'), the `trials` asked for, or fullstop ends the walk. Each trial is logged as `sweepTest` with its numbers. The truth
  * drifts with yaw and the locator's dead reckoning, more with every step;
  * the position and heading are in the record for a check against the floor.
  */
@@ -58,7 +60,7 @@ export function sweepTest (referee: Referee, options: SweepTestOptions): Promise
   return seeker.run('sweepTest', () => walk(referee, options), { seeker: seeker.name, sender: sender.name, ...options });
 }
 
-async function walk (referee: Referee, { at: target, direction, stepCm, startCm = stepCm, tolerance, until = 'nothing', clever = false, ...sweep }: SweepTestOptions): Promise<SweepTestResult> {
+async function walk (referee: Referee, { at: target, direction, stepCm, startCm = stepCm, tolerance, until = 'nothing', trials: maxTrials = Infinity, clever = false, ...sweep }: SweepTestOptions): Promise<SweepTestResult> {
 
   const showMs = 2000;  // the chevron at the direction found, for the eye, before the next step
 
@@ -96,6 +98,10 @@ async function walk (referee: Referee, { at: target, direction, stepCm, startCm 
       await wait(showMs);
       if (error === null ? until === 'nothing' : !good) {
         reason = error === null ? 'nothing' : 'missed';
+        break;
+      }
+      if (trials.length >= maxTrials) {
+        reason = 'done';
         break;
       }
     }
