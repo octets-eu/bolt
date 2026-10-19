@@ -93,9 +93,9 @@ class bolts {
    * The sweep behavior judged by the locator: both Bolts on their reference points, the seeker walks
    * `stepCm` a trial along `direction`, up or down the sheet or a sheet heading in degrees clockwise
    * from up, turns at random and sweeps, until a sweep is off by more than `tolerance` degrees, finds
-   * nothing, or `trials` are done; see @bolt/core behavior/sweep-test.ts.
+   * nothing, or `trials` are done; `reset: false` continues from where they stand; see @bolt/core behavior/sweep-test.ts.
    */
-  public sweepTest ({ seeker, sender, direction = 'up', stepCm = 25, startCm = stepCm, until = 'nothing', trials, tolerance = 30, range = 'long', span = 180, step = 15, reads = 5, clever = false }: { seeker: string, sender: string, direction?: 'up' | 'down' | number, stepCm?: number, startCm?: number, until?: 'nothing' | 'miss', trials?: number, tolerance?: number, range?: LadderRange, span?: number, step?: number, reads?: number, clever?: boolean }) {
+  public sweepTest ({ seeker, sender, direction = 'up', stepCm = 25, startCm = stepCm, until = 'nothing', trials, reset = true, tolerance = 30, range = 'long', span = 180, step = 15, reads = 5, clever = false }: { seeker: string, sender: string, direction?: 'up' | 'down' | number, stepCm?: number, startCm?: number, until?: 'nothing' | 'miss', trials?: number, reset?: boolean, tolerance?: number, range?: LadderRange, span?: number, step?: number, reads?: number, clever?: boolean }) {
     const a = this.get(seeker), b = this.get(sender);
     if (!a || !b) throw new NotConnectedError(a ? sender : seeker);
     const home = Plotter.startOf(seeker), mark = Plotter.startOf(sender);
@@ -105,7 +105,7 @@ class bolts {
     const sheet = (direction === 'up' ? 0 : direction === 'down' ? 180 : direction) * Math.PI / 180;
     const v = Plotter.toLocator(seeker, home.x + Math.sin(sheet), home.y - Math.cos(sheet))!;
     const heading = (Math.atan2(v.x, v.y) * 180 / Math.PI + 360) % 360;
-    return sweepTest(new Referee(a, b), { at, direction: Math.round(heading), stepCm, startCm, until, trials, tolerance, range, span, step, reads, clever });
+    return sweepTest(new Referee(a, b), { at, direction: Math.round(heading), stepCm, startCm, until, trials, reset, tolerance, range, span, step, reads, clever });
   }
 
   /** The approach judged by the locator: both on their reference points, green walks `startCm` up the sheet, turns at random and approaches blue; see @bolt/core experiments/approach.ts. */

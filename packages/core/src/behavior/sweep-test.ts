@@ -16,6 +16,8 @@ export interface SweepTestOptions extends Omit<SweepOptions, 'referee'> {
   until?: 'nothing' | 'miss' | undefined;
   /** The walk also ends after this many trials. */
   trials?: number | undefined;
+  /** Both Bolts hard reset at the start (default); false continues from where they stand, in the frames of the last reset. */
+  reset?: boolean | undefined;
   /** A sweep is good when its heading is within this of the bearing to the sender, degrees. */
   tolerance: number;
   /** Judge experiments.cleverSweep instead of behavior.sweep. */
@@ -45,8 +47,9 @@ export interface SweepTestResult {
 
 /**
  * The sweep behavior judged by the locator instead of the eye: both Bolts
- * start on their reference points, hard reset there, so the sender's
- * position is known in the seeker's frame; the referee runs the ladder. A
+ * start on their reference points, hard reset there unless `reset` is off,
+ * so the sender's position is known in the seeker's frame; the referee runs
+ * the ladder. A
  * trial: the seeker rolls `stepCm` along `direction`, turns by a random
  * angle, sweeps, and the sweep's heading is compared with the bearing to
  * the sender from the locator's position. Within `tolerance` the next
@@ -60,7 +63,7 @@ export function sweepTest (referee: Referee, options: SweepTestOptions): Promise
   return seeker.run('sweepTest', () => walk(referee, options), { seeker: seeker.name, sender: sender.name, ...options });
 }
 
-async function walk (referee: Referee, { at: target, direction, stepCm, startCm = stepCm, tolerance, until = 'nothing', trials: maxTrials = Infinity, clever = false, ...sweep }: SweepTestOptions): Promise<SweepTestResult> {
+async function walk (referee: Referee, { at: target, direction, stepCm, startCm = stepCm, tolerance, until = 'nothing', trials: maxTrials = Infinity, reset = true, clever = false, ...sweep }: SweepTestOptions): Promise<SweepTestResult> {
 
   const showMs = 2000;  // the chevron at the direction found, for the eye, before the next step
 
@@ -70,7 +73,7 @@ async function walk (referee: Referee, { at: target, direction, stepCm, startCm 
   const trials: SweepTestTrial[] = [];
   let reason: SweepTestResult['reason'] = 'aborted';
 
-  await Promise.all([seeker.lifecycle.reset(), sender.lifecycle.reset()]);
+  if (reset) await Promise.all([seeker.lifecycle.reset(), sender.lifecycle.reset()]);
   referee.start();
 
   try {
