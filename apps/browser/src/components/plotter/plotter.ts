@@ -9,6 +9,8 @@ import { session } from '../../session';
 let series = [] as any;
 let marker = [] as any;
 let bolts  = {} as any;
+// the direction each sweep found, from where its Bolt stood, as a sheet heading; drawn as a ray
+let rays   = [] as { x: number, y: number, heading: number, color: string }[];
 let rolling = false;
 
 // the canvas in CSS pixels, from its host's size; drawn in device pixels
@@ -43,6 +45,9 @@ const starts: { [name: string]: { x: number, y: number, heading: number } } = {
   'SB-9129': { x: 241, y: 317.5, heading: 270 },   // green, faces the left partition end
   'SB-11DF': { x: 264, y: 317.5, heading:  90 },   // blue, faces the right partition end
 };
+
+/** How far a sweep's ray reaches on the sheet, cm. */
+const RAY_CM = 200;
 
 /** The ends of the partition's two parts on the sheet, in the middle of their faces: the view always holds both. */
 const partitionEnds = [{ positionX: 181, positionY: 317.5 }, { positionX: 324, positionY: 317.5 }];
@@ -138,7 +143,6 @@ const Plotter = Factory.create('Plotter', {
   },
 
 
-  /** Every locator sample of an attached Bolt lands on the plan, counted from the Bolt's start; the sample's yaw gives the nose. A reset of the Bolt alone puts its dot on the start, as the Reset button does for all. */
   /** A sheet point in the locator frame of the Bolt `name`, or null without a start for it. */
   toLocator (name: string, x: number, y: number): { x: number, y: number } | null {
     const start = starts[name];
@@ -151,6 +155,12 @@ const Plotter = Factory.create('Plotter', {
     return start ? { x: start.x, y: start.y } : null;
   },
 
+  /**
+   * Every locator sample of an attached Bolt lands on the plan, counted from
+   * the Bolt's start; the sample's yaw gives the nose. A reset of the Bolt
+   * alone puts its dot on the start, as the Reset button does for all. A
+   * sweep's end line with a heading adds a ray from where the Bolt stands.
+   */
   attach (bolt: Bolt): () => void {
     return bolt.events.on('log', (entry: LogEntry) => {
       const start = starts[bolt.name];
@@ -158,6 +168,15 @@ const Plotter = Factory.create('Plotter', {
       const color = Bolts.configFor(bolt.name).colors.plot;
       if (entry.type === 'info' && entry.subtype === 'reset.out') {
         Plotter.placeBolt(bolt.name, { positionX: start.x, positionY: start.y }, color, start.heading);
+        Plotter.render();
+        return;
+      }
+      if (entry.type === 'info' && /^(sweep|cleverSweep) end \{/.test(entry.subtype)) {
+        const { heading } = JSON.parse(entry.subtype.slice(entry.subtype.indexOf('{'))) as { heading: number | null };
+        const at = bolts[bolt.name]?.locator;
+        if (heading === null || !at) return;
+        // a locator heading is -yaw; on the sheet the start's heading comes on top
+        rays.push({ x: at.positionX, y: at.positionY, heading: start.heading + heading, color });
         Plotter.render();
         return;
       }
@@ -180,6 +199,7 @@ const Plotter = Factory.create('Plotter', {
     series = [];
     marker = [];
     bolts  = {};
+    rays   = [];
     Bolts.forEach((bolt: Bolt) => {
       const start = starts[bolt.name];
       if (bolt.connected && start) Plotter.placeBolt(bolt.name, { positionX: start.x, positionY: start.y }, Bolts.configFor(bolt.name).colors.plot, start.heading);
@@ -245,6 +265,19 @@ const Plotter = Factory.create('Plotter', {
 
   },
 
+  /** A thin line of `RAY_CM` from where a sweep stood, the way it decided. */
+  plotRays (ctx: CanvasRenderingContext2D, meta: any) {
+    rays.forEach(({ x, y, heading, color }) => {
+      const a = heading * Math.PI / 180;
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      ctx.lineTo(x + Math.sin(a) * RAY_CM, y - Math.cos(a) * RAY_CM);
+      ctx.lineWidth = 1 / meta.scale;
+      ctx.strokeStyle = color;
+      ctx.stroke();
+    });
+  },
+
   plotMarker (ctx: CanvasRenderingContext2D, meta: any) {
     marker.forEach( ( point: any ) => {
       plot.circle(ctx, point.x, point.y, 3 / meta.scale, marker.fill || '#F00');
@@ -264,7 +297,8 @@ const Plotter = Factory.create('Plotter', {
       series.push(location);
     }
 
-    const data = series.slice(-1000);
+    // every sample since the last Reset
+    const data = series;
 
     // auto zoom: the points and both partition ends are on the canvas, a tenth of their extent free on every side (chosen)
     const xs = [...partitionEnds, ...data].map((p: any) => p.positionX);
@@ -286,6 +320,7 @@ const Plotter = Factory.create('Plotter', {
     if (plan.complete && plan.naturalWidth) ctx.drawImage(plan, 0, 0, SHEET.width, SHEET.height);
     Plotter.plotMarker(ctx, meta);
     Plotter.plotData(ctx, meta, data);
+    Plotter.plotRays(ctx, meta);
     Plotter.plotBolts(ctx, meta);
 
     Date.now() - t0 > 10 && console.log('Plotter.render', series.length, 'points', 'msecs', Date.now() - t0 );
