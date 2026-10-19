@@ -17,19 +17,15 @@ export interface SweepOptions {
   referee: LadderAuthority;
   /** The ladder to sweep on. */
   range?: LadderRange | undefined;
-  /** Degrees swept, centred on the heading at the start; 360 goes once round from it. */
-  span?: number | undefined;
-  /** Degrees between headings. */
-  step?: number | undefined;
-  /** Reads of the receivers per volley on the axis. */
+  /** Reads of the receivers per volley into a frame. */
   reads?: number | undefined;
 }
 
 export interface SweepResult {
   /**
-   * direction: the axis and its end are known. nothing: no level was heard
-   * at some headings and silent at others, the sender is out of reach or on
-   * top; or no read on the axis named an end.
+   * direction: the belief settled on a bearing. nothing: it did not within
+   * `maxRounds` standing rounds, the sender is out of reach, on top, or the
+   * reads never named a side.
    */
   reason: 'direction' | 'nothing' | 'aborted';
   /** The ladder swept on, and whether a frame of it confirmed the switch before the sweep. */
@@ -37,235 +33,393 @@ export interface SweepResult {
   negotiated: NegotiateResult['reason'];
   /** The direction found, a heading; null for nothing and aborted. */
   heading: number | null;
-  /** Levels the fit used, as strengths. */
+  /** Levels believed to carry, the ones with a lobe at this distance, as strengths, weakest first. */
   used: number[];
-  /** Frames heard per ladder level while turning. */
+  /** Frames heard per ladder level during the sweep. */
   levels: number[];
-  /** Reads on the axis that named a side. */
+  /** Reads that landed and named a side. */
   hits: number;
   seconds: number;
 }
 
-/** One heading stood at: asked for, read at the end of the turn, and the frames heard there per ladder level. */
-interface Position { target: number; heading: number; frames: number[] }
+/**
+ * What the sweep believes, as log likelihoods over the sender's bearing, a
+ * heading in 1 degree bins. Per ladder level a bin holds one number per
+ * state of that level at this distance, see `STATES`. `hits` is what the
+ * corner reads said, which is the same for every level.
+ */
+interface Belief {
+  readonly levels: readonly Float64Array[];
+  readonly hits: Float64Array;
+}
 
-const turnMs    = 600;    // a step's turn and its swing; as in seekEdge
-const firstMs   = 1000;   // the turn to the first heading, to the axis and to the direction found, up to 180 degrees
-const msBefore  = 45;     // a volley's centre before the expected notify; infrared-timing run 5
-const stepMs    = 6;      // between the reads of a volley; infrared-timing run 5
-const half      = 60;     // half-width of a lobe, degrees
-const heardMin  = 3;      // headings a level is heard at, at least, to be fitted; fewer is stray frames; chosen
-const silentMin = 2;      // and silent at, at least; chosen
-const endRounds = 10;     // ladder rounds the reads on the axis get before the sweep gives up; chosen
-const agree     = 2;      // hits on one side that decide the end; chosen
+/** Where the belief stands after a round: the likeliest bearing and the share of the belief within `exitWindow` of it. */
+interface Summary {
+  mode: number;
+  mass: number;
+}
+
+const BINS = 360;
+/** Half-widths a lobe may have, degrees: at 46 cm the weakest level reached 75, at 62 cm 45; measured 2026-10-19. */
+const widths: readonly number[] = [45, 60, 75];
+/** The states of a level at this distance: 0 not arriving, 1 to `widths.length` a carrier with a lobe of that half-width, `ALL` heard all round. */
+const STATES = widths.length + 2;
+const NONE = 0;
+const ALL = STATES - 1;
+const pIn    = 0.75;     // a carrier frame heard in one round, sender inside the lobe; the standing rounds of the walks of 2026-10-18
+const pOut   = 0.2;      // the same with the sender abeam
+const pNone  = 0.05;     // a frame of a level that does not arrive here
+const pAll   = 0.9;      // a frame of a level heard all round
+const pHitIn = 0.9;      // a read's corners hold the sender within 90 degrees of their mean
+const edge   = 15;       // a lobe's edge is soft: hearing slides from inside to outside over its half-width plus or minus this
+const exitWindow = 20;   // degrees either side of the mode that must hold `massMin` of the belief
+const massMin    = 0.9;
+const maxRounds  = 16;   // standing rounds before the sweep gives up; chosen
+const restMs     = 2500; // the most a turn gets to come to rest
+const candidates = 24;   // headings considered for the next round, 15 degrees apart
+const msBefore   = 45;   // a volley's centre before the expected notify; infrared-timing run 5
+const stepMs     = 6;    // between the reads of a volley; infrared-timing run 5
 /** Where the receivers sit, degrees off the nose: front left, front right, back right, back left. */
-export const corners = [-45, 45, 135, -135];
-const names     = ['FL', 'FR', 'BR', 'BL'];
+export const corners: readonly number[] = [-45, 45, 135, -135];
 
 /**
- * Where another Bolt is, from a standing turn. The other Bolt sends a
- * ladder (Communication.sendLadder), negotiated first with the referee
- * (negotiate-ladder.ts) so it holds for the sweep. Three steps, each a
- * function below:
+ * Where another Bolt is, from a belief. The other Bolt sends a ladder
+ * (Communication.sendLadder), negotiated first with the referee
+ * (negotiate-ladder.ts) so it holds for the sweep. This one listens where
+ * it stands for one ladder round, reads its corners into the frames, and
+ * folds every frame, every silent round and every read into a posterior
+ * over the sender's bearing; then it turns to the heading whose round is
+ * expected to narrow the posterior most, and listens again. It ends when
+ * `massMin` of the belief lies within `exitWindow` degrees of the mode,
+ * facing that heading, or after `maxRounds` rounds with nothing.
  *
- * 1. sweepForAxis: turn through `span` degrees in steps of `step`, stand one
- *    ladder round at each heading, count the frames per level, and fit two
- *    lobes to the heard and silent headings. The result is a line through
- *    this Bolt, the axis, with the sender at one of its ends; the notifies
- *    cannot say which, since the rear lobe hears as well as the front one.
- * 2. sweepForDirection: face the axis and read the receivers, timed into the
- *    sender's frames (beat.ts). The four sit at the corners, so a read that
- *    lands says whether the sender is ahead or behind. Two reads on one side
- *    decide; `endRounds` ladder rounds without that is nothing.
- * 3. Face the direction found.
+ * - A frame is heard with the sender inside the lobe of its level and lost
+ *   abeam, the lobe's edge soft over a band of `edge` degrees either side
+ *   of its half-width; a stronger level is heard all round, a weaker one
+ *   not at all. Which is which at this distance, and how wide the lobe is,
+ *   the belief does not know, so each level carries a state per width in
+ *   `widths` besides not arriving and heard all round, and the one the data
+ *   favours wins; the carriers are the levels most likely in a lobe state.
+ * - A frame counts wherever the nose is at the moment it arrives, the yaw
+ *   is read from the motion stream held for the whole sweep; a silence is
+ *   one standing round without a frame of the level.
+ * - The notifies cannot tell ahead from behind, so without a read the
+ *   belief has two humps 180 degrees apart. A read that lands names the
+ *   corners that heard (beat.ts); the sender is within 90 degrees of their
+ *   mean.
  *
  * Motor commands only, its own loop. Shows 'tracking' while it runs. Ends
- * pointing at the direction found, or where the reads ended when there is
- * none, stabilization off. Ends on fullstop. Records `sweep start` with the
- * constants, one `sweep` line per heading with the frames, `sweep axis`
- * with the fit, one `sweep hit` line per read that named a side, and
- * `sweep end` with the vote.
+ * pointing at the direction found, or where the last round stood when there
+ * is none, stabilization off. Ends on fullstop. Records `sweep start` with
+ * the constants, one `sweep round` line per standing round with the
+ * belief's mode, its mass in the window, the carrier probabilities and the
+ * likeliest lobe width per level, and `sweep end`.
  */
-export async function sweep (ctx: Context, actuators: Actuators, sensors: Sensors, communication: Communication, { referee, range = 'long', span = 180, step = 15, reads = 3 }: SweepOptions): Promise<SweepResult> {
+export async function sweep (ctx: Context, actuators: Actuators, sensors: Sensors, communication: Communication, { referee, range = 'long', reads = 5 }: SweepOptions): Promise<SweepResult> {
 
   const t0 = ctx.now();
   const { ladder, reason: negotiated } = await negotiateLadder(ctx, sensors, referee, range);
+  const belief = emptyBelief(ladder.channels.length);
+  const levels: number[] = ladder.channels.map(zero);
+  const heardThisRound: boolean[] = ladder.channels.map(no);
+  let hits = 0;
 
-  const levels     = ladder.channels.map(() => 0);
-  const heardRound = ladder.channels.map(() => 0);
+  const release = await sensors.motion.subscribe(null);
   const beat = await trackBeat(sensors, ladder.channels, function countFrame (channel: number): void {
     const k = ladder.channels.indexOf(channel);
-    heardRound[k] = (heardRound[k] ?? 0) + 1;
     levels[k] = (levels[k] ?? 0) + 1;
+    heardThisRound[k] = true;
+    observeFrame(belief, k, headingNow(ctx));
   });
-
   await communication.state('infrared', range === 'short' ? 'tracking-short' : 'tracking');
   await actuators.motor.stabilize(StabilizationIndex.full);
-  ctx.log('info', `sweep start ${JSON.stringify({ ladder: ladder.strengths, range, negotiated, span, step, reads, roundMs: ladder.roundMs, turnMs, firstMs, msBefore, stepMs, half, heardMin, silentMin, endRounds, agree })}`);
+  ctx.log('info', `sweep start ${JSON.stringify({ ladder: ladder.strengths, range, negotiated, reads, roundMs: ladder.roundMs, pIn, pOut, pNone, pAll, pHitIn, widths, edge, exitWindow, massMin, maxRounds, restMs, candidates, msBefore, stepMs })}`);
 
-  
-  const { axis, used } = await sweepForAxis(ctx, actuators, sensors, ladder, heardRound, span, step);
-  const { heading, hits } = axis === null ? { heading: null, hits: 0 } : await sweepForDirection(ctx, actuators, sensors, ladder, beat, axis, reads);
+  let heading: number | null = null;
+  let rounds = 0;
+  let next: number | null = null;
+  while (rounds < maxRounds && heading === null && !ctx.motion.aborted) {
+    const stood = await turnAndRest(ctx, actuators, next);
+    heardThisRound.fill(false);
+    const framesBefore = [...levels];
+    hits += await listenAndRead(ctx, beat, ladder, reads, belief);
+    observeSilences(belief, heardThisRound, stood);
+    rounds++;
+    const p = posterior(belief);
+    const { mode, mass } = summarize(p);
+    if (mass >= massMin) heading = mode;
+    else next = nextHeading(belief, p);
+    ctx.log('info', `sweep round ${JSON.stringify({
+      n: rounds, heading: Math.round(stood), frames: framesSince(levels, framesBefore), hits,
+      mode, mass: Math.round(mass * 100) / 100,
+      carrier: byStrength(ladder, carrierProbabilities(belief, p).map(hundredths)),
+      width: byStrength(ladder, lobeWidths(belief, p)),
+      next,
+    })}`);
+  }
 
-  if (heading !== null) await turnTo(ctx, actuators, sensors, heading, firstMs);
-  
+  if (heading !== null) await turnAndRest(ctx, actuators, heading);
   await actuators.motor.stop();
   await actuators.motor.stabilize(StabilizationIndex.none);
   await communication.state('infrared', null);
   await beat.release();
+  await release();
 
   const aborted = ctx.motion.aborted;
-  
+  const carrier = carrierProbabilities(belief, posterior(belief));
+  const reason: SweepResult['reason'] = aborted ? 'aborted' : heading === null ? 'nothing' : 'direction';
+  const seconds = Math.round((ctx.now() - t0) / 100) / 10;
+  ctx.log('info', `sweep end ${JSON.stringify({ reason, heading, rounds, hits, seconds })}`);
   return {
-    reason: aborted ? 'aborted' : heading === null ? 'nothing' : 'direction',
-    range, negotiated,
+    reason, range, negotiated,
     heading: aborted ? null : heading,
-    used: used.map(k => ladder.strengths[k] ?? 0),
-    levels, hits,
-    seconds: Math.round((ctx.now() - t0) / 100) / 10,
+    used: ladder.strengths.filter(function carries (_strength: number, k: number): boolean { return (carrier[k] ?? 0) > 0.5; }),
+    levels, hits, seconds,
   };
-  
 }
 
-/**
- * Step 1: the line the sender is on. Turns to each heading of the span,
- * listens one ladder round there and fits the lobes to what was heard;
- * `heardRound` is the frame counter the beat tracker fills. Logs one `sweep`
- * line per heading and `sweep axis` with the fit. Returns the axis, null
- * when no level was heard at some headings and silent at others, and the
- * levels the fit used as indexes into the ladder.
- */
-async function sweepForAxis (ctx: Context, actuators: Actuators, sensors: Sensors, ladder: Ladder, heardRound: number[], span: number, step: number): Promise<{ axis: number | null; used: number[] }> {
-  
-  const start = await turnTo(ctx, actuators, sensors, null, turnMs);
-  const count = span >= 360 ? Math.round(360 / step) : Math.floor(span / step) + 1;
-  const first = span >= 360 ? start : start - span / 2;
-  const positions: Position[] = [];
-  
-  for (let n = 0; n < count && !ctx.motion.aborted; n++) {
-    const target  = mod360(first + n * step);
-    const heading = await turnTo(ctx, actuators, sensors, target, n === 0 ? firstMs : turnMs);
-    const frames  = await listenOneRound(ctx, heardRound, ladder.roundMs);
-    positions.push({ target, heading, frames });
-    ctx.log('info', `sweep ${JSON.stringify({ n, target: Math.round(target), heading: Math.round(heading), frames })}`);
+function zero (): number { return 0; }
+function no (): boolean { return false; }
+function hundredths (v: number): number { return Math.round(v * 100) / 100; }
+
+/** The frames per level since `before`. */
+function framesSince (levels: readonly number[], before: readonly number[]): number[] {
+  return levels.map(function since (v: number, k: number): number { return v - (before[k] ?? 0); });
+}
+
+/** One value per ladder level, keyed by the level's strength, for a log line. */
+function byStrength (ladder: Ladder, values: readonly number[]): { [strength: number]: number } {
+  const out: { [strength: number]: number } = {};
+  ladder.strengths.forEach(function key (strength: number, k: number): void { out[strength] = values[k] ?? 0; });
+  return out;
+}
+
+/** A belief that knows nothing: every bin and state at log likelihood 0. */
+function emptyBelief (levelCount: number): Belief {
+  const levels: Float64Array[] = [];
+  for (let k = 0; k < levelCount; k++) levels.push(new Float64Array(BINS * STATES));
+  return { levels, hits: new Float64Array(BINS) };
+}
+
+/** The heading the nose points at now, from the yaw of the motion stream. */
+function headingNow (ctx: Context): number {
+  return mod360(-(ctx.status.angles?.yaw ?? 0));
+}
+
+/** How far a sender at `bearing` is off the nose or tail of a Bolt whose nose points at `heading`, 0 to 90 degrees. */
+function offAxis (bearing: number, heading: number): number {
+  const off = Math.abs(angleDistance(bearing, heading));
+  return Math.min(off, 180 - off);
+}
+
+/** How far a sender `off` the axis is inside a lobe of half-width `half`: 1 within `half` less `edge`, 0 beyond `half` plus `edge`, sliding between. */
+function insideLobe (off: number, half: number): number {
+  return Math.min(1, Math.max(0, (half + edge - off) / (2 * edge)));
+}
+
+/** The half-width of the lobe of a lobe state. */
+function halfWidth (state: number): number {
+  const half = widths[state - 1];
+  if (half === undefined) throw new Error(`sweep: state ${state} has no lobe`);
+  return half;
+}
+
+/** The probability of hearing a frame of a level in one round, by the level's state and how far the sender is off the axis. */
+function hearingProbability (state: number, off: number): number {
+  if (state === NONE) return pNone;
+  if (state === ALL) return pAll;
+  return pOut + (pIn - pOut) * insideLobe(off, halfWidth(state));
+}
+
+/** A frame of level `k` arrived with the nose at `heading`: every bin and state takes the log of hearing it there. */
+function observeFrame (belief: Belief, k: number, heading: number): void {
+  const L = belief.levels[k];
+  if (!L) return;
+  for (let b = 0; b < BINS; b++) {
+    const off = offAxis(b, heading);
+    for (let s = 0; s < STATES; s++) L[b * STATES + s] = (L[b * STATES + s] ?? 0) + Math.log(hearingProbability(s, off));
   }
-  
-  if (ctx.motion.aborted) return { axis: null, used: [] };
-  
-  return fitAxis(ctx, ladder, positions);
+}
 
+/** A standing round at `heading` passed without a frame of level `k`: every bin and state takes the log of not hearing it there. */
+function observeSilence (belief: Belief, k: number, heading: number): void {
+  const L = belief.levels[k];
+  if (!L) return;
+  for (let b = 0; b < BINS; b++) {
+    const off = offAxis(b, heading);
+    for (let s = 0; s < STATES; s++) L[b * STATES + s] = (L[b * STATES + s] ?? 0) + Math.log(1 - hearingProbability(s, off));
+  }
+}
+
+/** The silences of one standing round at `heading`: every level not heard in it. */
+function observeSilences (belief: Belief, heardThisRound: readonly boolean[], heading: number): void {
+  for (let k = 0; k < heardThisRound.length; k++) if (!heardThisRound[k]) observeSilence(belief, k, heading);
+}
+
+/** A read landed: the corners that heard put the sender within 90 degrees of `bearing`. */
+function observeHit (belief: Belief, bearing: number): void {
+  for (let b = 0; b < BINS; b++) belief.hits[b] = (belief.hits[b] ?? 0) + Math.log(Math.abs(angleDistance(b, bearing)) < 90 ? pHitIn : 1 - pHitIn);
+}
+
+/** The largest log likelihood among the states at bin `b` of a level. */
+function maxState (L: Float64Array, b: number): number {
+  let m = -Infinity;
+  for (let s = 0; s < STATES; s++) m = Math.max(m, L[b * STATES + s] ?? 0);
+  return m;
+}
+
+/** The log likelihood of bin `b` of a level, the states summed with equal prior. */
+function levelLogLikelihood (L: Float64Array, b: number): number {
+  const m = maxState(L, b);
+  let sum = 0;
+  for (let s = 0; s < STATES; s++) sum += Math.exp((L[b * STATES + s] ?? 0) - m);
+  return m + Math.log(sum / STATES);
+}
+
+/** The share of state `s` among all at bin `b` of a level. */
+function stateShare (L: Float64Array, b: number, s: number): number {
+  const m = maxState(L, b);
+  let sum = 0;
+  for (let t = 0; t < STATES; t++) sum += Math.exp((L[b * STATES + t] ?? 0) - m);
+  return Math.exp((L[b * STATES + s] ?? 0) - m) / sum;
+}
+
+/** The posterior over the bearing, normalised to sum 1. */
+function posterior (belief: Belief): Float64Array {
+  const p = new Float64Array(BINS);
+  let m = -Infinity;
+  for (let b = 0; b < BINS; b++) {
+    let v = belief.hits[b] ?? 0;
+    for (const L of belief.levels) v += levelLogLikelihood(L, b);
+    p[b] = v;
+    m = Math.max(m, v);
+  }
+  let sum = 0;
+  for (let b = 0; b < BINS; b++) {
+    p[b] = Math.exp((p[b] ?? 0) - m);
+    sum += p[b] ?? 0;
+  }
+  for (let b = 0; b < BINS; b++) p[b] = (p[b] ?? 0) / sum;
+  return p;
+}
+
+/** The bin with the most belief, and the belief within `exitWindow` degrees of it. */
+function summarize (p: Float64Array): Summary {
+  let mode = 0;
+  for (let b = 1; b < BINS; b++) if ((p[b] ?? 0) > (p[mode] ?? 0)) mode = b;
+  let mass = 0;
+  for (let b = 0; b < BINS; b++) if (Math.abs(angleDistance(b, mode)) <= exitWindow) mass += p[b] ?? 0;
+  return { mode, mass };
+}
+
+/** The share of the lobe states at bin `b` of a level, per width. */
+function lobeShares (L: Float64Array, b: number): number[] {
+  const shares: number[] = [];
+  for (let s = 1; s < ALL; s++) shares.push(stateShare(L, b, s));
+  return shares;
+}
+
+/** How likely each level is a carrier, one with a lobe: the lobe states' share of all, weighted by the posterior over the bearing. */
+function carrierProbabilities (belief: Belief, p: Float64Array): number[] {
+  return belief.levels.map(function lobeShare (L: Float64Array): number {
+    let total = 0;
+    for (let b = 0; b < BINS; b++) for (const share of lobeShares(L, b)) total += (p[b] ?? 0) * share;
+    return total;
+  });
+}
+
+/** The likeliest half-width of each level's lobe, given it has one, weighted by the posterior over the bearing. */
+function lobeWidths (belief: Belief, p: Float64Array): number[] {
+  return belief.levels.map(function width (L: Float64Array): number {
+    const total: number[] = widths.map(zero);
+    for (let b = 0; b < BINS; b++) lobeShares(L, b).forEach(function add (share: number, w: number): void { total[w] = (total[w] ?? 0) + (p[b] ?? 0) * share; });
+    return widths[total.indexOf(Math.max(...total))] ?? 0;
+  });
+}
+
+/** The heading whose standing round is expected to tell the most about the bearing, among `candidates` headings round the circle. */
+function nextHeading (belief: Belief, p: Float64Array): number {
+  let best = 0, bestGain = -Infinity;
+  for (let c = 0; c < candidates; c++) {
+    const heading = c * 360 / candidates;
+    const gain = expectedGain(belief, p, heading);
+    if (gain > bestGain) {
+      bestGain = gain;
+      best = heading;
+    }
+  }
+  return best;
+}
+
+/** The information a round at `heading` is expected to give about the bearing, summed over the levels. */
+function expectedGain (belief: Belief, p: Float64Array, heading: number): number {
+  let gain = 0;
+  for (const L of belief.levels) gain += levelGain(L, p, heading);
+  return gain;
 }
 
 /**
- * Step 2: which end of the axis. Faces the axis, so the sender is inside
- * the lobe at either end and its frames arrive, and reads the receivers
- * into every frame the beat expects. A read that lands names the corners
- * that heard: the front ones put the sender ahead, the back ones behind.
- * `agree` reads on one side decide; `endRounds` ladder rounds without that
- * give null. Logs `sweep hit` per read that named a side and `sweep end`
- * with the vote. Returns the heading and the reads that named a side.
+ * The mutual information between hearing level `L` in a round at `heading`
+ * and the bearing: the entropy of the predicted outcome less the expected
+ * entropy of the outcome once the bearing is known, the level's state
+ * marginalised.
  */
-async function sweepForDirection (ctx: Context, actuators: Actuators, sensors: Sensors, ladder: Ladder, beat: Beat, axis: number, reads: number): Promise<{ heading: number | null; hits: number }> {
-  
-  const facing = await turnTo(ctx, actuators, sensors, axis, firstMs);
+function levelGain (L: Float64Array, p: Float64Array, heading: number): number {
+  let predicted = 0, conditional = 0;
+  for (let b = 0; b < BINS; b++) {
+    const off = offAxis(b, heading);
+    let q = 0;
+    for (let s = 0; s < STATES; s++) q += stateShare(L, b, s) * hearingProbability(s, off);
+    predicted += (p[b] ?? 0) * q;
+    conditional += (p[b] ?? 0) * binaryEntropy(q);
+  }
+  return binaryEntropy(predicted) - conditional;
+}
+
+/** The entropy of a yes or no with probability `q`, in bits. */
+function binaryEntropy (q: number): number {
+  if (q <= 0 || q >= 1) return 0;
+  return -(q * Math.log2(q) + (1 - q) * Math.log2(1 - q));
+}
+
+/**
+ * Turn to `target`, or stay when null, and rest: the round starts when the
+ * ball neither moves nor turns, read from the motion stream, or after
+ * `restMs`. The firmware turns on a roll at speed 0 to the heading.
+ * Returns the heading at rest.
+ */
+async function turnAndRest (ctx: Context, actuators: Actuators, target: number | null): Promise<number> {
+  if (target !== null) await actuators.motor.roll(0, target);
   const t0 = performance.now();
-  let front = 0, back = 0, volleys = 0;
-  
-  while (performance.now() - t0 < endRounds * ladder.roundMs && !ctx.motion.aborted && front < agree && back < agree) {
+  await wait(200);
+  while (performance.now() - t0 < restMs && !ctx.motion.aborted && !isStill(ctx)) await wait(50);
+  return headingNow(ctx);
+}
+
+/** `status.isStill` without the throw: false while no fresh motion sample has come. */
+function isStill (ctx: Context): boolean {
+  try { return ctx.status.isStill; }
+  catch { return false; }
+}
+
+/**
+ * One standing round: reads the corners into every frame the beat expects
+ * until the ladder round is over, and folds each read that landed into the
+ * belief. The frames themselves arrive through the beat tracker. Returns
+ * the reads that landed and named a side.
+ */
+async function listenAndRead (ctx: Context, beat: Beat, ladder: Ladder, reads: number, belief: Belief): Promise<number> {
+  const t0 = performance.now();
+  let hits = 0;
+  while (performance.now() - t0 < ladder.roundMs && !ctx.motion.aborted) {
     const receivers = await readAtNextFrame(ctx, beat, ladder, reads);
     if (receivers === null) continue;
-    volleys++;
-    const side = sideOfHit(receivers);
-    if (side === null) continue;
-    if (side === 'front') front++; else back++;
-    ctx.log('info', `sweep hit ${JSON.stringify({ receivers: receivers.map(i => names[i]).join('+'), side, front, back })}`);
+    const bearing = hitBearing(receivers, headingNow(ctx));
+    if (bearing === null) continue;
+    observeHit(belief, bearing);
+    hits++;
   }
-  
-  const heading = ctx.motion.aborted ? null : front >= agree ? axis : back >= agree ? mod360(axis + 180) : null;
-  
-  ctx.log('info', `sweep end ${JSON.stringify({ axis, facing: Math.round(facing), volleys, front, back, heading, seconds: Math.round((performance.now() - t0) / 100) / 10 })}`);
-  
-  return { heading, hits: front + back };
-
-}
-
-/**
- * Turn to `target`, or stay when null, and give it `ms`; the motion stream
- * is held that long so the heading at the end is read, not assumed. The
- * firmware turns on a roll at speed 0 to the heading.
- */
-async function turnTo (ctx: Context, actuators: Actuators, sensors: Sensors, target: number | null, ms: number): Promise<number> {
-  const release = await sensors.motion.subscribe(null);
-  if (target !== null) await actuators.motor.roll(0, target);
-  await wait(ms);
-  const heading = mod360(-(ctx.status.angles?.yaw ?? 0));
-  await release();
-  return heading;
-}
-
-/** Stand for one ladder round and return the frames heard per level, from the counter the beat tracker fills. */
-async function listenOneRound (ctx: Context, heardRound: number[], roundMs: number): Promise<number[]> {
-  heardRound.fill(0);
-  const t0 = performance.now();
-  while (performance.now() - t0 < roundMs && !ctx.motion.aborted) await wait(50);
-  return [...heardRound];
-}
-
-/**
- * The fit of two lobes, `half` degrees each side of a candidate and of its
- * opposite, to the heard and silent headings, summed over every level heard
- * at `heardMin` headings or more and silent at `silentMin` or more; a level
- * heard everywhere or nowhere says nothing. A frame outside the lobes counts
- * twice as much against a candidate as a silence inside, which dropped
- * frames give at every level: frames decide, a single silence never. An
- * axis is a line, so the candidates run to 180, and the ones that score
- * alike are averaged on a 180 degree circle, which makes the axis finer
- * than the step between headings. Logs `sweep axis`.
- */
-function fitAxis (ctx: Context, ladder: Ladder, positions: Position[]): { axis: number | null; used: number[] } {
-  
-  const heardAt = ladder.channels.map((_, k) => positions.filter(p => (p.frames[k] ?? 0) > 0).length);
-  const used = ladder.channels.map((_, k) => k).filter(k => (heardAt[k] ?? 0) >= heardMin && positions.length - (heardAt[k] ?? 0) >= silentMin);
-  let axis: number | null = null, fit = 0;
-  
-  if (used.length) {
-  
-    const best: number[] = [];
-    fit = -Infinity;
-  
-    for (let d = 0; d < 180; d++) {
-      const score = scoreAxis(d, positions, used);
-      if (score > fit + 1e-9) {
-        fit = score;
-        best.length = 0;
-      }
-      if (score >= fit - 1e-9) best.push(d);
-    }
-  
-    let sx = 0, sy = 0;
-  
-    for (const d of best) {
-      sx += Math.cos(d * Math.PI / 90);
-      sy += Math.sin(d * Math.PI / 90);
-    }
-    axis = Math.round(mod360(Math.atan2(sy, sx) * 90 / Math.PI) * 10) / 10;
-  }
-  
-  ctx.log('info', `sweep axis ${JSON.stringify({ heardAt, used: used.map(k => ladder.strengths[k]), fit, axis })}`);
-  
-  return { axis, used };
-
-}
-
-/** How well the lobes of candidate axis `d` match the frames and silences at the positions, over the levels `used`. */
-function scoreAxis (d: number, positions: Position[], used: number[]): number {
-  let score = 0;
-  for (const p of positions) {
-    const off = Math.abs(angleDistance(d, p.heading));
-    const inside = off <= half || off >= 180 - half;
-    for (const k of used) score += (p.frames[k] ?? 0) > 0 ? (inside ? 1 : -2) : (inside ? -0.5 : 1);
-  }
-  return score;
+  return hits;
 }
 
 /**
@@ -275,34 +429,29 @@ function scoreAxis (d: number, positions: Position[], used: number[]): number {
  * case it waits a moment.
  */
 export async function readAtNextFrame (ctx: Context, beat: Beat, ladder: Ladder, reads: number): Promise<number[] | null> {
-
   const lead = msBefore + stepMs * (reads - 1) / 2;
   const at = beat.next(performance.now() + lead + 12);
-  
   if (at === null) {
     await wait(50);
     return null;
   }
-  
   const payloads = await readVolley(ctx, at - lead, reads, stepMs);
-  
   for (const payload of payloads) {
     if (payload === null) continue;
-    const receivers = corners.map((_, i) => i).filter(i => ladder.channels.includes(payload[i] ?? -1));
+    const receivers: number[] = [];
+    for (let i = 0; i < corners.length; i++) if (ladder.channels.includes(payload[i] ?? -1)) receivers.push(i);
     if (receivers.length) return receivers;
   }
-
   return null;
-
 }
 
-/** The side the corners that heard put the sender on: front, back, or null for opposite corners or all four, which name no side. */
-function sideOfHit (receivers: number[]): 'front' | 'back' | null {
+/** Where the corners that heard put the sender: the heading plus their mean angle; null for opposite corners or all four, which name no side. */
+function hitBearing (receivers: readonly number[], heading: number): number | null {
   let sx = 0, sy = 0;
   for (const i of receivers) {
     sx += Math.cos((corners[i] ?? 0) * Math.PI / 180);
     sy += Math.sin((corners[i] ?? 0) * Math.PI / 180);
   }
   if (Math.hypot(sx, sy) < 0.5) return null;
-  return Math.abs(Math.atan2(sy, sx) * 180 / Math.PI) < 90 ? 'front' : 'back';
+  return mod360(heading + Math.atan2(sy, sx) * 180 / Math.PI);
 }

@@ -54,7 +54,7 @@ export class Behavior {
     return negotiateLadder(this.ctx, this.sensors, referee, range);
   }
 
-  /** Where the Bolt that sends the ladder is, from a standing turn; see sweep.ts. */
+  /** Where the Bolt that sends the ladder is, from a belief over its bearing; see sweep.ts. */
   @log
   async sweep (options: SweepOptions): Promise<SweepResult> {
     return sweep(this.ctx, this.actuators, this.sensors, this.communication, options);

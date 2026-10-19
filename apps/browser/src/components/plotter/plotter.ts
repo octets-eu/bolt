@@ -171,7 +171,7 @@ const Plotter = Factory.create('Plotter', {
         Plotter.render();
         return;
       }
-      if (entry.type === 'info' && /^(sweep|cleverSweep) end \{/.test(entry.subtype)) {
+      if (entry.type === 'info' && /^sweep end \{/.test(entry.subtype)) {
         const { heading } = JSON.parse(entry.subtype.slice(entry.subtype.indexOf('{'))) as { heading: number | null };
         const at = bolts[bolt.name]?.locator;
         if (heading === null || !at) return;

@@ -86,10 +86,10 @@ class bolts {
   }
 
   /** The floor test of the sweep behavior: `seeker` sweeps trial after trial, armed by a tap, while `sender` sends the ladder; see @bolt/core experiments/sweep-trials.ts. */
-  public sweepTrials ({ seeker, sender, range = 'long', span = 180, step = 15, reads = 5 }: { seeker: string, sender: string, range?: LadderRange, span?: number, step?: number, reads?: number }) {
+  public sweepTrials ({ seeker, sender, range = 'long', reads = 5 }: { seeker: string, sender: string, range?: LadderRange, reads?: number }) {
     const a = this.get(seeker), b = this.get(sender);
     if (!a || !b) throw new NotConnectedError(a ? sender : seeker);
-    return sweepTrials(new Referee(a, b), { range, span, step, reads });
+    return sweepTrials(new Referee(a, b), { range, reads });
   }
 
   /**
@@ -98,7 +98,7 @@ class bolts {
    * from up, turns at random and sweeps, until a sweep is off by more than `tolerance` degrees, finds
    * nothing, or `trials` are done; `legs` walks several directions in turn, `reset: false` continues from where they stand; see @bolt/core behavior/sweep-test.ts.
    */
-  public sweepTest ({ seeker, sender, direction = 'up', stepCm = 25, startCm = stepCm, until = 'nothing', trials, legs, reset = true, tolerance = 30, range = 'long', span = 180, step = 15, reads = 5, clever = false }: { seeker: string, sender: string, direction?: SheetDirection, stepCm?: number, startCm?: number, until?: 'nothing' | 'miss', trials?: number, legs?: { direction: SheetDirection, stepCm: number, trials?: number }[], reset?: boolean, tolerance?: number, range?: LadderRange, span?: number, step?: number, reads?: number, clever?: boolean }) {
+  public sweepTest ({ seeker, sender, direction = 'up', stepCm = 25, startCm = stepCm, until = 'nothing', trials, legs, reset = true, tolerance = 30, range = 'long', reads = 5 }: { seeker: string, sender: string, direction?: SheetDirection, stepCm?: number, startCm?: number, until?: 'nothing' | 'miss', trials?: number, legs?: { direction: SheetDirection, stepCm: number, trials?: number }[], reset?: boolean, tolerance?: number, range?: LadderRange, reads?: number }) {
     const a = this.get(seeker), b = this.get(sender);
     if (!a || !b) throw new NotConnectedError(a ? sender : seeker);
     const home = Plotter.startOf(seeker), mark = Plotter.startOf(sender);
@@ -111,11 +111,11 @@ class bolts {
       return Math.round((Math.atan2(v.x, v.y) * 180 / Math.PI + 360) % 360);
     };
     const walkLegs = legs?.map(leg => ({ ...leg, direction: heading(leg.direction) }));
-    return sweepTest(new Referee(a, b), { at, direction: heading(direction), stepCm, startCm, until, trials, legs: walkLegs, reset, tolerance, range, span, step, reads, clever });
+    return sweepTest(new Referee(a, b), { at, direction: heading(direction), stepCm, startCm, until, trials, legs: walkLegs, reset, tolerance, range, reads });
   }
 
   /** The approach judged by the locator: both on their reference points, green walks `startCm` up the sheet, turns at random and approaches blue; see @bolt/core experiments/approach.ts. */
-  public approachTest ({ seeker, sender, startCm = 150, span = 180, step = 15, reads = 5 }: { seeker: string, sender: string, startCm?: number, span?: number, step?: number, reads?: number }) {
+  public approachTest ({ seeker, sender, startCm = 150, reads = 5 }: { seeker: string, sender: string, startCm?: number, reads?: number }) {
     const a = this.get(seeker), b = this.get(sender);
     if (!a || !b) throw new NotConnectedError(a ? sender : seeker);
     const home = Plotter.startOf(seeker), mark = Plotter.startOf(sender);
@@ -123,7 +123,7 @@ class bolts {
     const at = Plotter.toLocator(seeker, mark.x, mark.y)!;
     const v = Plotter.toLocator(seeker, home.x, home.y - 1)!;
     const direction = Math.round((Math.atan2(v.x, v.y) * 180 / Math.PI + 360) % 360);
-    return approachTest(new Referee(a, b), { at, direction, startCm, span, step, reads });
+    return approachTest(new Referee(a, b), { at, direction, startCm, reads });
   }
 
   /** The passBy experiment with two connected Bolts by name; see @bolt/core experiments/pass-by.ts. */
