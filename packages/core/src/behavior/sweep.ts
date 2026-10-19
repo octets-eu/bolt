@@ -19,6 +19,8 @@ export interface SweepOptions {
   range?: LadderRange | undefined;
   /** Reads of the receivers per volley into a frame. */
   reads?: number | undefined;
+  /** The heading the sender was last found at, from a spot on the way here; folded in with the weight of one read, it breaks the nose-or-tail tie when no read lands. */
+  prior?: number | undefined;
 }
 
 export interface SweepResult {
@@ -77,6 +79,7 @@ const edge   = 15;       // a lobe's edge is soft: hearing slides from inside to
 const exitWindow = 20;   // degrees either side of the mode that must hold `massMin` of the belief
 const massMin    = 0.9;
 const maxRounds  = 16;   // standing rounds before the sweep gives up; chosen
+const farRounds  = 32;   // the same while the likeliest carrier is the ladder's strongest level: far out a read lands once in ten rounds; chosen
 const restMs     = 2500; // the most a turn gets to come to rest
 const candidates = 24;   // headings considered for the next round, 15 degrees apart
 const msBefore   = 45;   // a volley's centre before the expected notify; infrared-timing run 5
@@ -93,7 +96,8 @@ const corners: readonly number[] = [-45, 45, 135, -135];
  * over the sender's bearing; then it turns to the heading whose round is
  * expected to narrow the posterior most, and listens again. It ends when
  * `massMin` of the belief lies within `exitWindow` degrees of the mode,
- * facing that heading, or after `maxRounds` rounds with nothing.
+ * facing that heading, or after `maxRounds` rounds with nothing,
+ * `farRounds` while the likeliest carrier is the ladder's strongest level.
  *
  * - A frame is heard with the sender inside the lobe of its level and lost
  *   abeam, the lobe's edge soft over a band of `edge` degrees either side
@@ -108,7 +112,9 @@ const corners: readonly number[] = [-45, 45, 135, -135];
  * - The notifies cannot tell ahead from behind, so without a read the
  *   belief has two humps 180 degrees apart. A read that lands names the
  *   corners that heard (beat.ts); the sender is within 90 degrees of their
- *   mean.
+ *   mean. A `prior`, the direction the last sweep found, counts as one such
+ *   read: the frames still find the axis, the prior only picks its end
+ *   until real reads outweigh it.
  *
  * Motor commands only, its own loop. Shows 'tracking' while it runs. Ends
  * pointing at the direction found, or where the last round stood when there
@@ -117,11 +123,12 @@ const corners: readonly number[] = [-45, 45, 135, -135];
  * belief's mode, its mass in the window, the carrier probabilities and the
  * likeliest lobe width per level, and `sweep end`.
  */
-export async function sweep (ctx: Context, actuators: Actuators, sensors: Sensors, communication: Communication, { referee, range = 'long', reads = 5 }: SweepOptions): Promise<SweepResult> {
+export async function sweep (ctx: Context, actuators: Actuators, sensors: Sensors, communication: Communication, { referee, range = 'long', reads = 5, prior }: SweepOptions): Promise<SweepResult> {
 
   const t0 = ctx.now();
   const { ladder, reason: negotiated } = await negotiateLadder(ctx, sensors, referee, range);
   const belief = emptyBelief(ladder.channels.length);
+  if (prior !== undefined) observeHit(belief, prior);
   const levels: number[] = ladder.channels.map(zero);
   const heardThisRound: boolean[] = ladder.channels.map(no);
   const counts = { hits: 0, flooded: 0 };
@@ -135,13 +142,14 @@ export async function sweep (ctx: Context, actuators: Actuators, sensors: Sensor
   });
   await communication.state('infrared', range === 'short' ? 'tracking-short' : 'tracking');
   await actuators.motor.stabilize(StabilizationIndex.full);
-  ctx.log('info', `sweep start ${JSON.stringify({ ladder: ladder.strengths, range, negotiated, reads, roundMs: ladder.roundMs, pIn, pOut, pNone, pAll, pHitIn, widths, edge, exitWindow, massMin, maxRounds, restMs, candidates, msBefore, stepMs })}`);
+  ctx.log('info', `sweep start ${JSON.stringify({ ladder: ladder.strengths, range, negotiated, reads, prior: prior ?? null, roundMs: ladder.roundMs, pIn, pOut, pNone, pAll, pHitIn, widths, edge, exitWindow, massMin, maxRounds, farRounds, restMs, candidates, msBefore, stepMs })}`);
 
   let heading: number | null = null;
   let rounds = 0;
   let next: number | null = null;
+  let limit = maxRounds;
 
-  while (rounds < maxRounds && heading === null && !ctx.motion.aborted) {
+  while (rounds < limit && heading === null && !ctx.motion.aborted) {
 
     const stood = await turnAndRest(ctx, actuators, next);
     heardThisRound.fill(false);
@@ -151,12 +159,14 @@ export async function sweep (ctx: Context, actuators: Actuators, sensors: Sensor
     rounds++;
     const p = posterior(belief);
     const { mode, mass } = summarize(p);
+    const carrier = carrierProbabilities(belief, p);
+    limit = likeliest(carrier) === ladder.channels.length - 1 ? farRounds : maxRounds;
     if (mass >= massMin) heading = mode;
     else next = nextHeading(belief, p);
     ctx.log('info', `sweep round ${JSON.stringify({
       n: rounds, heading: Math.round(stood), frames: framesSince(levels, framesBefore), hits: counts.hits, flooded: counts.flooded,
       mode, mass: Math.round(mass * 100) / 100,
-      carrier: byStrength(ladder, carrierProbabilities(belief, p).map(hundredths)),
+      carrier: byStrength(ladder, carrier.map(hundredths)), limit,
       width: byStrength(ladder, lobeWidths(belief, p)),
       next,
     })}`);
@@ -187,6 +197,13 @@ export async function sweep (ctx: Context, actuators: Actuators, sensors: Sensor
 }
 
 function zero (): number { return 0; }
+
+/** The index of the largest value. */
+function likeliest (values: readonly number[]): number {
+  let best = 0;
+  for (let k = 1; k < values.length; k++) if ((values[k] ?? 0) > (values[best] ?? 0)) best = k;
+  return best;
+}
 function no (): boolean { return false; }
 function hundredths (v: number): number { return Math.round(v * 100) / 100; }
 
