@@ -32,6 +32,7 @@ const pNone  = 0.05;     // a frame of a level that does not arrive here
 const pAll   = 0.9;      // a frame of a level heard all round
 const pHitIn = 0.9;      // a read's corners hold the sender within 90 degrees of their mean
 const half   = 60;       // half-width of a lobe, degrees
+const edge   = 15;       // the lobe's edge is soft: hearing slides from inside to outside over `half` plus or minus this
 const window = 20;       // degrees either side of the mode that must hold `massMin` of the belief
 const massMin   = 0.9;
 const maxRounds = 16;    // standing rounds before the sweep gives up; chosen
@@ -49,7 +50,8 @@ const candidates = 24;   // headings considered for the next round, 15 degrees a
  * that heading, or after `maxRounds` rounds with nothing.
  *
  * - A frame is heard with the sender inside the lobe of its level and lost
- *   abeam; a stronger level is heard all round, a weaker one not at all.
+ *   abeam, the lobe's edge soft over a band of `edge` degrees either side
+ *   of `half`; a stronger level is heard all round, a weaker one not at all.
  *   Which is which at this distance the belief does not know, so each level
  *   carries three states and the one the data favours wins; the carrier is
  *   the level most likely in the lobe state.
@@ -83,7 +85,7 @@ export async function cleverSweep (ctx: Context, actuators: Actuators, sensors: 
   });
   await communication.state('infrared', range === 'short' ? 'tracking-short' : 'tracking');
   await actuators.motor.stabilize(StabilizationIndex.full);
-  ctx.log('info', `cleverSweep start ${JSON.stringify({ ladder: ladder.strengths, range, negotiated, reads, roundMs: ladder.roundMs, pIn, pOut, pNone, pAll, pHitIn, half, window, massMin, maxRounds, restMs })}`);
+  ctx.log('info', `cleverSweep start ${JSON.stringify({ ladder: ladder.strengths, range, negotiated, reads, roundMs: ladder.roundMs, pIn, pOut, pNone, pAll, pHitIn, half, edge, window, massMin, maxRounds, restMs })}`);
 
   let heading: number | null = null;
   let rounds = 0;
@@ -139,17 +141,22 @@ function headingNow (ctx: Context): number {
   return mod360(-(ctx.status.angles?.yaw ?? 0));
 }
 
-/** Whether a sender at `bearing` is inside the lobe of a Bolt whose nose points at `heading`: within `half` degrees of nose or tail. */
-function insideLobe (bearing: number, heading: number): boolean {
+/**
+ * How far a sender at `bearing` is inside the lobe of a Bolt whose nose
+ * points at `heading`: 1 within `half` less `edge` degrees of nose or tail,
+ * 0 beyond `half` plus `edge`, sliding between.
+ */
+function insideLobe (bearing: number, heading: number): number {
   const off = Math.abs(angleDistance(bearing, heading));
-  return off <= half || off >= 180 - half;
+  const nearest = Math.min(off, 180 - off);
+  return Math.min(1, Math.max(0, (half + edge - nearest) / (2 * edge)));
 }
 
-/** The probability of hearing a frame of a level in one round, by the level's state and whether the sender is inside the lobe. */
-function hearingProbability (state: number, inside: boolean): number {
+/** The probability of hearing a frame of a level in one round, by the level's state and how far the sender is inside the lobe. */
+function hearingProbability (state: number, inside: number): number {
   if (state === 0) return pNone;
   if (state === 2) return pAll;
-  return inside ? pIn : pOut;
+  return pOut + (pIn - pOut) * inside;
 }
 
 /** A frame of level `k` arrived with the nose at `heading`: every bin and state takes the log of hearing it there. */
