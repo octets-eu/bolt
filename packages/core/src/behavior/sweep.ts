@@ -39,6 +39,8 @@ export interface SweepResult {
   levels: number[];
   /** Reads that landed and named a side. */
   hits: number;
+  /** Reads that landed with all four corners hearing the weakest level: the sender is on top. */
+  flooded: number;
   seconds: number;
 }
 
@@ -80,7 +82,7 @@ const candidates = 24;   // headings considered for the next round, 15 degrees a
 const msBefore   = 45;   // a volley's centre before the expected notify; infrared-timing run 5
 const stepMs     = 6;    // between the reads of a volley; infrared-timing run 5
 /** Where the receivers sit, degrees off the nose: front left, front right, back right, back left. */
-export const corners: readonly number[] = [-45, 45, 135, -135];
+const corners: readonly number[] = [-45, 45, 135, -135];
 
 /**
  * Where another Bolt is, from a belief. The other Bolt sends a ladder
@@ -122,7 +124,7 @@ export async function sweep (ctx: Context, actuators: Actuators, sensors: Sensor
   const belief = emptyBelief(ladder.channels.length);
   const levels: number[] = ladder.channels.map(zero);
   const heardThisRound: boolean[] = ladder.channels.map(no);
-  let hits = 0;
+  const counts = { hits: 0, flooded: 0 };
 
   const release = await sensors.motion.subscribe(null);
   const beat = await trackBeat(sensors, ladder.channels, function countFrame (channel: number): void {
@@ -138,11 +140,13 @@ export async function sweep (ctx: Context, actuators: Actuators, sensors: Sensor
   let heading: number | null = null;
   let rounds = 0;
   let next: number | null = null;
+
   while (rounds < maxRounds && heading === null && !ctx.motion.aborted) {
+
     const stood = await turnAndRest(ctx, actuators, next);
     heardThisRound.fill(false);
     const framesBefore = [...levels];
-    hits += await listenAndRead(ctx, beat, ladder, reads, belief);
+    await listenAndRead(ctx, beat, ladder, reads, belief, counts);
     observeSilences(belief, heardThisRound, stood);
     rounds++;
     const p = posterior(belief);
@@ -150,7 +154,7 @@ export async function sweep (ctx: Context, actuators: Actuators, sensors: Sensor
     if (mass >= massMin) heading = mode;
     else next = nextHeading(belief, p);
     ctx.log('info', `sweep round ${JSON.stringify({
-      n: rounds, heading: Math.round(stood), frames: framesSince(levels, framesBefore), hits,
+      n: rounds, heading: Math.round(stood), frames: framesSince(levels, framesBefore), hits: counts.hits, flooded: counts.flooded,
       mode, mass: Math.round(mass * 100) / 100,
       carrier: byStrength(ladder, carrierProbabilities(belief, p).map(hundredths)),
       width: byStrength(ladder, lobeWidths(belief, p)),
@@ -159,6 +163,7 @@ export async function sweep (ctx: Context, actuators: Actuators, sensors: Sensor
   }
 
   if (heading !== null) await turnAndRest(ctx, actuators, heading);
+  
   await actuators.motor.stop();
   await actuators.motor.stabilize(StabilizationIndex.none);
   await communication.state('infrared', null);
@@ -169,13 +174,16 @@ export async function sweep (ctx: Context, actuators: Actuators, sensors: Sensor
   const carrier = carrierProbabilities(belief, posterior(belief));
   const reason: SweepResult['reason'] = aborted ? 'aborted' : heading === null ? 'nothing' : 'direction';
   const seconds = Math.round((ctx.now() - t0) / 100) / 10;
-  ctx.log('info', `sweep end ${JSON.stringify({ reason, heading, rounds, hits, seconds })}`);
+
+  ctx.log('info', `sweep end ${JSON.stringify({ reason, heading, rounds, hits: counts.hits, flooded: counts.flooded, seconds })}`);
+  
   return {
     reason, range, negotiated,
     heading: aborted ? null : heading,
     used: ladder.strengths.filter(function carries (_strength: number, k: number): boolean { return (carrier[k] ?? 0) > 0.5; }),
-    levels, hits, seconds,
+    levels, hits: counts.hits, flooded: counts.flooded, seconds,
   };
+
 }
 
 function zero (): number { return 0; }
@@ -405,30 +413,32 @@ function isStill (ctx: Context): boolean {
 /**
  * One standing round: reads the corners into every frame the beat expects
  * until the ladder round is over, and folds each read that landed into the
- * belief. The frames themselves arrive through the beat tracker. Returns
- * the reads that landed and named a side.
+ * belief. The frames themselves arrive through the beat tracker. Counts
+ * the reads that landed and named a side as hits, and the reads with all
+ * four corners on the weakest level as flooded.
  */
-async function listenAndRead (ctx: Context, beat: Beat, ladder: Ladder, reads: number, belief: Belief): Promise<number> {
+async function listenAndRead (ctx: Context, beat: Beat, ladder: Ladder, reads: number, belief: Belief, counts: { hits: number; flooded: number }): Promise<void> {
   const t0 = performance.now();
-  let hits = 0;
+  const weakest = ladder.channels[0] ?? -1;
   while (performance.now() - t0 < ladder.roundMs && !ctx.motion.aborted) {
-    const receivers = await readAtNextFrame(ctx, beat, ladder, reads);
-    if (receivers === null) continue;
+    const payload = await readAtNextFrame(ctx, beat, ladder, reads);
+    if (payload === null) continue;
+    if (payload.every(function isWeakest (channel: number): boolean { return channel === weakest; })) counts.flooded++;
+    const receivers: number[] = [];
+    for (let i = 0; i < corners.length; i++) if (ladder.channels.includes(payload[i] ?? -1)) receivers.push(i);
     const bearing = hitBearing(receivers, headingNow(ctx));
     if (bearing === null) continue;
     observeHit(belief, bearing);
-    hits++;
+    counts.hits++;
   }
-  return hits;
 }
 
 /**
  * One volley of `reads` into the next frame the beat expects, and the
- * receivers that heard a channel of the ladder in the first read that
- * landed; null when none landed, or the beat is not learned yet, in which
- * case it waits a moment.
+ * first read that landed, the channel each corner heard; null when none
+ * landed, or the beat is not learned yet, in which case it waits a moment.
  */
-export async function readAtNextFrame (ctx: Context, beat: Beat, ladder: Ladder, reads: number): Promise<number[] | null> {
+async function readAtNextFrame (ctx: Context, beat: Beat, ladder: Ladder, reads: number): Promise<readonly number[] | null> {
   const lead = msBefore + stepMs * (reads - 1) / 2;
   const at = beat.next(performance.now() + lead + 12);
   if (at === null) {
@@ -438,9 +448,7 @@ export async function readAtNextFrame (ctx: Context, beat: Beat, ladder: Ladder,
   const payloads = await readVolley(ctx, at - lead, reads, stepMs);
   for (const payload of payloads) {
     if (payload === null) continue;
-    const receivers: number[] = [];
-    for (let i = 0; i < corners.length; i++) if (ladder.channels.includes(payload[i] ?? -1)) receivers.push(i);
-    if (receivers.length) return receivers;
+    if (payload.some(function heard (channel: number): boolean { return ladder.channels.includes(channel); })) return payload;
   }
   return null;
 }
