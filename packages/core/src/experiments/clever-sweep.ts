@@ -14,10 +14,10 @@ import type { SweepOptions, SweepResult } from '../behavior/sweep';
 
 /**
  * What the sweep believes, as log likelihoods over the sender's bearing, a
- * heading in 1 degree bins. Per ladder level a bin holds three numbers, one
- * per state of that level at this distance: not arriving, a carrier with a
- * lobe, heard all round. `hits` is what the corner reads said, which is the
- * same for every level.
+ * heading in 1 degree bins. Per ladder level a bin holds one number per
+ * state of that level at this distance: not arriving, a carrier with a lobe
+ * of each width in `widths`, heard all round. `hits` is what the corner
+ * reads said, which is the same for every level.
  */
 interface Belief {
   levels: Float64Array[];
@@ -25,14 +25,15 @@ interface Belief {
 }
 
 const BINS   = 360;
-const STATES = 3;        // of a level: 0 not arriving, 1 the carrier with a lobe, 2 heard all round
+const widths = [45, 60, 75];          // half-widths a lobe may have, degrees; at 46 cm the weakest level reached 75, at 62 cm 45
+const STATES = widths.length + 2;     // of a level: 0 not arriving, 1 to widths.length the carrier with a lobe of that width, last heard all round
+const ALL    = STATES - 1;
 const pIn    = 0.75;     // a carrier frame heard in one round, sender inside the lobe; the standing rounds of the walks
 const pOut   = 0.2;      // the same with the sender abeam
 const pNone  = 0.05;     // a frame of a level that does not arrive here
 const pAll   = 0.9;      // a frame of a level heard all round
 const pHitIn = 0.9;      // a read's corners hold the sender within 90 degrees of their mean
-const half   = 60;       // half-width of a lobe, degrees
-const edge   = 15;       // the lobe's edge is soft: hearing slides from inside to outside over `half` plus or minus this
+const edge   = 15;       // a lobe's edge is soft: hearing slides from inside to outside over its half-width plus or minus this
 const window = 20;       // degrees either side of the mode that must hold `massMin` of the belief
 const massMin   = 0.9;
 const maxRounds = 16;    // standing rounds before the sweep gives up; chosen
@@ -51,10 +52,11 @@ const candidates = 24;   // headings considered for the next round, 15 degrees a
  *
  * - A frame is heard with the sender inside the lobe of its level and lost
  *   abeam, the lobe's edge soft over a band of `edge` degrees either side
- *   of `half`; a stronger level is heard all round, a weaker one not at all.
- *   Which is which at this distance the belief does not know, so each level
- *   carries three states and the one the data favours wins; the carrier is
- *   the level most likely in the lobe state.
+ *   of its half-width; a stronger level is heard all round, a weaker one
+ *   not at all. Which is which at this distance, and how wide the lobe is,
+ *   the belief does not know, so each level carries a state per width in
+ *   `widths` besides not arriving and heard all round, and the one the data
+ *   favours wins; the carrier is the level most likely in a lobe state.
  * - A frame counts wherever the nose is at the moment it arrives, the yaw
  *   is read from the motion stream held for the whole sweep; a silence is
  *   one standing round without a frame of the level.
@@ -64,8 +66,9 @@ const candidates = 24;   // headings considered for the next round, 15 degrees a
  *
  * Same options and result as behavior/sweep.ts, so sweepTest judges both.
  * Logs `cleverSweep start` with the constants, one `cleverSweep round` line
- * per standing round with the belief's mode, its mass in the window and
- * the carrier probabilities, and `cleverSweep end`.
+ * per standing round with the belief's mode, its mass in the window, the
+ * carrier probabilities and the likeliest lobe width per level, and
+ * `cleverSweep end`.
  */
 export async function cleverSweep (ctx: Context, actuators: Actuators, sensors: Sensors, communication: Communication, { referee, range = 'long', reads = 5 }: SweepOptions): Promise<SweepResult> {
 
@@ -85,7 +88,7 @@ export async function cleverSweep (ctx: Context, actuators: Actuators, sensors: 
   });
   await communication.state('infrared', range === 'short' ? 'tracking-short' : 'tracking');
   await actuators.motor.stabilize(StabilizationIndex.full);
-  ctx.log('info', `cleverSweep start ${JSON.stringify({ ladder: ladder.strengths, range, negotiated, reads, roundMs: ladder.roundMs, pIn, pOut, pNone, pAll, pHitIn, half, edge, window, massMin, maxRounds, restMs })}`);
+  ctx.log('info', `cleverSweep start ${JSON.stringify({ ladder: ladder.strengths, range, negotiated, reads, roundMs: ladder.roundMs, pIn, pOut, pNone, pAll, pHitIn, widths, edge, window, massMin, maxRounds, restMs })}`);
 
   let heading: number | null = null;
   let rounds = 0;
@@ -100,11 +103,12 @@ export async function cleverSweep (ctx: Context, actuators: Actuators, sensors: 
     const p = posterior(belief);
     const { mode, mass } = summarize(p);
     const carrier = carrierProbabilities(belief, p);
+    const width = lobeWidths(belief, p);
     if (mass >= massMin) heading = mode;
     else next = nextHeading(belief, p);
     ctx.log('info', `cleverSweep round ${JSON.stringify({
       n: rounds, heading: Math.round(stood), frames: levels.map((v, k) => v - (framesBefore[k] ?? 0)), hits,
-      mode, mass: Math.round(mass * 100) / 100, carrier: Object.fromEntries(ladder.strengths.map((s, k) => [s, Math.round((carrier[k] ?? 0) * 100) / 100])), next,
+      mode, mass: Math.round(mass * 100) / 100, carrier: Object.fromEntries(ladder.strengths.map((s, k) => [s, Math.round((carrier[k] ?? 0) * 100) / 100])), width: Object.fromEntries(ladder.strengths.map((s, k) => [s, width[k]])), next,
     })}`);
   }
 
@@ -141,22 +145,22 @@ function headingNow (ctx: Context): number {
   return mod360(-(ctx.status.angles?.yaw ?? 0));
 }
 
-/**
- * How far a sender at `bearing` is inside the lobe of a Bolt whose nose
- * points at `heading`: 1 within `half` less `edge` degrees of nose or tail,
- * 0 beyond `half` plus `edge`, sliding between.
- */
-function insideLobe (bearing: number, heading: number): number {
+/** How far a sender at `bearing` is off the nose or tail of a Bolt whose nose points at `heading`, 0 to 90 degrees. */
+function offAxis (bearing: number, heading: number): number {
   const off = Math.abs(angleDistance(bearing, heading));
-  const nearest = Math.min(off, 180 - off);
-  return Math.min(1, Math.max(0, (half + edge - nearest) / (2 * edge)));
+  return Math.min(off, 180 - off);
 }
 
-/** The probability of hearing a frame of a level in one round, by the level's state and how far the sender is inside the lobe. */
-function hearingProbability (state: number, inside: number): number {
+/** How far a sender `off` the axis is inside a lobe of half-width `half`: 1 within `half` less `edge`, 0 beyond `half` plus `edge`, sliding between. */
+function insideLobe (off: number, half: number): number {
+  return Math.min(1, Math.max(0, (half + edge - off) / (2 * edge)));
+}
+
+/** The probability of hearing a frame of a level in one round, by the level's state and how far the sender is off the axis. */
+function hearingProbability (state: number, off: number): number {
   if (state === 0) return pNone;
-  if (state === 2) return pAll;
-  return pOut + (pIn - pOut) * inside;
+  if (state === ALL) return pAll;
+  return pOut + (pIn - pOut) * insideLobe(off, widths[state - 1] ?? 60);
 }
 
 /** A frame of level `k` arrived with the nose at `heading`: every bin and state takes the log of hearing it there. */
@@ -164,8 +168,8 @@ function observeFrame (belief: Belief, k: number, heading: number): void {
   const L = belief.levels[k];
   if (!L) return;
   for (let b = 0; b < BINS; b++) {
-    const inside = insideLobe(b, heading);
-    for (let s = 0; s < STATES; s++) L[b * STATES + s] = (L[b * STATES + s] ?? 0) + Math.log(hearingProbability(s, inside));
+    const off = offAxis(b, heading);
+    for (let s = 0; s < STATES; s++) L[b * STATES + s] = (L[b * STATES + s] ?? 0) + Math.log(hearingProbability(s, off));
   }
 }
 
@@ -174,8 +178,8 @@ function observeSilence (belief: Belief, k: number, heading: number): void {
   const L = belief.levels[k];
   if (!L) return;
   for (let b = 0; b < BINS; b++) {
-    const inside = insideLobe(b, heading);
-    for (let s = 0; s < STATES; s++) L[b * STATES + s] = (L[b * STATES + s] ?? 0) + Math.log(1 - hearingProbability(s, inside));
+    const off = offAxis(b, heading);
+    for (let s = 0; s < STATES; s++) L[b * STATES + s] = (L[b * STATES + s] ?? 0) + Math.log(1 - hearingProbability(s, off));
   }
 }
 
@@ -189,9 +193,9 @@ function observeHit (belief: Belief, bearing: number): void {
   for (let b = 0; b < BINS; b++) belief.hits[b] = (belief.hits[b] ?? 0) + Math.log(Math.abs(angleDistance(b, bearing)) < 90 ? pHitIn : 1 - pHitIn);
 }
 
-/** The log likelihood of bin `b` for level `k`, the three states summed with equal prior. */
+/** The log likelihood of bin `b` for level `k`, the states summed with equal prior. */
 function levelLogLikelihood (L: Float64Array, b: number): number {
-  const m = Math.max(L[b * STATES] ?? 0, L[b * STATES + 1] ?? 0, L[b * STATES + 2] ?? 0);
+  const m = maxState(L, b);
   let sum = 0;
   for (let s = 0; s < STATES; s++) sum += Math.exp((L[b * STATES + s] ?? 0) - m);
   return m + Math.log(sum / STATES);
@@ -224,18 +228,34 @@ function summarize (p: Float64Array): { mode: number; mass: number } {
   return { mode, mass };
 }
 
-/** How likely each level is the carrier, the one with a lobe: the lobe state's share of the three, weighted by the posterior over the bearing. */
+/** How likely each level is the carrier, the one with a lobe: the lobe states' share of all, weighted by the posterior over the bearing. */
 function carrierProbabilities (belief: Belief, p: Float64Array): number[] {
   return belief.levels.map(function lobeShare (L: Float64Array): number {
     let total = 0;
-    for (let b = 0; b < BINS; b++) total += (p[b] ?? 0) * stateShare(L, b, 1);
+    for (let b = 0; b < BINS; b++) for (let s = 1; s < ALL; s++) total += (p[b] ?? 0) * stateShare(L, b, s);
     return total;
   });
 }
 
-/** The share of state `s` among the three at bin `b` of a level. */
+/** The most likely half-width of each level's lobe, given it has one, weighted by the posterior over the bearing. */
+function lobeWidths (belief: Belief, p: Float64Array): number[] {
+  return belief.levels.map(function width (L: Float64Array): number {
+    const share = widths.map(() => 0);
+    for (let b = 0; b < BINS; b++) for (let s = 1; s < ALL; s++) share[s - 1] = (share[s - 1] ?? 0) + (p[b] ?? 0) * stateShare(L, b, s);
+    return widths[share.indexOf(Math.max(...share))] ?? 0;
+  });
+}
+
+/** The largest log likelihood among the states at bin `b` of a level. */
+function maxState (L: Float64Array, b: number): number {
+  let m = -Infinity;
+  for (let s = 0; s < STATES; s++) m = Math.max(m, L[b * STATES + s] ?? 0);
+  return m;
+}
+
+/** The share of state `s` among all at bin `b` of a level. */
 function stateShare (L: Float64Array, b: number, s: number): number {
-  const m = Math.max(L[b * STATES] ?? 0, L[b * STATES + 1] ?? 0, L[b * STATES + 2] ?? 0);
+  const m = maxState(L, b);
   let sum = 0;
   for (let t = 0; t < STATES; t++) sum += Math.exp((L[b * STATES + t] ?? 0) - m);
   return Math.exp((L[b * STATES + s] ?? 0) - m) / sum;
@@ -271,9 +291,9 @@ function expectedGain (belief: Belief, p: Float64Array, heading: number): number
 function levelGain (L: Float64Array, p: Float64Array, heading: number): number {
   let predicted = 0, conditional = 0;
   for (let b = 0; b < BINS; b++) {
-    const inside = insideLobe(b, heading);
+    const off = offAxis(b, heading);
     let q = 0;
-    for (let s = 0; s < STATES; s++) q += stateShare(L, b, s) * hearingProbability(s, inside);
+    for (let s = 0; s < STATES; s++) q += stateShare(L, b, s) * hearingProbability(s, off);
     predicted += (p[b] ?? 0) * q;
     conditional += (p[b] ?? 0) * binaryEntropy(q);
   }
