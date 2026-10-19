@@ -3,6 +3,9 @@
 import m from 'mithril';
 
 import { Bolt, BoltConfig, NotConnectedError, Referee, approachTest, passBy, seekToCollision, sweepTest, sweepTrials } from '@bolt/core';
+
+/** A direction on the sheet: up or down it, or a heading in degrees clockwise from up. */
+type SheetDirection = 'up' | 'down' | number;
 import type { LadderRange } from '@bolt/core';
 import type { SeekMethod } from '@bolt/core';
 import { WebBleTransport, isBluetoothAvailable, onAvailabilityChanged, getPermittedBolts, requestBolt, waitForAdvertisement } from '@bolt/web-ble';
@@ -93,19 +96,22 @@ class bolts {
    * The sweep behavior judged by the locator: both Bolts on their reference points, the seeker walks
    * `stepCm` a trial along `direction`, up or down the sheet or a sheet heading in degrees clockwise
    * from up, turns at random and sweeps, until a sweep is off by more than `tolerance` degrees, finds
-   * nothing, or `trials` are done; `reset: false` continues from where they stand; see @bolt/core behavior/sweep-test.ts.
+   * nothing, or `trials` are done; `legs` walks several directions in turn, `reset: false` continues from where they stand; see @bolt/core behavior/sweep-test.ts.
    */
-  public sweepTest ({ seeker, sender, direction = 'up', stepCm = 25, startCm = stepCm, until = 'nothing', trials, reset = true, tolerance = 30, range = 'long', span = 180, step = 15, reads = 5, clever = false }: { seeker: string, sender: string, direction?: 'up' | 'down' | number, stepCm?: number, startCm?: number, until?: 'nothing' | 'miss', trials?: number, reset?: boolean, tolerance?: number, range?: LadderRange, span?: number, step?: number, reads?: number, clever?: boolean }) {
+  public sweepTest ({ seeker, sender, direction = 'up', stepCm = 25, startCm = stepCm, until = 'nothing', trials, legs, reset = true, tolerance = 30, range = 'long', span = 180, step = 15, reads = 5, clever = false }: { seeker: string, sender: string, direction?: SheetDirection, stepCm?: number, startCm?: number, until?: 'nothing' | 'miss', trials?: number, legs?: { direction: SheetDirection, stepCm: number, trials?: number }[], reset?: boolean, tolerance?: number, range?: LadderRange, span?: number, step?: number, reads?: number, clever?: boolean }) {
     const a = this.get(seeker), b = this.get(sender);
     if (!a || !b) throw new NotConnectedError(a ? sender : seeker);
     const home = Plotter.startOf(seeker), mark = Plotter.startOf(sender);
     if (!home || !mark) throw new Error(`no start on the sheet for ${home ? sender : seeker}`);
     const at = Plotter.toLocator(seeker, mark.x, mark.y)!;
     // up is -y on the sheet; a unit sheet vector along the direction, turned into the seeker's frame, as a heading
-    const sheet = (direction === 'up' ? 0 : direction === 'down' ? 180 : direction) * Math.PI / 180;
-    const v = Plotter.toLocator(seeker, home.x + Math.sin(sheet), home.y - Math.cos(sheet))!;
-    const heading = (Math.atan2(v.x, v.y) * 180 / Math.PI + 360) % 360;
-    return sweepTest(new Referee(a, b), { at, direction: Math.round(heading), stepCm, startCm, until, trials, reset, tolerance, range, span, step, reads, clever });
+    const heading = (direction: SheetDirection): number => {
+      const sheet = (direction === 'up' ? 0 : direction === 'down' ? 180 : direction) * Math.PI / 180;
+      const v = Plotter.toLocator(seeker, home.x + Math.sin(sheet), home.y - Math.cos(sheet))!;
+      return Math.round((Math.atan2(v.x, v.y) * 180 / Math.PI + 360) % 360);
+    };
+    const walkLegs = legs?.map(leg => ({ ...leg, direction: heading(leg.direction) }));
+    return sweepTest(new Referee(a, b), { at, direction: heading(direction), stepCm, startCm, until, trials, legs: walkLegs, reset, tolerance, range, span, step, reads, clever });
   }
 
   /** The approach judged by the locator: both on their reference points, green walks `startCm` up the sheet, turns at random and approaches blue; see @bolt/core experiments/approach.ts. */

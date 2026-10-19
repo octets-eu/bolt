@@ -4,6 +4,13 @@ import { angleDistance, distance, headingTo, mod360 } from '../helpers/math';
 import type { Point } from '../helpers/math';
 import { wait } from '../helpers/utils';
 
+/** One leg of a walk: steps of `stepCm` along `direction`, a heading in the seeker's locator frame, `trials` of them, or on until the walk ends. */
+export interface SweepTestLeg {
+  direction: number;
+  stepCm: number;
+  trials?: number | undefined;
+}
+
 export interface SweepTestOptions extends Omit<SweepOptions, 'referee'> {
   /** Where the sender stands, in the seeker's locator frame, cm; the reference points of the floor plan. */
   at: Point;
@@ -16,6 +23,8 @@ export interface SweepTestOptions extends Omit<SweepOptions, 'referee'> {
   until?: 'nothing' | 'miss' | undefined;
   /** The walk also ends after this many trials. */
   trials?: number | undefined;
+  /** Several legs after the one reset, each with its own direction, step and count, instead of `direction`, `stepCm` and `trials`. */
+  legs?: SweepTestLeg[] | undefined;
   /** Both Bolts hard reset at the start (default); false continues from where they stand, in the frames of the last reset. */
   reset?: boolean | undefined;
   /** A sweep is good when its heading is within this of the bearing to the sender, degrees. */
@@ -54,7 +63,8 @@ export interface SweepTestResult {
  * angle, sweeps, and the sweep's heading is compared with the bearing to
  * the sender from the locator's position. Within `tolerance` the next
  * trial follows; a miss, a sweep that finds nothing (unless `until` is
- * 'miss'), the `trials` asked for, or fullstop ends the walk. Each trial is logged as `sweepTest` with its numbers. The truth
+ * 'miss'), the `trials` asked for, or fullstop ends the walk. `legs` walks
+ * several directions in turn after the one reset. Each trial is logged as `sweepTest` with its numbers. The truth
  * drifts with yaw and the locator's dead reckoning, more with every step;
  * the position and heading are in the record for a check against the floor.
  */
@@ -63,7 +73,7 @@ export function sweepTest (referee: Referee, options: SweepTestOptions): Promise
   return seeker.run('sweepTest', () => walk(referee, options), { seeker: seeker.name, sender: sender.name, ...options });
 }
 
-async function walk (referee: Referee, { at: target, direction, stepCm, startCm = stepCm, tolerance, until = 'nothing', trials: maxTrials = Infinity, reset = true, clever = false, ...sweep }: SweepTestOptions): Promise<SweepTestResult> {
+async function walk (referee: Referee, { at: target, direction, stepCm, startCm = stepCm, tolerance, until = 'nothing', trials: maxTrials, legs = [{ direction, stepCm, trials: maxTrials }], reset = true, clever = false, ...sweep }: SweepTestOptions): Promise<SweepTestResult> {
 
   const showMs = 2000;  // the chevron at the direction found, for the eye, before the next step
 
@@ -77,9 +87,10 @@ async function walk (referee: Referee, { at: target, direction, stepCm, startCm 
   referee.start();
 
   try {
-    while (!s.aborted) {
+    walking: for (const leg of legs) for (let k = 0; k < (leg.trials ?? Infinity); k++) {
+      if (s.aborted) break;
       await communication.state('motor', 'cruising');
-      await seeker.navigation.roll(trials.length ? stepCm : startCm, direction);
+      await seeker.navigation.roll(trials.length ? leg.stepCm : startCm, leg.direction);
       if (s.aborted) break;
       await seeker.navigation.rotate(Math.round(Math.random() * 360));
       if (s.aborted) break;
@@ -101,13 +112,10 @@ async function walk (referee: Referee, { at: target, direction, stepCm, startCm 
       await wait(showMs);
       if (error === null ? until === 'nothing' : !good) {
         reason = error === null ? 'nothing' : 'missed';
-        break;
-      }
-      if (trials.length >= maxTrials) {
-        reason = 'done';
-        break;
+        break walking;
       }
     }
+    if (!s.aborted && reason === 'aborted') reason = 'done';
   } finally {
     await communication.state('motor', null);
     await referee.end();
