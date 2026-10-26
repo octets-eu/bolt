@@ -19,6 +19,11 @@ container (colima)            host (macOS, user rig)              Bolt
   or on `stop`. Only loopback and the colima network may connect.
 - `@bolt/node-socket` is the core `Transport` over that socket. `connect.mjs`
   brings the Bolts up and is the pattern a seeker follows.
+- `m5.py` is the same split for the M5 beacon: it owns the M5's USB serial port
+  and runs the `mpremote` sends; the container asks over TCP (7010). The M5
+  sends a Bolt-format frame on a channel, channel 7 being free of the ladders.
+  `m5test.mjs` crosses both bridges: a Bolt listens while the container tells
+  the M5 to send, and counts what was heard.
 
 ## The one manual step
 
@@ -56,6 +61,7 @@ built and run on the host (colima), where a container reaches the host as
 ```
 rig/sandbox/run.sh                      a shell in the sandbox
 rig/sandbox/run.sh npm run rig          bring up the Bolts from inside
+rig/sandbox/run.sh npm run m5test       a Bolt hears the M5, across both bridges
 ```
 
 - **Filesystem.** Only the repo is mounted (`/workspace`); `node_modules` is a
@@ -63,8 +69,9 @@ rig/sandbox/run.sh npm run rig          bring up the Bolts from inside
   No docker socket is passed in, so nothing inside can widen its own mounts or
   reach another container. The command runs as the host user, so files it
   writes into the repo belong to that user.
-- **Network.** `init-firewall.sh` drops all egress but DNS, the bridge on
-  `192.168.5.2:7000-7002`, and the allowlisted domains (`api.anthropic.com`,
+- **Network.** `init-firewall.sh` drops all egress but DNS, the host on
+  `192.168.5.2:7000-7010` (the Bolt bridge and the M5 forwarder), and the
+  allowlisted domains (`api.anthropic.com`,
   and `registry.npmjs.org` so the container can install and build; drop the
   latter for full lockdown). It needs `NET_ADMIN`, which `run.sh` grants.
   Proven: the bridge and `api.anthropic.com` are reachable, other hosts are not.

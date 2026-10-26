@@ -8,7 +8,8 @@
 set -euo pipefail
 
 BRIDGE_HOST="${BRIDGE_HOST:-192.168.5.2}"
-BRIDGE_PORTS="${BRIDGE_PORTS:-7000:7002}"
+# 7000-7002 the Bolt bridge, 7010 the M5 forwarder
+BRIDGE_PORTS="${BRIDGE_PORTS:-7000:7010}"
 # space separated; registry.npmjs.org lets the container install and build, drop it for full lockdown
 ALLOW_DOMAINS="${ALLOW_DOMAINS:-api.anthropic.com registry.npmjs.org}"
 

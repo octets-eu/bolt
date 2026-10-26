@@ -15,7 +15,8 @@
     "preview": "npm run preview --workspace apps/browser",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "lint": "eslint .",
-    "rig": "tsx rig/connect.mjs"
+    "rig": "tsx rig/connect.mjs",
+    "m5test": "tsx rig/m5test.mjs"
   },
   "engines": {
     "node": ">=22.12"

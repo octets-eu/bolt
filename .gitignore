@@ -8,3 +8,7 @@ dist/
 docs/private/
 .env.local
 sessions/
+
+# python bytecode
+__pycache__/
+*.pyc
