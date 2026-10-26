@@ -1,0 +1,27 @@
+{
+  "name": "@bolt/node-socket",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Node TCP transport for @bolt/core: talks to the Bolt bridge, which holds the Bluetooth link.",
+  "main": "./dist/index.js",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch --preserveWatchOutput",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@bolt/core": "*"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.9.0"
+  }
+}
