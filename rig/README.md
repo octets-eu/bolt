@@ -45,3 +45,31 @@ BRIDGE_HOST=192.168.5.2 npm run rig         # from inside the container
 
 `npm run rig` runs `connect.mjs` through `tsx`, which resolves the packages'
 extensionless ESM imports that a bundler would otherwise handle.
+
+## The sandbox
+
+`sandbox/` runs a client, or an agent, in a container that can reach the Bolts
+only through the bridge and reach the network only where the work needs. It is
+built and run on the host (colima), where a container reaches the host as
+`192.168.5.2`.
+
+```
+rig/sandbox/run.sh                      a shell in the sandbox
+rig/sandbox/run.sh npm run rig          bring up the Bolts from inside
+```
+
+- **Filesystem.** Only the repo is mounted (`/workspace`); `node_modules` is a
+  container-owned volume so the Linux build does not clash with the host's.
+  No docker socket is passed in, so nothing inside can widen its own mounts or
+  reach another container. The command runs as the host user, so files it
+  writes into the repo belong to that user.
+- **Network.** `init-firewall.sh` drops all egress but DNS, the bridge on
+  `192.168.5.2:7000-7002`, and the allowlisted domains (`api.anthropic.com`,
+  and `registry.npmjs.org` so the container can install and build; drop the
+  latter for full lockdown). It needs `NET_ADMIN`, which `run.sh` grants.
+  Proven: the bridge and `api.anthropic.com` are reachable, other hosts are not.
+- **Motors.** The bridge, not the sandbox, is the safety floor: it cuts the
+  motors when the client disconnects, goes silent past the deadman, or on `stop`.
+
+First use in a fresh checkout, from a sandbox shell: `npm install`, then build
+`@bolt/core` and `@bolt/node-socket`.
