@@ -71,14 +71,15 @@ rig/sandbox/run.sh npm run m5test       a Bolt hears the M5, across both bridges
   writes into the repo belong to that user.
 - **Network.** `init-firewall.sh` drops all egress but DNS, the host on
   `192.168.5.2:7000-7010` (the Bolt bridge and the M5 forwarder), and the
-  allowlisted domains (`api.anthropic.com`,
-  and `registry.npmjs.org` so the container can install and build; drop the
-  latter for full lockdown). It needs `NET_ADMIN`, which `run.sh` grants.
-  Proven: the bridge and `api.anthropic.com` are reachable, other hosts are not.
+  allowlisted domains, by default `api.anthropic.com` alone, so an agent cannot
+  install packages. `ALLOW_DOMAINS` in the environment overrides the list for one
+  run. It needs `NET_ADMIN`, which `run.sh` grants. Proven: the bridge and
+  `api.anthropic.com` are reachable, the registry and other hosts are not.
 - **Motors.** The bridge, not the sandbox, is the safety floor: it cuts the
   motors when the client disconnects, goes silent past the deadman, or on `stop`.
 
-First use in a fresh checkout, from a sandbox shell: `npm install`, then build
+First use in a fresh checkout, from a sandbox shell started with
+`ALLOW_DOMAINS="api.anthropic.com registry.npmjs.org"`: `npm install`, then build
 `@bolt/core` and `@bolt/node-socket`.
 
 ## A headless agent (API key), watched over tmux
@@ -100,13 +101,18 @@ docker run --rm \
   -e HOME=/claude-home -e CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1 \
   --env-file ~/Rig/secret.env \
   -v /Users/rig/Rig/bolt:/workspace -v bolt_node_modules:/workspace/node_modules \
-  -v bolt_claude_home:/claude-home -w /workspace \
-  bolt-sandbox claude -p "Hi"
+  -v /Users/rig/Rig/claude-home:/claude-home -w /workspace \
+  bolt-sandbox claude --strict-mcp-config -p "Hi"
 ```
 
-`bolt_claude_home` persists Claude Code's config and workspace trust across runs.
+`/Users/rig/Rig/claude-home` is Claude Code's HOME in the container. Its config,
+workspace trust and the session transcripts (`.claude/projects/-workspace/*.jsonl`)
+land there as plain files on the M1, owned by rig. `--strict-mcp-config` keeps
+the container from starting the repo's `bolt-tools` MCP server (chrome-devtools-mcp,
+enabled by `.claude/settings.local.json`): the sandbox has no Chrome, and the npx
+install it triggers would fail at the firewall.
 For a session you watch and interfere with, add `-it`, run it inside tmux on the
 M1 (`tmux new -s agent ...`), and `tmux attach -t agent` over SSH from the M4 or
 phone. `capture-pane` and `send-keys` drive the same session non-interactively.
-If print mode balks at workspace trust, trust it once in an interactive run (the
-trust persists on `bolt_claude_home`).
+Print mode asks no workspace trust; if an interactive run does, the answer
+persists in `claude-home`.

@@ -10,8 +10,9 @@ set -euo pipefail
 BRIDGE_HOST="${BRIDGE_HOST:-192.168.5.2}"
 # 7000-7002 the Bolt bridge, 7010 the M5 forwarder
 BRIDGE_PORTS="${BRIDGE_PORTS:-7000:7010}"
-# space separated; registry.npmjs.org lets the container install and build, drop it for full lockdown
-ALLOW_DOMAINS="${ALLOW_DOMAINS:-api.anthropic.com registry.npmjs.org}"
+# space separated; the API only, so an agent cannot install packages. An install
+# opens the registry for that one run: ALLOW_DOMAINS="api.anthropic.com registry.npmjs.org"
+ALLOW_DOMAINS="${ALLOW_DOMAINS:-api.anthropic.com}"
 
 iptables -F; iptables -X 2>/dev/null || true
 

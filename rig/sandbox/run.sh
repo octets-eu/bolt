@@ -7,7 +7,9 @@
 #   rig/sandbox/run.sh npm run rig          bring up the Bolts from inside
 #   rig/sandbox/run.sh npm run rig -- SB-9129
 #
-# First time in a fresh checkout, from the shell: npm install && \
+# First time in a fresh checkout, the registry opened for this one shell:
+#   ALLOW_DOMAINS="api.anthropic.com registry.npmjs.org" rig/sandbox/run.sh
+#   then inside: npm install && \
 #   npm run build --workspace packages/core && \
 #   npm run build --workspace packages/node-socket
 set -euo pipefail
@@ -20,7 +22,7 @@ docker build -t "$image" "$here" >&2
 
 exec docker run --rm -it \
   --cap-add=NET_ADMIN --cap-add=NET_RAW \
-  -e BRIDGE_HOST="${BRIDGE_HOST:-192.168.5.2}" \
+  -e BRIDGE_HOST="${BRIDGE_HOST:-192.168.5.2}" -e ALLOW_DOMAINS \
   -e HOST_UID="$(id -u)" -e HOST_GID="$(id -g)" \
   -v "$repo":/workspace \
   -v bolt_node_modules:/workspace/node_modules \
