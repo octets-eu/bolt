@@ -80,3 +80,33 @@ rig/sandbox/run.sh npm run m5test       a Bolt hears the M5, across both bridges
 
 First use in a fresh checkout, from a sandbox shell: `npm install`, then build
 `@bolt/core` and `@bolt/node-socket`.
+
+## A headless agent (API key), watched over tmux
+
+The image carries the Claude Code CLI. The agent runs in the container billed to
+the API key; you watch and steer it by attaching to its tmux over SSH. Put the
+key on the M1 as rig, mode 600:
+
+```
+~/Rig/secret.env      contains: ANTHROPIC_API_KEY=sk-ant-...
+```
+
+A one-shot, firewalled, with telemetry off so nothing hangs on a blocked host:
+
+```
+docker run --rm \
+  --cap-add=NET_ADMIN --cap-add=NET_RAW \
+  -e HOST_UID=$(id -u) -e HOST_GID=$(id -g) \
+  -e HOME=/claude-home -e CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1 \
+  --env-file ~/Rig/secret.env \
+  -v /Users/rig/Rig/bolt:/workspace -v bolt_node_modules:/workspace/node_modules \
+  -v bolt_claude_home:/claude-home -w /workspace \
+  bolt-sandbox claude -p "Hi"
+```
+
+`bolt_claude_home` persists Claude Code's config and workspace trust across runs.
+For a session you watch and interfere with, add `-it`, run it inside tmux on the
+M1 (`tmux new -s agent ...`), and `tmux attach -t agent` over SSH from the M4 or
+phone. `capture-pane` and `send-keys` drive the same session non-interactively.
+If print mode balks at workspace trust, trust it once in an interactive run (the
+trust persists on `bolt_claude_home`).

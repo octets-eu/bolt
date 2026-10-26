@@ -12,5 +12,9 @@ uid="${HOST_UID:-501}"
 gid="${HOST_GID:-20}"
 # the node_modules volume comes up owned by root; hand it to the run user
 chown "${uid}:${gid}" /workspace/node_modules 2>/dev/null || true
+# a persistent HOME volume (Claude Code creds, workspace trust) likewise
+if [ -n "${HOME:-}" ] && [ "$HOME" != "/" ]; then
+  mkdir -p "$HOME" && chown -R "${uid}:${gid}" "$HOME" 2>/dev/null || true
+fi
 
 exec setpriv --reuid "$uid" --regid "$gid" --clear-groups "$@"
