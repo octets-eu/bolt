@@ -68,3 +68,14 @@ What has to be in place and tested, in the order it is needed. `[x]` is proven, 
 
 - [ ] Bolts charged above 4.0 V and on their spots; beacon on its spot, powered, USB to the M1; floor clear.
 - [ ] Nobody is needed during the session. A Bolt that leaves the floor ends it; no guard exists.
+
+## 9 Camera: the moto g35 as the agent's judge, arriving 29.10.
+
+- [ ] On the phone: developer options, USB debugging; one cable to the M1. On the M1 as noiv: `brew install android-platform-tools scrcpy`; `adb devices` as rig sees the phone after the fingerprint prompt.
+- [ ] `scrcpy --video-source=camera --list-cameras`: three or more ids with a wide size means the ultrawide is open. If not, the fallback is mirroring the stock camera app.
+- [ ] The frame forwarder on the M1, beside the bridge: owns the phone, serves the latest frame as a JPEG on port 7020, loopback and the colima net only. How it gets frames out of scrcpy on macOS is the open piece; a file recording, a pipe, or a client that decodes the stream are the candidates, to be tested with the phone in hand.
+- [ ] Firewall: the bridge range `7000:7010` grows to cover the camera port.
+- [ ] Libraries in the image or the node_modules volume, so the agent has them without the registry: a JPEG decoder, `sharp`, OpenCV as WebAssembly.
+- [ ] A frames folder in the workspace the agent can save to and look at with its Read tool.
+- [ ] One line in the brief: the port, the packages, the folder. Nothing about what to do with them.
+- [ ] The phone on its mount above the floor, powered over USB, screen off, camera open during a session.
