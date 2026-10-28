@@ -1,0 +1,220 @@
+// sensory_map.jsonc — declarative environment→brain channels.
+// See docs/declarative-wiring.md. Each channel sets brain.drive<Drive> from a
+// named source through a pipeline of typed ops. Comments here are the rationale
+// (the reason the wiring is what it is). JSONC: `//` line comments only.
+//
+// STEP 9 (docs/done/feat-body-muscle.md): every source arrives from the Substrate
+// boundary in WORLD units — food@nose in OD600-eq. bacterial density,
+// acid@nose in pH, o2@nose in % O₂, pheromone@nose in nM ascaroside. No
+// pixel level reaches this file, and Worm.sense() keeps no inline fallback:
+// this map IS the animal's sensory transduction.
+//
+// The receptors are LOG receptors (Weber-Fechner): a channel takes log10 of
+// its stimulus first, then works in decades. Every constant below was
+// translated EXACTLY from the pre-step-9 level units at the mapping's 4
+// decades of food (1 level = 4/255 decades = 3.7 % of density) and 5 decades
+// of pheromone, so the first step-9 build behaves as before on a mean-127
+// lawn; what changes is the world (acid is pH, thin agar feeds less).
+{
+  "channels": [
+
+    // --- log receptors -----------------------------------------------------
+    // logFood: decades of food above the receptor's own detection floor
+    // (0.001 OD, bare agar). 0 on agar, 2 on the mean-127 lawn, 4 on the
+    // thickest lawn. The floor is a property of the receptor, not of the
+    // scenery — the mapping's floor happens to coincide.
+    { "drive": "logFood", "source": "food@nose",
+      "pipeline": [ { "op": "log10" }, { "op": "add", "k": 3 } ] },
+    // logPhero: decades of ascaroside above 0.01 nM (below detection).
+    { "drive": "logPhero", "source": "pheromone@nose",
+      "pipeline": [ { "op": "log10" }, { "op": "add", "k": 2 } ] },
+
+    {
+      "drive": "chemoAtt",
+      // AWA/AWC: absolute food level, saturating. Was level/140 — 140 levels
+      // = 2.196 decades: AWC saturates at 0.16 OD, just above the mean lawn.
+      "note": "AWA/AWC absolute food level at the nose",
+      "source": "logFood",
+      "pipeline": [
+        { "op": "div", "by": 2.196 },
+        { "op": "clamp", "lo": 0, "hi": 1 }
+      ]
+    },
+
+    // --- ASE Weber-Fechner: relative dC/dt ---------------------------------
+    // relG = d(ln C)/dt = ln10 · d(log10 C)/dt — the relative rate of change,
+    // scale-free by construction (no adapting divisor needed: the log did it).
+    // Pre-step-9 this was ΔL/(dt·max(adaptL, 8)) in levels, which at the mean
+    // level 127 equals 0.218 · d(log10 C)/dt — so the old norm 0.06 /s
+    // becomes 0.275 /s here (4.6×; the old sensor was blunter on bright
+    // lawns and sharper on dark ground, the new one is Weber everywhere).
+    { "drive": "logFoodDelayed",  "source": "logFood",  "pipeline": [ { "op": "delay" } ] },
+    { "drive": "logPheroDelayed", "source": "logPhero", "pipeline": [ { "op": "delay" } ] },
+    {
+      "drive": "relG",   // ASE ON/OFF drive: relative dC/dt of food at the nose (1/s)
+      "source": "logFood",
+      "pipeline": [
+        { "op": "sub",   "in": "logFoodDelayed" },
+        { "op": "divBy", "in": "dtSafe" },
+        { "op": "gain",  "k": 2.3026 }
+      ]
+    },
+    {
+      "drive": "relR",   // same for the pheromone channel (ASK/ADL)
+      "source": "logPhero",
+      "pipeline": [
+        { "op": "sub",   "in": "logPheroDelayed" },
+        { "op": "divBy", "in": "dtSafe" },
+        { "op": "gain",  "k": 2.3026 }
+      ]
+    },
+    {
+      "drive": "chemoSaltL",
+      // ASEL = ON cell: food concentration RISING at the nose. 0.275 /s of
+      // relative change saturates (was 0.06 in level units, see above).
+      "note": "ASEL ON cell — rising food (relG > 0)",
+      "source": "relG",
+      "pipeline": [
+        { "op": "div", "by": 0.275 },
+        { "op": "clamp", "lo": 0, "hi": 1 }
+      ]
+    },
+    {
+      "drive": "chemoSaltR",
+      // ASER = OFF cell: food concentration FALLING. Mirror of ASEL on -relG.
+      "note": "ASER OFF cell — falling food (relG < 0)",
+      "source": "relG",
+      "pipeline": [
+        { "op": "gain", "k": -1 },
+        { "op": "div", "by": 0.275 },
+        { "op": "clamp", "lo": 0, "hi": 1 }
+      ]
+    },
+
+    // --- pheromone: ASK attraction / ADL repulsion (push-pull) ------------
+    // Linear in decades above detection: was noseR/255 · gain, and a level
+    // IS a fifth of a decade, so logPhero/5 · gain is the same drive.
+    {
+      "drive": "pheroAtt",
+      "note": "ASK pheromone attraction",
+      "source": "logPhero",
+      "pipeline": [
+        { "op": "div", "by": 5 },
+        { "op": "gain", "k": 2.2 },
+        { "op": "clamp", "lo": 0, "hi": 1 }
+      ]
+    },
+    {
+      "drive": "pheroRep",
+      "note": "ADL pheromone repulsion",
+      "source": "logPhero",
+      "pipeline": [
+        { "op": "div", "by": 5 },
+        { "op": "gain", "k": 1.1 },
+        { "op": "clamp", "lo": 0, "hi": 1 }
+      ]
+    },
+
+    {
+      "drive": "o2",
+      // URX: crowding as the O2 proxy — 3+ neighbors saturate. The Substrate
+      // now reports o2@nose (% O₂, from the lawn's respiration); wiring the
+      // URX/AQR/PQR path to it is a later step (step 9 decision 4).
+      "note": "URX O2 proxy from crowding",
+      "source": "crowd",
+      "pipeline": [
+        { "op": "div", "by": 3 },
+        { "op": "clamp", "lo": 0, "hi": 1 }
+      ]
+    },
+    {
+      "drive": "thermo",
+      // AFD: biotope heat -> restlessness (noxious-heat response).
+      "note": "AFD thermosensation from host heat",
+      "source": "heat",
+      "pipeline": [
+        { "op": "gain", "k": 0.35 },
+        { "op": "clamp", "lo": 0, "hi": 1 }
+      ]
+    },
+
+    // --- ASH nociception (noci = max(acidPain, edge)) ---------------------
+    // acid@nose is pH; ASH avoidance sets in at pH 4 (Sambongi 2000). The
+    // Substrate's acid field is the scene's blue where blue dominates, so the
+    // old "blue fence" (B > 180 and dominant by 60) is now a pH: 180 was pH
+    // 3.5, the animal's threshold is 4 (pixel ≈ 153). Blob's navy (B 105,
+    // pH 4.9) stays a mood, not a wall. (SC10's remote screen-edge pain
+    // retired 2026-09-01: the edge is just a wall, sensed by nose touch.)
+    {
+      "drive": "acidPain", // internal: 1 below the ASH pH threshold
+      "note": "ASH acid avoidance",
+      "source": "acid@nose",
+      "pipeline": [ { "op": "threshold", "lt": 4 } ]
+    },
+    {
+      "drive": "noci",     // ASH: acid only — the screen edge is a wall (touch)
+      "note": "ASH nociception",
+      "combine": "max",
+      "inputs": [ "acidPain" ]
+    },
+
+    // --- pirouette (klinokinesis) — stateful, seconds scale -----------------
+    // Klinokinesis works on SECONDS (Pierce-Shimomura 1999): the log nose
+    // level is smoothed over ~1 s and compared with a ~4 s baseline; falling
+    // below it while hungry biases a reversal (fresh direction). The
+    // difference is in DECADES; pirouetteDecades (live param, 1.25 = the old
+    // 80 levels) is the fall for a full drive. Leaving a mean-127 lawn for
+    // agar is 2 decades; the projection's own texture is ~0.3.
+    { "drive": "odorBaseline", "source": "logFood", "pipeline": [ { "op": "lowpassSeeded", "tau": 4 } ] },
+    { "drive": "noseSlow",     "source": "logFood", "pipeline": [ { "op": "lowpassSeeded", "tau": 1 } ] },
+    {
+      "drive": "pirouette",
+      "note": "klinokinesis — reversal bias when food falls below baseline while hungry",
+      "source": "odorBaseline",
+      "pipeline": [
+        { "op": "sub", "in": "noseSlow" },                 // baseline - nose(1 s), decades
+        { "op": "divParam", "param": "pirouetteDecades" },
+        { "op": "clamp", "lo": 0, "hi": 1 },
+        { "op": "mul", "in": "satietyComplement" }         // * (1 - satiety)
+      ]
+    },
+
+    // --- gradient signal → weathervane steering (SC1) --------------------
+    // dA folds food + temperament-weighted pheromone relative change, then
+    // swingCorr correlates it with the head-swing phase, low-passed over
+    // ~one swing period; turnL/turnR split it by sign. swingCorr is read by
+    // turnL, turnR and stepBody's graded term → the per-tick memo makes its
+    // low-pass advance once. NOTE: this makes SC1 *declared*, not retired —
+    // steering still bypasses the ASE→interneuron→SMB chain.
+    { "drive": "socialRelR", "source": "relR", "pipeline": [ { "op": "mul", "in": "social" } ] },
+    { "drive": "dASum", "combine": "add", "inputs": [ "relG", "socialRelR" ] },
+    {
+      "drive": "dA",     // adapted gradient signal fed to the weathervane
+      "note": "food + temperament-weighted pheromone gradient, clamped",
+      "source": "dASum",
+      "pipeline": [
+        { "op": "div", "by": 0.275 },                // weathervane norm (see relG)
+        { "op": "clamp", "lo": -1, "hi": 1 }
+      ]
+    },
+    {
+      "drive": "swingCorr",  // internal: EMA of dA × swing phase
+      "note": "weathervane correlation (SC1 steering filter)",
+      "source": "dA",
+      "pipeline": [
+        { "op": "mul", "in": "sinCast" },
+        { "op": "lowpass", "tau": 2.5 }
+      ]
+    },
+    {
+      "drive": "turnL",
+      "source": "swingCorr",
+      "pipeline": [ { "op": "gain", "k": 2 }, { "op": "clamp", "lo": 0, "hi": 1 } ]
+    },
+    {
+      "drive": "turnR",
+      "source": "swingCorr",
+      "pipeline": [ { "op": "gain", "k": -2 }, { "op": "clamp", "lo": 0, "hi": 1 } ]
+    }
+  ]
+}

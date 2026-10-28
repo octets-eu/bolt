@@ -5,7 +5,7 @@ What has to be in place and tested, in the order it is needed. `[x]` is proven, 
 ## 1 Repo and sync
 
 - [x] Layout: `agent/` stays here, `agent/Rig/` mirrors `~/Rig/` on the M1, `agent/Rig/container/` is the workspace the container mounts. `agent/sync.sh` with no argument stages into `agent/stage/`.
-- [ ] Commit the layout.
+- [x] Commit the layout.
 - [ ] First push with `RSYNC_RSH` and the M1 target. Then on the M1: trash `~/Rig/bolt` and `~/Rig/bridge/` from the old layout, start the bridge from `~/Rig/bridge.py`.
 - [ ] Update the paths in `docs/private/m1-rig.md`.
 - [ ] Git in the workspace, once, on the M1 as rig: `git init` in `~/Rig/container`, identity `operator <operator@hypatia.earth>` set locally there, `.gitignore` already in place; then `git add -A && git commit -m baseline`. Never pulled; the agent's own checkpoints and history.
@@ -19,23 +19,30 @@ What has to be in place and tested, in the order it is needed. `[x]` is proven, 
 ## 2 Host services on the M1, as rig
 
 - [x] colima runs, the image builds, the firewall allows the API alone; the registry opens per run with `ALLOW_DOMAINS`.
-- [ ] Bridge started once from rig's GUI Terminal for the Bluetooth grant; `uv run bridge.py status` shows both links up; `probe` each Bolt.
-- [ ] Forwarder running: `uv run m5.py`; `ping` answers.
+- [x] Bridge running with both links up (status, 28.10.). `probe` times out while the Bolts sleep; it needs them awake, so it is a floor item.
+- [x] Forwarder running; `ping` answers `m5 ok` (28.10.).
 - [ ] Bridge safety by hand: kill a client while a Bolt rolls, motors stop; `uv run bridge.py stop`, motors stop.
-- [ ] Key file passes `grep -q '^ANTHROPIC_API_KEY=sk-' ~/Rig/secret.env`; never printed. Workspace spend limit set in the console.
+- [x] Key file passes `grep -q '^ANTHROPIC_API_KEY=sk-' ~/Rig/secret.env`; never printed.
+- [ ] Workspace spend limit set in the console.
 - [ ] Decide the speed cap in the bridge; today the floor is deadman plus motors-off.
 
-## 3 M5 beep, not built
+## 3 M5: beep, menu, dashboard, not built
 
 - [ ] `beep` command in `m5.py`, a PWM tone on the M5 Fire's speaker (GPIO 25) over mpremote.
 - [ ] Heard from the container through the forwarder.
-- [ ] Decide when the agent beeps: session start, session end, stuck.
+- [ ] Decide when the agent beeps: session start, session end, stuck; three beeps mean "I need you", per the brief.
+- [ ] The forwarder holds the serial port open: a loop on the M5 pushes button events up and takes draw commands down, beacon sends go through the same link. The forwarder is then the only process on the port; the CLI `uv run m5.py send` goes away.
+- [ ] The M5 stays dumb: it draws lines and reports A, B, C and long presses. Menu items are a table in the forwarder, label to function; a new item is one line there and nothing on the M5.
+- [ ] Stop button: `stop` to the bridge's control port (motors off on both Bolts), `docker pause` on the agent's container, a beep, "STOPPED" on the screen; a second press resumes the container, the motors stay off until the agent commands them.
+- [ ] First actions: stop and resume; beacon on channel 7 on and off, long or short ladder; Bolts to sleep and awake; agent start, stop, "I am here" clearing the attention; restart the bridge, restart the forwarder.
+- [ ] Dashboard as the resting screen, refreshed every second or two: per Bolt link, client, age of the last frame from the bridge's status; battery once something polls it; agent running, elapsed, cost from its log, last report line; beacon idle or sending, channel, frames; camera up, frames per second; the attention reason until a button clears it.
+- [ ] Buttons: A and C move, B selects, a long press on B goes back to the dashboard. The menu appears on the first press.
 
 ## 4 tmux
 
 - [x] tmux 3.8 on the M1; `send-keys` and `capture-pane` proven over SSH.
-- [ ] The agent session runs inside `tmux new -d -s agent`; attach from the M4 over SSH.
-- [ ] Detach, drop the SSH connection, reconnect, attach: the session is still there.
+- [x] The agent session runs inside `tmux new -d -s agent` (proven 28.10. with an interactive `docker run -it ... claude` inside); `agent/watch.sh` from here attaches to it over SSH, Ctrl-b d detaches.
+- [x] The session lives on the M1's tmux server, not on the SSH connection: it was driven from five separate SSH connections (28.10.).
 - [ ] `pipe-pane` writes the screen to a log file.
 
 ## 5 Start script, `~/Rig/run-agent.sh`, documented in `agent/Rig/README.md`
@@ -60,8 +67,8 @@ What has to be in place and tested, in the order it is needed. `[x]` is proven, 
 - [ ] Comprehension: the agent explains the rig, the environment and the challenge in its own words and says what it would verify first; no Bolt touched. Where it misreads, the brief is wrong.
 - [ ] Chain: the agent brings up both Bolts, reads the batteries, pings the M5, hears channel 7; numbers only, no motion.
 - [ ] Motion: one 90° turn and back, locator heading reported, then stop.
-- [ ] Budget: `--max-budget-usd 0.50`; the session stops and the record carries the cost.
-- [ ] Steering: `send-keys` mid-run, `capture-pane` shows it.
+- [x] Budget: `--max-budget-usd 0.006` on a four-step task stopped it after 3 turns with `subtype error_max_budget_usd`, cost 0.0285 in the record (28.10.). The check runs between turns, so a session overshoots by up to one turn; the budget is a stop, not a cap.
+- [x] Steering: `send-keys` answered the first-run prompts and asked a question, `capture-pane` read the answer (28.10.). Submit with `C-m`, not `Enter`: Claude Code's prompt box ignores tmux's Enter. First-run onboarding (theme, API key confirmation, security notes, trust of /workspace) is done once and persists in `claude-home`; the interactive default is auto mode.
 - [ ] Long run: a small `--autocompact` window; the report survives the compaction.
 
 ## 8 The floor before every session
@@ -77,5 +84,6 @@ What has to be in place and tested, in the order it is needed. `[x]` is proven, 
 - [ ] Firewall: the bridge range `7000:7010` grows to cover the camera port.
 - [ ] Libraries in the image or the node_modules volume, so the agent has them without the registry: a JPEG decoder, `sharp`, OpenCV as WebAssembly.
 - [ ] A frames folder in the workspace the agent can save to and look at with its Read tool.
+- [ ] The camera example, `packages/node-socket/camtest.mjs` behind `npm run camtest`: fetches one frame from port 7020, saves it to the frames folder, prints its size and the time it took. The third of the three examples, next to `connect.mjs` and `m5test.mjs`.
 - [ ] One line in the brief: the port, the packages, the folder. Nothing about what to do with them.
 - [ ] The phone on its mount above the floor, powered over USB, screen off, camera open during a session.

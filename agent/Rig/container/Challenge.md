@@ -26,7 +26,7 @@ Read direction from ring and convert into bolts motor commands. And activates de
 
 ### Scheme
 
-example of connectome is in file: (insert here)
+an example of the file format, the worm's circuit and sensory map, is in `examples/worm/` (see its README; the worm is a different animal, the format is the point)
 
 ## Success criteria
 
