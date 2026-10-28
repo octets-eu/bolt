@@ -37,6 +37,7 @@ What has to be in place and tested, in the order it is needed. `[x]` is proven, 
 - [ ] First actions: stop and resume; beacon on channel 7 on and off, long or short ladder; Bolts to sleep and awake; agent start, stop, "I am here" clearing the attention; restart the bridge, restart the forwarder.
 - [ ] Dashboard as the resting screen, refreshed every second or two: per Bolt link, client, age of the last frame from the bridge's status; battery once something polls it; agent running, elapsed, cost from its log, last report line; beacon idle or sending, channel, frames; camera up, frames per second; the attention reason until a button clears it.
 - [ ] Buttons: A and C move, B selects, a long press on B goes back to the dashboard. The menu appears on the first press.
+- [ ] Page the human over ntfy: the ntfy app on the iPhone 13 subscribed to a private topic, the topic name in `docs/private/rig.env`, one `curl` from the forwarder; `page <reason>` becomes a forwarder command next to the beep, so the agent's "I need you" rings the phone anywhere, not only the room. The FRITZ!App Fon as a real call is the later upgrade.
 
 ## 4 tmux
 
