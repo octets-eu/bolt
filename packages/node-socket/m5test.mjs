@@ -3,7 +3,7 @@
 // of the ladders). Counts the channel-7 notifications heard. Proves the chain
 // container -> M5 forwarder -> infrared -> Bolt -> bridge -> container.
 //
-//   BRIDGE_HOST=192.168.5.2 node rig/m5test.mjs [SB-9129] [channel] [count]
+//   BRIDGE_HOST=192.168.5.2 npm run m5test -- [SB-9129] [channel] [count]
 
 import net from 'node:net';
 import { Bolt } from '@bolt/core';

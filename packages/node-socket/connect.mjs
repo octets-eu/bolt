@@ -3,9 +3,9 @@
 // over, read the battery, flash the Bolt's colour on the matrix, let go. No
 // motion. Run from the repo root so the workspace packages resolve:
 //
-//   node rig/connect.mjs                      both Bolts, bridge on loopback
-//   node rig/connect.mjs SB-9129              one Bolt
-//   BRIDGE_HOST=192.168.5.2 node rig/connect.mjs   from inside the container
+//   npm run rig                               both Bolts, bridge on loopback
+//   npm run rig -- SB-9129                    one Bolt
+//   BRIDGE_HOST=192.168.5.2 npm run rig       from inside the container
 
 import { Bolt } from '@bolt/core';
 import { SocketTransport, portFor } from '@bolt/node-socket';

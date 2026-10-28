@@ -1,0 +1,22 @@
+# The repo subset that goes into the agent's workspace (~/Rig/container on the
+# M1): an rsync filter, first match wins, read by sync.sh. Core, the Node path
+# to the bridge, the public docs and the root package files. The brief and
+# anything else we add to the workspace live in agent/Rig/container/ and are
+# laid over this subset by sync.sh.
+- .DS_Store
+- node_modules/
+- dist/
+- __pycache__/
+- *.pyc
++ /package.json
++ /package-lock.json
++ /.gitignore
++ /packages/
++ /packages/core/***
++ /packages/node-socket/***
++ /docs/
++ /docs/hide-and-seek.md
++ /docs/bolt-reference.md
++ /docs/recipes.md
++ /docs/terms.png
+- *

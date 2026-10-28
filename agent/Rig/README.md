@@ -4,6 +4,15 @@ The browser app drives the Bolts over Web Bluetooth. The rig drives the same
 `@bolt/core` from Node, so a seeker can run in a sandbox with no browser and no
 Bluetooth of its own.
 
+## Layout on the M1
+
+`/Users/rig/Rig` is this folder, laid down by `agent/sync.sh` from the repo's
+`agent/Rig/`: the bridge, the forwarder, the sandbox build, this README.
+`container/` inside it is the agent's workspace, the only folder the container
+mounts: core, node-socket and the public docs from the repo, plus the brief as
+its `CLAUDE.md`. What lives here and nowhere else, the key (`secret.env`), the
+agent's home (`claude-home/`) and `sessions/`, no sync touches.
+
 ## Topology
 
 ```
@@ -32,7 +41,7 @@ is denied, so **start it once from the rig user's own Terminal on screen** and
 approve the prompt. After that it survives and can be managed over SSH.
 
 ```
-cd ~/Rig/bridge && uv run bridge.py        # in rig's GUI Terminal, approve Bluetooth
+cd ~/Rig && uv run bridge.py               # in rig's GUI Terminal, approve Bluetooth
 uv run bridge.py status | stop | quit      # from anywhere, incl. SSH
 uv run bridge.py probe SB-9129             # one ping through the whole chain
 ```
@@ -59,9 +68,9 @@ built and run on the host (colima), where a container reaches the host as
 `192.168.5.2`.
 
 ```
-rig/sandbox/run.sh                      a shell in the sandbox
-rig/sandbox/run.sh npm run rig          bring up the Bolts from inside
-rig/sandbox/run.sh npm run m5test       a Bolt hears the M5, across both bridges
+~/Rig/sandbox/run.sh                    a shell in the sandbox
+~/Rig/sandbox/run.sh npm run rig        bring up the Bolts from inside
+~/Rig/sandbox/run.sh npm run m5test     a Bolt hears the M5, across both bridges
 ```
 
 - **Filesystem.** Only the repo is mounted (`/workspace`); `node_modules` is a
@@ -100,7 +109,7 @@ docker run --rm \
   -e HOST_UID=$(id -u) -e HOST_GID=$(id -g) \
   -e HOME=/claude-home -e CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1 \
   --env-file ~/Rig/secret.env \
-  -v /Users/rig/Rig/bolt:/workspace -v bolt_node_modules:/workspace/node_modules \
+  -v /Users/rig/Rig/container:/workspace -v bolt_node_modules:/workspace/node_modules \
   -v /Users/rig/Rig/claude-home:/claude-home -w /workspace \
   bolt-sandbox claude --strict-mcp-config -p "Hi"
 ```
