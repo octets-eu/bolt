@@ -4,7 +4,13 @@
 #   ~/Rig/run-agent.sh 10                  a session of 10; euros for you, the flag counts
 #                                          dollars, so the stop comes a little before
 #   ~/Rig/run-agent.sh 10 --interactive    the same with a terminal, for a session you sit
-#                                          in; run it inside tmux (agent/watch.sh opens one)
+#                                          in; run it inside tmux (agent/watch.sh opens one).
+#                                          The budget flag is print mode only, so this run is
+#                                          bounded by the console's limit alone
+#   MODEL=opus EFFORT=high AUTOCOMPACT=300k ~/Rig/run-agent.sh 10
+#                                          the model (alias or id), the thinking depth (low,
+#                                          medium, high, xhigh, max) and the context size at
+#                                          which compaction runs; unset, claude's defaults
 #
 # Before the run: refuses while the last section of brain/docs/questions.md has no
 # answer; commits the workspace, so the agent's diff at the end is its work alone;
@@ -15,7 +21,6 @@
 # question, a budget stop or an error page the phone over ntfy and beep the M5
 # three times; a clean end beeps once and pages "done". NTFY_TOPIC (and NTFY_URL,
 # default https://ntfy.sh) come from ~/Rig/rig.env, the API key from ~/Rig/secret.env.
-# MODEL in the environment picks the model; unset, claude's default runs.
 set -euo pipefail
 
 rig="$HOME/Rig"
@@ -63,8 +68,10 @@ docker_flags=(
   -v "$workspace":/workspace -v bolt_node_modules:/workspace/node_modules
   -v "$rig/claude-home":/claude-home -w /workspace
 )
-claude_flags=( --strict-mcp-config --max-budget-usd "$budget" )
+claude_flags=( --strict-mcp-config )
 [ -n "${MODEL:-}" ] && claude_flags+=( --model "$MODEL" )
+[ -n "${EFFORT:-}" ] && claude_flags+=( --effort "$EFFORT" )
+[ -n "${AUTOCOMPACT:-}" ] && claude_flags+=( --autocompact "$AUTOCOMPACT" )
 
 status=0
 if [ "$mode" = "--interactive" ]; then
@@ -72,7 +79,7 @@ if [ "$mode" = "--interactive" ]; then
 else
   prompt="$(cat "$rig/prompt.md")"
   docker run "${docker_flags[@]}" bolt-sandbox \
-    claude "${claude_flags[@]}" -p "$prompt" --output-format stream-json --verbose \
+    claude "${claude_flags[@]}" --max-budget-usd "$budget" -p "$prompt" --output-format stream-json --verbose \
     > "$dir/stream.jsonl" 2> "$dir/stderr.log" || status=$?
 fi
 

@@ -107,10 +107,13 @@ prompt from `~/Rig/prompt.md`, the stream and the result record under
 the workspace's `brain/docs/questions.md` has no answer, commits the workspace
 and writes the budget into `Session.md`. After the run it rings: a question, a
 budget stop or an error page the phone over ntfy and beep the M5 three times, a
-clean end beeps once and pages "done". `--interactive` runs the same with a
-terminal; run that inside tmux on the M1 (`agent/watch.sh` opens the session)
-and attach over SSH from anywhere, Ctrl-b d detaches. The script's header has
-the details.
+clean end beeps once and pages "done". `MODEL`, `EFFORT` and `AUTOCOMPACT` in
+the environment pick the model (alias or id), the thinking depth (low to max)
+and the context size at which compaction runs; unset, claude's defaults.
+`--interactive` runs the same with a terminal; run that inside tmux on the M1
+(`agent/watch.sh` opens the session) and attach over SSH from anywhere, Ctrl-b d
+detaches. The budget flag is print mode only, so an interactive run is bounded
+by the console's limit alone. The script's header has the details.
 
 Files on the M1 that no sync writes: `~/Rig/secret.env` with
 `ANTHROPIC_API_KEY=sk-ant-...`, mode 600, and `~/Rig/claude-home`, Claude

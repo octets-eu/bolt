@@ -63,11 +63,11 @@ Later:
 - [ ] Commits the synced workspace before the session, so the agent starts clean and its diff at the end is exactly its work.
 - [ ] Refuses to start while the last section of `brain/docs/questions.md` has no answer.
 - [ ] docker flags: firewall caps, host uid, `HOME=/claude-home`, `BRIDGE_HOST=192.168.5.2` (every script defaults to loopback and the README's headless command lacks it), nonessential traffic off, env-file, mounts for `container` and `claude-home`, `--strict-mcp-config`.
-- [ ] claude flags: `-p` with the prompt read from a file, `--output-format stream-json` into a log, `--max-budget-usd`, `--autocompact` window, the model. Print mode is the session; a question goes through the file (section 6), so no interactive run is needed.
+- [ ] claude flags: `-p` with the prompt read from a file, `--output-format stream-json` into a log, `--max-budget-usd`, and from the environment `--model` (alias or id), `--effort` (low, medium, high, xhigh, max) and `--autocompact <size>`, all documented flags (checked 03.11.). Print mode is the session; a question goes through the file (section 6), so no interactive run is needed.
 - [ ] The result record, cost and turns, appended to the session's report.
 - [ ] Logs under `~/Rig/sessions/<date>/`, outside the container.
 - [ ] Rings on exit: an unanswered question at the end of `questions.md`, a budget stop or an error page the phone over ntfy (one curl from the host, the topic from `rig.env`) and send `beep 3` to the forwarder; a clean end sends one beep and a page that says done.
-- [ ] An interactive variant with `-it` for the comprehension test and for a session you sit in.
+- [ ] An interactive variant with `-it` for the comprehension test and for a session you sit in. The budget flag is print mode only (docs, 03.11.), so this run is bounded by the console's limit alone.
 
 ## 6 The brief and the workspace documents
 
