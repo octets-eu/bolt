@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # One agent session in the sandbox on the M1, run as rig. A session is a budget:
 #
-#   ~/Rig/run-agent.sh 10                  a session of 10; euros for you, the flag counts
-#                                          dollars, so the stop comes a little before
+#   ~/Rig/run-agent.sh 10                  a session of $10; dollars throughout, as the flag
+#                                          and the monthly credit count
 #   ~/Rig/run-agent.sh 10 --interactive    the same with a terminal, for a session you sit
 #                                          in; run it inside tmux (agent/watch.sh opens one).
 #                                          The budget flag is print mode only, so this run is
@@ -55,7 +55,7 @@ fi
 stamp="$(date +%Y-%m-%d_%H%M)"
 dir="$rig/sessions/$stamp"
 mkdir -p "$dir"
-printf '# Session\n\nBudget: %s €, the number the start script enforces.\n' "$budget" > "$workspace/Session.md"
+printf '# Session\n\nBudget: $%s, the number the start script enforces.\n' "$budget" > "$workspace/Session.md"
 git -C "$workspace" add -A
 git -C "$workspace" commit -q -m "before session $stamp" || true
 
