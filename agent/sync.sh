@@ -23,4 +23,7 @@ export RSYNC_RSH
 dest="${RIG_TARGET%/}/"
 
 rsync -a --itemize-changes "$@" --filter="merge $here/sync.rules" "$repo/" "${dest}container/"
-rsync -a --itemize-changes "$@" "$here/Rig/" "$dest"
+# the floor plan lives with the browser app, which loads it from its public folder;
+# the workspace gets a copy under docs/, the one place its documents point at
+rsync -a --itemize-changes "$@" "$repo/apps/browser/public/floor-plan.svg" "${dest}container/docs/"
+rsync -a --itemize-changes "$@" --exclude __pycache__/ --exclude .DS_Store "$here/Rig/" "$dest"

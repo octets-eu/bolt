@@ -8,16 +8,18 @@ and keeps one JPEG current. The container asks over TCP (port 7020, loopback
 and the colima net only), one text line per connection:
 
   ping                 -> cam ok
-  on                   -> on            (starts the stream, idempotent)
+  on [id]              -> on <id>       (starts the stream from camera <id>, default
+                          CAM_ID; a different id restarts the stream)
   off                  -> off           (stops it)
-  status               -> status on|off frames=<n> age=<ms>|none
+  status               -> status on <id>|off age=<ms>|none
   frame                -> frame <bytes> <age_ms>\n followed by the JPEG bytes
                           error off  when the stream is not on
   error <reason>       on anything else
 
 The stream runs only between `on` and `off`; nothing is recorded. Environment:
 CAM_SERIAL selects the adb device when more than one is attached (an address
-like <ip>:5555 or an adb mDNS name), CAM_ID the camera id (2, the ultrawide),
+like <ip>:5555 or an adb mDNS name), CAM_ID the default camera id (2, the
+ultrawide; 0 is the main camera, half the floor at twice the detail),
 CAM_SIZE the longer side (1632), CAM_FPS the frames kept per second (2),
 CAM_PORT the port (7020). Run on the M1 as rig: python3 cam.py
 """
@@ -36,16 +38,17 @@ LATEST = os.path.join(WORK, "latest.jpg")
 lock = threading.Lock()
 procs = {}          # "scrcpy", "ffmpeg" -> Popen
 started = 0.0
+current = None      # camera id of the running stream
 
 
 def alive():
     return all(p.poll() is None for p in procs.values()) and len(procs) == 2
 
 
-def start():
-    global started
-    if alive():
-        return "on already"
+def start(cam_id=CAM_ID):
+    global started, current
+    if alive() and cam_id == current:
+        return f"on {cam_id} already"
     stop()
     if os.path.exists(FIFO):
         os.unlink(FIFO)
@@ -53,7 +56,7 @@ def start():
     if os.path.exists(LATEST):
         os.unlink(LATEST)
     scrcpy = ["scrcpy"] + (["-s", SERIAL] if SERIAL else []) + [
-        "--video-source=camera", f"--camera-id={CAM_ID}", "--camera-ar=sensor",
+        "--video-source=camera", f"--camera-id={cam_id}", "--camera-ar=sensor",
         f"--max-size={SIZE}", "--video-codec=h265", "--video-bit-rate=2M",
         "--no-playback", "--no-audio", "--record-format=mkv", f"--record={FIFO}"]
     ffmpeg = ["ffmpeg", "-loglevel", "error", "-i", FIFO, "-vf", f"fps={FPS}",
@@ -62,7 +65,8 @@ def start():
     procs["scrcpy"] = subprocess.Popen(scrcpy, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
     procs["ffmpeg"] = subprocess.Popen(ffmpeg, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
     started = time.time()
-    return "on"
+    current = cam_id
+    return f"on {cam_id}"
 
 
 def stop():
@@ -86,15 +90,18 @@ def frame_age_ms():
 
 def status():
     age = frame_age_ms()
-    return f"status {'on' if alive() else 'off'} age={age if age is not None else 'none'}"
+    return f"status {('on ' + str(current)) if alive() else 'off'} age={age if age is not None else 'none'}"
 
 
 def handle(line):
     with lock:
         if line == "ping":
             return b"cam ok\n"
-        if line == "on":
-            return (start() + "\n").encode()
+        if line == "on" or line.startswith("on "):
+            cam_id = line[3:].strip() or CAM_ID
+            if not cam_id.isdigit():
+                return b"error camera id must be a number\n"
+            return (start(cam_id) + "\n").encode()
         if line == "off":
             return (stop() + "\n").encode()
         if line == "status":

@@ -5,6 +5,7 @@
 //
 //   BRIDGE_HOST=192.168.5.2 npm run camtest           from inside the container
 //   npm run camtest -- --keep                         leave the camera on
+//   npm run camtest -- 0                              the main camera instead of the ultrawide
 
 import net from 'node:net';
 import { mkdirSync, writeFileSync } from 'node:fs';
@@ -12,6 +13,7 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 const host = process.env.BRIDGE_HOST ?? '127.0.0.1';
 const port = Number(process.env.CAM_PORT ?? 7020);
 const keep = process.argv.includes('--keep');
+const id = process.argv.slice(2).find((a) => /^\d+$/.test(a));
 
 /** One line to the forwarder; resolves with the text reply and the bytes after it. */
 function cam (line) {
@@ -30,7 +32,7 @@ function cam (line) {
 
 const t0 = Date.now();
 console.log('ping:', (await cam('ping')).text);
-console.log('on:', (await cam('on')).text);
+console.log('on:', (await cam(id ? `on ${id}` : 'on')).text);
 let reply;
 for (let i = 0; i < 60; i++) {
   reply = await cam('frame');

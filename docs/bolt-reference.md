@@ -149,7 +149,7 @@ Yaw counts the other way from headings: after a yaw reset, heading equals minus 
 
 **Still.** The ball is still when the locator moved under 1 cm and the yaw spanned under 1° across the last half second. At rest both sit at their floors, 0.01 cm and 0.002°; after a turn the yaw is fixed from 0.7 s on.
 
-**Compass.** Calibrate to north makes the Bolt spin and report the yaw of magnetic north as the compass event. The magnetometer's spread at a spot is what repeated spins disagree by.
+**Compass.** Calibrate to north makes the Bolt spin and report the yaw of magnetic north as the compass event. The magnetometer's spread at a spot is what repeated spins disagree by. North is a last resort: the spread is large, the axis is sometimes wrong, and a magnet nearby confuses it; headings in this project come from the gyro and the locator.
 
 ## 6 Collisions
 

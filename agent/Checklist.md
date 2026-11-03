@@ -57,10 +57,10 @@ What has to be in place and tested, in the order it is needed. `[x]` is proven, 
 
 ## 6 The brief and the workspace documents
 
-- [ ] Situation: the floor, the fixed things, what drifts during a session, what the agent senses and does, what is unknown at the start, what counts as evidence.
+- [x] Situation (03.11.): folded into the end of `Challenge.md` as "what is where", one line per file the brief does not name: the floor plan, the two photos from the mount, four pointers into the seek's code. The brief links the challenge, the challenge links `Session.md`; no file is named twice.
 - [ ] Architecture: the connectome, the observation layer, the ring, the two skills, the diagnosis order; the channel and circuit file formats.
 - [ ] Goal and gate with no human in the loop: the agent varies the start heading, switches the beacon, judges by the locator; reports are read afterwards.
-- [ ] Setup file: floor size, beacon bearing, Bolt spots, filled before a session.
+- [ ] `Session.md` (the form exists, 03.11.): the beacon's place, the Bolts' places and roles, the camera's address, the budget; filled before each session.
 - [ ] Report format and folder; the next session reads the last report first.
 
 ## 7 Test runs, in order
@@ -78,7 +78,7 @@ What has to be in place and tested, in the order it is needed. `[x]` is proven, 
 - [ ] Bolts charged above 4.0 V and on their spots; beacon on its spot, powered, USB to the M1; floor clear.
 - [ ] Nobody is needed during the session. A Bolt that leaves the floor ends it; no guard exists.
 
-## 9 Camera: the moto g35 as the agent's judge, arriving 29.10.
+## 9 Camera: the moto g35 as the agent's eye on the floor
 
 - [x] On the phone: developer options, USB debugging, fingerprint accepted; adb sees it as `moto_g35_5G`, USB name "Unisoc Phone" (29.10., on the M4).
 - [x] The same on the M1, over Wi-Fi since no cable reaches the mount (03.11.): `brew install scrcpy` and `brew install --cask android-platform-tools` as noiv; the phone's Wireless debugging paired from the M1 as rig with `adb pair <ip>:<pair-port> <code>`, after which the phone announces itself as `adb-ZE223G3PP3-1PuuVZ._adb-tls-connect._tcp` and adb connects by that name after every reboot. The M1's adb server must be started once from rig's GUI Terminal: started over SSH, every TCP connect to the phone fails with "no route to host" (macOS Local Network permission), the same wall as Bluetooth. scrcpy from the M1 lists the three cameras.
@@ -87,7 +87,7 @@ What has to be in place and tested, in the order it is needed. `[x]` is proven, 
 - [x] Firewall: the host range is `7000:7020` now, in `init-firewall.sh`; takes effect with the next image build.
 - [x] Libraries: `jpeg-js`, `sharp` and `@techstark/opencv-js` are root devDependencies (03.11.); they reach the volume with the next install, registry opened once.
 - [x] `frames/` in the workspace, gitignored, created by the first `camtest`.
-- [x] The camera example, `npm run camtest`, from inside the firewalled container (03.11.): ping, on, a 120 KB frame into `frames/` after 4.6 s, off. It polls for 30 s and prints the forwarder's status on failure.
+- [x] The camera example, `npm run camtest`, from inside the firewalled container (03.11.): ping, on, a 120 KB frame into `frames/` after 4.6 s, off. It polls for 30 s and prints the forwarder's status on failure. `npm run camtest -- 0` takes the main camera: the forwarder's `on [id]` makes the lens the agent's choice, id 2 the ultrawide and the whole floor, id 0 the main camera and the stretch between the speakers at twice the detail; `floor-ultra-wide.jpg` and `floor-main.jpg` in the workspace show each.
 - [x] One line in the brief: the camera bullet under "What the rig provides", port, protocol, packages, folder.
 - [x] Over Wi-Fi too (29.10.): `adb tcpip 5555` while on USB, then `adb connect <phone-ip>:5555`, and scrcpy with `-s <ip>:5555`. At 960x720 and 2 Mbit/s the pipe path delivered 10 frames in 15 s with no decode errors, both Bolts visible on the floor from about 1.5 m; at 3264x2448 and 3 Mbit/s packet loss tore the frames. From the M1 over Wi-Fi with H.265 at `--max-size=1632` (1600x1200) and 2 Mbit/s: 10 frames in 15 s, no decode errors (03.11.). That is the mount's setting. The plain TCP mode lasts until the phone reboots; the paired service does not.
-- [x] The phone on its 2 m mount since 03.11., on a charger, Wi-Fi to the M1; the camera runs only between the agent's `on` and `off`.
+- [x] The phone on its mount on the partition's ceiling since 03.11., 2 m up, no cable, on its own battery, Wi-Fi to the M1; the camera runs only between the agent's `on` and `off`.

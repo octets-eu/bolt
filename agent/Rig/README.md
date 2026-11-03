@@ -83,7 +83,8 @@ built and run on the host (colima), where a container reaches the host as
   reach another container. The command runs as the host user, so files it
   writes into the repo belong to that user.
 - **Network.** `init-firewall.sh` drops all egress but DNS, the host on
-  `192.168.5.2:7000-7010` (the Bolt bridge and the M5 forwarder), and the
+  `192.168.5.2:7000-7020` (the Bolt bridge, the M5 forwarder and the camera
+  forwarder), and the
   allowlisted domains, by default `api.anthropic.com` alone, so an agent cannot
   install packages. `ALLOW_DOMAINS` in the environment overrides the list for one
   run. It needs `NET_ADMIN`, which `run.sh` grants. Proven: the bridge and

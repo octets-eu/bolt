@@ -4,9 +4,8 @@ You run inside the sandbox container on the rig. This folder is the part of the 
 
 ## Know-how
 
-Read these before touching a Bolt, in this order:
+The task is `Challenge.md`; read it first, it points at the rest. Before touching a Bolt:
 
-- `docs/hide-and-seek.md` is the goal: what happens in a game.
 - `docs/bolt-reference.md` is how a Bolt works, independent of floor and room.
 - `docs/recipes.md` is the seek as it stands, pointing at the code.
 - `docs/terms.png` is the vocabulary.
@@ -19,7 +18,7 @@ The library is `packages/core/src`. `behavior/` holds behaviors with a result an
 
 - **The M5 beacon** through the forwarder on port 7010 of the same host. One text line per request: `ping`, `send <ch> [count] [gapMs]`, `frame <ch> <duty> [count]`, `beacon <far> <near> <seconds>`. It sends Bolt-format frames on a channel; channel 7 is free of the ladders 0 to 6.
 
-- **The camera** over the floor, through the camera forwarder on port 7020 of the same host, one text line per connection: `ping`, `on`, `off`, `status`, `frame`. After `on` the phone's ultrawide streams and `frame` answers `frame <bytes> <age_ms>` followed by the JPEG, 1600x1200, about two a second; `off` stops the camera. `npm run camtest` (`packages/node-socket/camtest.mjs`) fetches one frame into `frames/`. The workspace has `jpeg-js`, `sharp` and `@techstark/opencv-js` for whatever you do with a frame.
+- **The camera** over the floor, through the camera forwarder on port 7020 of the same host, one text line per connection: `ping`, `on [id]`, `off`, `status`, `frame`. `on` alone streams the ultrawide, id 2, the whole floor; `on 0` streams the main camera, the stretch between the speakers at twice the detail; `floor-ultra-wide.jpg` and `floor-main.jpg` show each. After `on` the phone streams and `frame` answers `frame <bytes> <age_ms>` followed by the JPEG, 1600x1200, about two a second; `off` stops the camera. `npm run camtest` (`packages/node-socket/camtest.mjs`) fetches one frame into `frames/`. The workspace has `jpeg-js`, `sharp` and `@techstark/opencv-js` for whatever you do with a frame.
 
 - **The Node path.** `@bolt/node-socket` is the core `Transport` over the bridge socket. `npm run rig` (`packages/node-socket/connect.mjs`) brings the Bolts up, reads the battery and lets go; it is the pattern to follow. `npm run m5test` crosses both bridges.
 
