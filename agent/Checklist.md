@@ -14,7 +14,7 @@ What has to be in place and tested, in the order it is needed. `[x]` is proven, 
 - [x] Built inside the container (03.11.): the old volume had folders from the first install under another uid and `npm install` failed with EACCES, so the volume was removed and made fresh, registry opened once: 115 packages, core and node-socket compiled, `sharp` arm64 and the decoders load. A volume belongs to one uid; recreate it rather than fix it.
 - [x] `npm run rig` from inside the container (03.11., new layout): both Bolts up through the bridge, SB-11DF at 4.24 V, the matrix char ran.
 - [x] `npm run m5test` from inside (03.11.): 11 of 10 frames heard on channel 7.
-- [ ] `agent/pull.sh` after the first session: `packages/core/src/brain/`, the agent's only folder, lands in the repo and `git diff` shows it; needs a clean tree, so commit before a pull.
+- [x] `agent/pull.sh` proven (03.11.): the brain folder skeleton's five placeholders came from the M1 into `packages/core/src/brain/` and `git status` showed them. Needs a clean tree, so commit before a pull.
 
 ## 2 Host services on the M1, as rig
 
