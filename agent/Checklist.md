@@ -6,14 +6,14 @@ What has to be in place and tested, in the order it is needed. `[x]` is proven, 
 
 - [x] Layout: `agent/` stays here, `agent/Rig/` mirrors `~/Rig/` on the M1, `agent/Rig/container/` is the workspace the container mounts. `agent/sync.sh` with no argument stages into `agent/stage/`.
 - [x] Commit the layout.
-- [ ] First push with `RSYNC_RSH` and the M1 target. Then on the M1: trash `~/Rig/bolt` and `~/Rig/bridge/` from the old layout, start the bridge from `~/Rig/bridge.py`.
-- [ ] Update the paths in `docs/private/m1-rig.md`.
-- [ ] Git in the workspace, once, on the M1 as rig: `git init` in `~/Rig/container`, identity `operator <operator@hypatia.earth>` set locally there, `.gitignore` already in place; then `git add -A && git commit -m baseline`. Never pulled; the agent's own checkpoints and history.
+- [x] First push (03.11., 85 files); the old `~/Rig/bolt` and `~/Rig/bridge/` are in rig's Trash. The bridge from `~/Rig/bridge.py` needs its first start from rig's GUI Terminal again: over SSH it gets no Bluetooth, the grant did not follow the move.
+- [x] Update the paths in `docs/private/m1-rig.md`.
+- [x] Git in the workspace (03.11.): `~/Rig/container` is a repo with the identity `operator <operator@hypatia.earth>` and a baseline commit of 81 files, the brain folder skeleton (`docs`, `utils`, `connectome/{motor,ring,observation}`, each with a `.gitkeep`) included. Never pulled; the agent's own checkpoints and history.
 - [ ] The start script commits the synced state before every session, so the agent starts clean and its diff at the end is exactly its work.
-- [ ] Rebuild the image on the M1 from `~/Rig/sandbox`.
-- [ ] Build core and node-socket inside the container; open the registry for that one shell if the `bolt_node_modules` volume is missing.
-- [ ] `npm run rig` from inside the container: both Bolts up, battery read.
-- [ ] `npm run m5test` from inside: frames on channel 7 heard.
+- [x] Rebuild the image on the M1 from `~/Rig/sandbox` (03.11.; the firewall says 7000:7020).
+- [x] Built inside the container (03.11.): the old volume had folders from the first install under another uid and `npm install` failed with EACCES, so the volume was removed and made fresh, registry opened once: 115 packages, core and node-socket compiled, `sharp` arm64 and the decoders load. A volume belongs to one uid; recreate it rather than fix it.
+- [x] `npm run rig` from inside the container (03.11., new layout): both Bolts up through the bridge, SB-11DF at 4.24 V, the matrix char ran.
+- [x] `npm run m5test` from inside (03.11.): 11 of 10 frames heard on channel 7.
 - [ ] `agent/pull.sh` after the first session: `packages/core/src/brain/`, the agent's only folder, lands in the repo and `git diff` shows it; needs a clean tree, so commit before a pull.
 
 ## 2 Host services on the M1, as rig
@@ -86,8 +86,8 @@ What has to be in place and tested, in the order it is needed. `[x]` is proven, 
 - [x] The frame forwarder, `agent/Rig/cam.py`, running on the M1 as rig since 03.11. (`CAM_SERIAL=<phone>:5555 nohup python3 cam.py`): `ping`, `on`, `off`, `status`, `frame`; the first frame 5 s after `on`, 1600x1200 H.265 over Wi-Fi, two a second, nothing recorded, the stream runs only between `on` and `off`. Proven from the host; from the container after the push. The frame path underneath (29.10.): `scrcpy --video-source=camera --camera-id=2 --camera-size=3264x2448 --video-bit-rate=4M --no-playback --no-audio --record-format=mkv --record=<fifo>` and `ffmpeg -i <fifo> -vf fps=1 ...` pulls frames live through a named pipe, one per second; with `-update 1` ffmpeg keeps one latest JPEG current for the forwarder to serve. `--time-limit` ends a recording cleanly; `--camera-size` and `--max-size` cannot be combined; an mp4 killed mid-way is unreadable, mkv is not.
 - [x] Firewall: the host range is `7000:7020` now, in `init-firewall.sh`; takes effect with the next image build.
 - [x] Libraries: `jpeg-js`, `sharp` and `@techstark/opencv-js` are root devDependencies (03.11.); they reach the volume with the next install, registry opened once.
-- [ ] A frames folder in the workspace the agent can save to and look at with its Read tool.
-- [ ] The camera example, `packages/node-socket/camtest.mjs` behind `npm run camtest`, written 03.11.: on, one frame into `frames/`, size and time, off. Untested until the push and the image rebuild.
+- [x] `frames/` in the workspace, gitignored, created by the first `camtest`.
+- [x] The camera example, `npm run camtest`, from inside the firewalled container (03.11.): ping, on, a 120 KB frame into `frames/` after 4.6 s, off. It polls for 30 s and prints the forwarder's status on failure.
 - [x] One line in the brief: the camera bullet under "What the rig provides", port, protocol, packages, folder.
 - [x] Over Wi-Fi too (29.10.): `adb tcpip 5555` while on USB, then `adb connect <phone-ip>:5555`, and scrcpy with `-s <ip>:5555`. At 960x720 and 2 Mbit/s the pipe path delivered 10 frames in 15 s with no decode errors, both Bolts visible on the floor from about 1.5 m; at 3264x2448 and 3 Mbit/s packet loss tore the frames. From the M1 over Wi-Fi with H.265 at `--max-size=1632` (1600x1200) and 2 Mbit/s: 10 frames in 15 s, no decode errors (03.11.). That is the mount's setting. The plain TCP mode lasts until the phone reboots; the paired service does not.
-- [ ] The phone on its mount above the floor, powered over USB, screen off, camera open during a session.
+- [x] The phone on its 2 m mount since 03.11., on a charger, Wi-Fi to the M1; the camera runs only between the agent's `on` and `off`.

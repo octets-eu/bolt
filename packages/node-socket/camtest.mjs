@@ -32,13 +32,13 @@ const t0 = Date.now();
 console.log('ping:', (await cam('ping')).text);
 console.log('on:', (await cam('on')).text);
 let reply;
-for (let i = 0; i < 30; i++) {
+for (let i = 0; i < 60; i++) {
   reply = await cam('frame');
   if (reply.text.startsWith('frame')) break;
   await new Promise((r) => setTimeout(r, 500));
 }
 if (!reply.text.startsWith('frame')) {
-  console.log('no frame:', reply.text);
+  console.log('no frame:', reply.text, '|', (await cam('status')).text);
 } else {
   const [, size, age] = reply.text.split(' ');
   mkdirSync('frames', { recursive: true });
