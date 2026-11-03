@@ -28,6 +28,10 @@ container (colima)            host (macOS, user rig)              Bolt
   or on `stop`. Only loopback and the colima network may connect.
 - `@bolt/node-socket` is the core `Transport` over that socket. `connect.mjs`
   brings the Bolts up and is the pattern a seeker follows.
+- `cam.py` is the same split for the phone over the floor: it owns the phone
+  through adb, runs scrcpy on its ultrawide camera into ffmpeg, and keeps one
+  JPEG current; the container asks on 7020 (`on`, `frame`, `off`). Nothing is
+  recorded; the camera runs only between `on` and `off`.
 - `m5.py` is the same split for the M5 beacon: it owns the M5's USB serial port
   and runs the `mpremote` sends; the container asks over TCP (7010). The M5
   sends a Bolt-format frame on a channel, channel 7 being free of the ladders.

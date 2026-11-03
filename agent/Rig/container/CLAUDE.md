@@ -19,6 +19,8 @@ The library is `packages/core/src`. `behavior/` holds behaviors with a result an
 
 - **The M5 beacon** through the forwarder on port 7010 of the same host. One text line per request: `ping`, `send <ch> [count] [gapMs]`, `frame <ch> <duty> [count]`, `beacon <far> <near> <seconds>`. It sends Bolt-format frames on a channel; channel 7 is free of the ladders 0 to 6.
 
+- **The camera** over the floor, through the camera forwarder on port 7020 of the same host, one text line per connection: `ping`, `on`, `off`, `status`, `frame`. After `on` the phone's ultrawide streams and `frame` answers `frame <bytes> <age_ms>` followed by the JPEG, 1600x1200, about two a second; `off` stops the camera. `npm run camtest` (`packages/node-socket/camtest.mjs`) fetches one frame into `frames/`. The workspace has `jpeg-js`, `sharp` and `@techstark/opencv-js` for whatever you do with a frame.
+
 - **The Node path.** `@bolt/node-socket` is the core `Transport` over the bridge socket. `npm run rig` (`packages/node-socket/connect.mjs`) brings the Bolts up, reads the battery and lets go; it is the pattern to follow. `npm run m5test` crosses both bridges.
 
 - **Builds.** `node_modules` is prebuilt. After a sync, build the library before running anything: `npm run build --workspace packages/core && npm run build --workspace packages/node-socket`

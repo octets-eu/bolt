@@ -12,3 +12,4 @@ sessions/
 # python bytecode
 __pycache__/
 *.pyc
+frames/

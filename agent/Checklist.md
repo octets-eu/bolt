@@ -21,6 +21,7 @@ What has to be in place and tested, in the order it is needed. `[x]` is proven, 
 - [x] colima runs, the image builds, the firewall allows the API alone; the registry opens per run with `ALLOW_DOMAINS`.
 - [x] Bridge running with both links up (status, 28.10.). `probe` times out while the Bolts sleep; it needs them awake, so it is a floor item.
 - [x] Forwarder running; `ping` answers `m5 ok` (28.10.).
+- [ ] Camera forwarder running after a reboot: `cd ~/Rig && CAM_SERIAL=<phone>:5555 nohup python3 cam.py > cam.log &`; the phone\'s plain port dies with its reboot, then the paired name goes in `CAM_SERIAL` instead.
 - [ ] Bridge safety by hand: kill a client while a Bolt rolls, motors stop; `uv run bridge.py stop`, motors stop.
 - [x] Key file passes `grep -q '^ANTHROPIC_API_KEY=sk-' ~/Rig/secret.env`; never printed.
 - [ ] Workspace spend limit set in the console.
@@ -79,12 +80,14 @@ What has to be in place and tested, in the order it is needed. `[x]` is proven, 
 
 ## 9 Camera: the moto g35 as the agent's judge, arriving 29.10.
 
-- [ ] On the phone: developer options, USB debugging; one cable to the M1. On the M1 as noiv: `brew install android-platform-tools scrcpy`; `adb devices` as rig sees the phone after the fingerprint prompt.
-- [ ] `scrcpy --video-source=camera --list-cameras`: three or more ids with a wide size means the ultrawide is open. If not, the fallback is mirroring the stock camera app.
-- [ ] The frame forwarder on the M1, beside the bridge: owns the phone, serves the latest frame as a JPEG on port 7020, loopback and the colima net only. How it gets frames out of scrcpy on macOS is the open piece; a file recording, a pipe, or a client that decodes the stream are the candidates, to be tested with the phone in hand.
-- [ ] Firewall: the bridge range `7000:7010` grows to cover the camera port.
-- [ ] Libraries in the image or the node_modules volume, so the agent has them without the registry: a JPEG decoder, `sharp`, OpenCV as WebAssembly.
+- [x] On the phone: developer options, USB debugging, fingerprint accepted; adb sees it as `moto_g35_5G`, USB name "Unisoc Phone" (29.10., on the M4).
+- [x] The same on the M1, over Wi-Fi since no cable reaches the mount (03.11.): `brew install scrcpy` and `brew install --cask android-platform-tools` as noiv; the phone's Wireless debugging paired from the M1 as rig with `adb pair <ip>:<pair-port> <code>`, after which the phone announces itself as `adb-ZE223G3PP3-1PuuVZ._adb-tls-connect._tcp` and adb connects by that name after every reboot. The M1's adb server must be started once from rig's GUI Terminal: started over SSH, every TCP connect to the phone fails with "no route to host" (macOS Local Network permission), the same wall as Bluetooth. scrcpy from the M1 lists the three cameras.
+- [x] `scrcpy --video-source=camera --list-cameras` (scrcpy 5.0.1): id 0 back 4080x3072, id 1 front, id 2 back 3264x2448, the 8 MP ultrawide, open to apps. A frame from id 2 shows the keyboard, mouse and cup that id 0 cuts out. No fallback needed.
+- [x] The frame forwarder, `agent/Rig/cam.py`, running on the M1 as rig since 03.11. (`CAM_SERIAL=<phone>:5555 nohup python3 cam.py`): `ping`, `on`, `off`, `status`, `frame`; the first frame 5 s after `on`, 1600x1200 H.265 over Wi-Fi, two a second, nothing recorded, the stream runs only between `on` and `off`. Proven from the host; from the container after the push. The frame path underneath (29.10.): `scrcpy --video-source=camera --camera-id=2 --camera-size=3264x2448 --video-bit-rate=4M --no-playback --no-audio --record-format=mkv --record=<fifo>` and `ffmpeg -i <fifo> -vf fps=1 ...` pulls frames live through a named pipe, one per second; with `-update 1` ffmpeg keeps one latest JPEG current for the forwarder to serve. `--time-limit` ends a recording cleanly; `--camera-size` and `--max-size` cannot be combined; an mp4 killed mid-way is unreadable, mkv is not.
+- [x] Firewall: the host range is `7000:7020` now, in `init-firewall.sh`; takes effect with the next image build.
+- [x] Libraries: `jpeg-js`, `sharp` and `@techstark/opencv-js` are root devDependencies (03.11.); they reach the volume with the next install, registry opened once.
 - [ ] A frames folder in the workspace the agent can save to and look at with its Read tool.
-- [ ] The camera example, `packages/node-socket/camtest.mjs` behind `npm run camtest`: fetches one frame from port 7020, saves it to the frames folder, prints its size and the time it took. The third of the three examples, next to `connect.mjs` and `m5test.mjs`.
-- [ ] One line in the brief: the port, the packages, the folder. Nothing about what to do with them.
+- [ ] The camera example, `packages/node-socket/camtest.mjs` behind `npm run camtest`, written 03.11.: on, one frame into `frames/`, size and time, off. Untested until the push and the image rebuild.
+- [x] One line in the brief: the camera bullet under "What the rig provides", port, protocol, packages, folder.
+- [x] Over Wi-Fi too (29.10.): `adb tcpip 5555` while on USB, then `adb connect <phone-ip>:5555`, and scrcpy with `-s <ip>:5555`. At 960x720 and 2 Mbit/s the pipe path delivered 10 frames in 15 s with no decode errors, both Bolts visible on the floor from about 1.5 m; at 3264x2448 and 3 Mbit/s packet loss tore the frames. From the M1 over Wi-Fi with H.265 at `--max-size=1632` (1600x1200) and 2 Mbit/s: 10 frames in 15 s, no decode errors (03.11.). That is the mount's setting. The plain TCP mode lasts until the phone reboots; the paired service does not.
 - [ ] The phone on its mount above the floor, powered over USB, screen off, camera open during a session.
