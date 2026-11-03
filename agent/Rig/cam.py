@@ -11,7 +11,7 @@ and the colima net only), one text line per connection:
   on [id]              -> on <id>       (starts the stream from camera <id>, default
                           CAM_ID; a different id restarts the stream)
   off                  -> off           (stops it)
-  status               -> status on <id>|off age=<ms>|none
+  status               -> status on <id>|off age=<ms>|none battery=<pct>% charging|discharging|none
   frame                -> frame <bytes> <age_ms>\n followed by the JPEG bytes
                           error off  when the stream is not on
   error <reason>       on anything else
@@ -49,6 +49,11 @@ def start(cam_id=CAM_ID):
     global started, current
     if alive() and cam_id == current:
         return f"on {cam_id} already"
+    if SERIAL:  # a phone over Wi-Fi drops off adb with its reboot or Wi-Fi; a connect is idempotent
+        try:
+            subprocess.run(["adb", "connect", SERIAL], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=10)
+        except (OSError, subprocess.TimeoutExpired):
+            pass
     stop()
     if os.path.exists(FIFO):
         os.unlink(FIFO)
@@ -88,9 +93,23 @@ def frame_age_ms():
         return None
 
 
+def phone_battery():
+    """The phone's battery as `<pct>% charging|discharging`, or `none` when adb has no phone."""
+    try:
+        out = subprocess.run(["adb"] + (["-s", SERIAL] if SERIAL else []) + ["shell", "dumpsys", "battery"],
+                             capture_output=True, text=True, timeout=5).stdout
+    except (OSError, subprocess.TimeoutExpired):
+        return "none"
+    fields = dict(line.strip().split(": ", 1) for line in out.splitlines() if ": " in line)
+    level, state = fields.get("level"), fields.get("status")
+    if level is None:
+        return "none"
+    return f"{level}% {'charging' if state in ('2', '5') else 'discharging'}"
+
+
 def status():
     age = frame_age_ms()
-    return f"status {('on ' + str(current)) if alive() else 'off'} age={age if age is not None else 'none'}"
+    return f"status {('on ' + str(current)) if alive() else 'off'} age={age if age is not None else 'none'} battery={phone_battery()}"
 
 
 def handle(line):

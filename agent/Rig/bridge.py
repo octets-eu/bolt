@@ -26,10 +26,10 @@ big-endian), payload.
 
 Data ports listen on every interface and accept loopback and the colima
 network only. The control port listens on loopback; one text line per
-command: status, stop, quit.
+command: status, stop, quit; battery [name] reads the volts through the bridge.
 
 Run:   uv run bridge.py                 serve
-       uv run bridge.py status|stop|quit
+       uv run bridge.py status|stop|quit|battery [name]
        uv run bridge.py probe SB-9129   one ping through the bridge
 """
 
@@ -82,6 +82,8 @@ def packet(flags, target, device, command, seq, data):
 MOTORS_OFF = packet(0x18, 0x12, 0x16, 0x01, 0xFE, [0, 0, 0, 0])
 # ping to the API processor; flags: requests response, resets inactivity timeout
 PING = packet(0x0A, None, 0x10, 0x00, 0x01, [])
+# battery voltage from the Nordic, which answers asleep too; flags as the ping plus has target
+BATTERY = packet(0x1A, 0x11, 0x13, 0x03, 0x02, [])
 
 
 def message(kind, payload=b""):
@@ -305,6 +307,71 @@ def parse_packet(raw):
     return device, command, seq, error
 
 
+def packet_payload(raw):
+    """The data bytes of a full packet's unescaped bytes, checksum stripped."""
+    flags, i = raw[0], 1
+    i += 1 if flags & 0x10 else 0
+    i += 1 if flags & 0x20 else 0
+    i += 3  # device, command, seq
+    if (flags & 0x01) and raw[i - 1] != 0xFF:
+        i += 1  # error
+    return bytes(raw[i:-1])
+
+
+def exchange(port, pkt, device, command, seq, timeout=4):
+    """One packet through the bridge as a client; the matching response's payload, None without one, a string for link down or a failed write."""
+    try:
+        with socket.create_connection(("127.0.0.1", port), timeout=timeout + 1) as s:
+            s.sendall(message(WRITE_RESP, pkt))
+            f = s.makefile("rb")
+            buffer, in_packet, escaped = [], False, False
+            deadline = time.time() + timeout
+            while time.time() < deadline:
+                head = f.read(3)
+                if len(head) < 3:
+                    break
+                kind, length = head[0], (head[1] << 8) | head[2]
+                payload = f.read(length)
+                if kind == LINK and payload != b"\x01":
+                    return "link down"
+                if kind == WRITE_FAILED:
+                    return "write failed: " + payload.decode()
+                if kind != FRAME:
+                    continue
+                for b in payload:  # reassemble like core's PacketParser
+                    if b == 0x8D:
+                        buffer, in_packet, escaped = [], True, False
+                    elif not in_packet:
+                        continue
+                    elif b == 0xD8:
+                        if parse_packet(buffer)[:3] == (device, command, seq):
+                            return packet_payload(buffer)
+                        in_packet = False
+                    elif b == 0xAB:
+                        escaped = True
+                    elif escaped:
+                        buffer.append(b | 0x88)
+                        escaped = False
+                    else:
+                        buffer.append(b)
+    except (OSError, TimeoutError):
+        pass
+    return None
+
+
+def battery(name):
+    """The Bolt's battery voltage through the bridge. A client's disconnect cuts the motors, so not while a session drives."""
+    result = exchange(BOLTS[name], BATTERY, 0x13, 0x03, 0x02)
+    if isinstance(result, str):
+        print(name, result)
+    elif result is None:
+        print(name, "no response within 4 s")
+    elif len(result) >= 2:
+        print(name, f"{((result[0] << 8) | result[1]) / 100:.2f} V")
+    else:
+        print(name, "response without voltage:", result.hex())
+
+
 def probe(name):
     """One ping through the bridge: expects written, then the Bolt's response, reassembled across notifications."""
     port = BOLTS[name]
@@ -356,6 +423,9 @@ if __name__ == "__main__":
         asyncio.run(serve())
     elif args[0] in ("status", "stop", "quit"):
         send_control(args[0])
+    elif args[0] == "battery":
+        for name in (args[1:] or list(BOLTS)):
+            battery(name)
     elif args[0] == "probe" and len(args) == 2:
         probe(args[1])
     else:

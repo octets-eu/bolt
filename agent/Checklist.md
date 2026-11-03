@@ -21,9 +21,9 @@ The session, as decided: a session is a budget, nothing else. The agent picks se
 ## 2 Host services on the M1, as rig
 
 - [x] colima runs, the image builds, the firewall allows the API alone; the registry opens per run with `ALLOW_DOMAINS`.
-- [x] Bridge running with both links up (status, 28.10.). `probe` times out while the Bolts sleep; it needs them awake, so it is a floor item. `Bridge.command` on rig's Desktop starts it with a double-click (03.11., linked, not yet clicked); Terminal's Bluetooth grant covers it.
+- [x] Bridge running with both links up (status, 28.10.). `probe` times out while the Bolts sleep; it needs them awake, so it is a floor item. `Bridge.command` on rig's Desktop starts it with a double-click (03.11., clicked, works); Terminal's Bluetooth grant covers it. It then prints the rig's state: links, Bolt volts through the new `bridge.py battery` (4.22 and 4.24 V on 03.11.), the M5's ping, the camera forwarder's status, the phone's battery over adb; proven over SSH with the phone away.
 - [x] Forwarder running; `ping` answers `m5 ok` (28.10.).
-- [ ] Camera forwarder running after a reboot: `adb start-server` once in rig's GUI Terminal, then `cd ~/Rig && CAM_SERIAL=<phone> nohup python3 cam.py > cam.log &`; the phone's plain port dies with its reboot, then the paired name goes in `CAM_SERIAL` instead.
+- [ ] Camera forwarder running after a reboot: `adb start-server` once in rig's GUI Terminal (a double-click on `Bridge.command` does it too), then `cd ~/Rig && set -a && . ./rig.env && set +a && nohup python3 cam.py > cam.log 2>&1 &`. `CAM_SERIAL` comes from `rig.env`; the phone's plain port dies with the phone's reboot, then the paired name goes in instead. The forwarder and the launcher run `adb connect` themselves, so a Wi-Fi drop heals on the next `on` or double-click (written 03.11., untested).
 - [ ] Bridge safety by hand: kill a client while a Bolt rolls, motors stop; `uv run bridge.py stop`, motors stop.
 - [x] Key file passes `grep -q '^ANTHROPIC_API_KEY=sk-' ~/Rig/secret.env`; never printed.
 - [ ] Workspace spend limit set in the console.
@@ -115,4 +115,4 @@ Later:
 - [x] Over Wi-Fi too (29.10.): `adb tcpip 5555` while on USB, then `adb connect <phone-ip>:5555`, and scrcpy with `-s <ip>:5555`. At 960x720 and 2 Mbit/s the pipe path delivered 10 frames in 15 s with no decode errors, both Bolts visible on the floor from about 1.5 m; at 3264x2448 and 3 Mbit/s packet loss tore the frames. From the M1 over Wi-Fi with H.265 at `--max-size=1632` (1600x1200) and 2 Mbit/s: 10 frames in 15 s, no decode errors (03.11.). That is the mount's setting. The plain TCP mode lasts until the phone reboots; the paired service does not.
 - [x] The phone on its mount on the partition's ceiling since 03.11., 2 m up, no cable, on its own battery, Wi-Fi to the M1; the camera runs only between the agent's `on` and `off`.
 - [ ] The four reference points for the frame-to-sheet rule, measured once from a frame and the plan (section 6).
-- [ ] The phone's battery in the forwarder's status line, from `adb shell dumpsys battery`. The phone runs on its battery and a session has no clock.
+- [ ] The phone's battery in the forwarder's status line, from `adb shell dumpsys battery`, as `battery=<pct>% charging|discharging`. The phone runs on its battery and a session has no clock. Written 03.11.; live with the forwarder's next start.
