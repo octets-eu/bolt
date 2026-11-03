@@ -103,25 +103,29 @@ def adb(*args, timeout=10):
 
 
 def ensure_phone():
-    """The phone on adb. A phone over Wi-Fi drops off with its reboot or a Wi-Fi change, and an adb
-    server that lost it once keeps failing with "No route to host" while the phone answers ping;
-    a fresh server connects. So: connect, and when the state is not `device`, fresh server and again."""
+    """The phone on adb, answering. The phone closes an idle debugging connection after about half a
+    minute (a stream keeps it busy), and the adb server then keeps failing with "No route to host"
+    while the phone answers ping; a fresh server connects. The device state still says `device` after
+    the drop, so the check is a shell call. Returns True when the phone answers."""
     if not SERIAL:
-        return
+        return False
     for attempt in (1, 2):
+        if adb("shell", "echo", "ok", timeout=5).strip() == "ok":
+            return True
         if attempt == 2:
             adb("kill-server")
         try:
             subprocess.run(["adb", "connect", SERIAL], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=10)
         except (OSError, subprocess.TimeoutExpired):
             pass
-        if adb("get-state").strip() == "device":
-            return
+    return adb("shell", "echo", "ok", timeout=5).strip() == "ok"
 
 
 def phone_battery():
     """The phone's battery as `<pct>% charging|discharging`, or `none` when adb has no phone."""
     out = adb("shell", "dumpsys", "battery", timeout=5)
+    if "level:" not in out and ensure_phone():
+        out = adb("shell", "dumpsys", "battery", timeout=5)
     fields = dict(line.strip().split(": ", 1) for line in out.splitlines() if ": " in line)
     level, state = fields.get("level"), fields.get("status")
     if level is None:
