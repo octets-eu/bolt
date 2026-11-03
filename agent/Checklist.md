@@ -21,7 +21,7 @@ The session, as decided: a session is a budget, nothing else. The agent picks se
 ## 2 Host services on the M1, as rig
 
 - [x] colima runs, the image builds, the firewall allows the API alone; the registry opens per run with `ALLOW_DOMAINS`.
-- [x] Bridge running with both links up (status, 28.10.). `probe` times out while the Bolts sleep; it needs them awake, so it is a floor item.
+- [x] Bridge running with both links up (status, 28.10.). `probe` times out while the Bolts sleep; it needs them awake, so it is a floor item. `Bridge.command` on rig's Desktop starts it with a double-click (03.11., linked, not yet clicked); Terminal's Bluetooth grant covers it.
 - [x] Forwarder running; `ping` answers `m5 ok` (28.10.).
 - [ ] Camera forwarder running after a reboot: `adb start-server` once in rig's GUI Terminal, then `cd ~/Rig && CAM_SERIAL=<phone> nohup python3 cam.py > cam.log &`; the phone's plain port dies with its reboot, then the paired name goes in `CAM_SERIAL` instead.
 - [ ] Bridge safety by hand: kill a client while a Bolt rolls, motors stop; `uv run bridge.py stop`, motors stop.

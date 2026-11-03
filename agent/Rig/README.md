@@ -45,7 +45,8 @@ is denied, so **start it once from the rig user's own Terminal on screen** and
 approve the prompt. After that it survives and can be managed over SSH.
 
 ```
-cd ~/Rig && uv run bridge.py               # in rig's GUI Terminal, approve Bluetooth
+Bridge.command on rig's Desktop            # double-click; a link to ~/Rig/Bridge.command
+cd ~/Rig && uv run bridge.py               # the same by hand in rig's GUI Terminal
 uv run bridge.py status | stop | quit      # from anywhere, incl. SSH
 uv run bridge.py probe SB-9129             # one ping through the whole chain
 ```
