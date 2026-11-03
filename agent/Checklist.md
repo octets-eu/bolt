@@ -27,7 +27,7 @@ The session, as decided: a session is a budget, nothing else. The agent picks se
 - [ ] Bridge safety by hand: kill a client while a Bolt rolls, motors stop; `uv run bridge.py stop`, motors stop.
 - [x] Key file passes `grep -q '^ANTHROPIC_API_KEY=sk-' ~/Rig/secret.env`; never printed.
 - [ ] Workspace spend limit set in the console.
-- [ ] The ntfy topic in `docs/private/rig.env` as `NTFY_TOPIC`; the paging commit names it there and the file holds only the two sync variables. The sync copies the file to `~/Rig/rig.env` for the start script.
+- [x] The ntfy topic in `docs/private/rig.env` as `NTFY_TOPIC` (03.11.); a test post from the M4 was accepted by ntfy.sh. The sync copies the file to `~/Rig/rig.env` for the start script.
 - [ ] Decide the speed cap in the bridge; today the floor is deadman plus motors-off. The agent drives the Bolts to their spots and back, so it drives more than the seek alone.
 
 ## 3 M5: the bell first, menu and dashboard later
