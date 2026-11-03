@@ -39,7 +39,7 @@ an example of the file format, the worm's circuit and sensory map, is in `./exam
 ### Extra points for:
 
 - The matrix visualizes the seeker state, eg the ring, in realtime
-- Minimal token usage, keep track, ceiling is 30€.
+- Minimal token usage; keep a ledger of what you spend against the session's budget.
 - Even works, when sender moves
 
 

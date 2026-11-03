@@ -26,7 +26,7 @@ The session, as decided: a session is a budget, nothing else. The agent picks se
 - [ ] Camera forwarder running after a reboot: `adb start-server` once in rig's GUI Terminal (a double-click on `Bridge.command` does it too), then `cd ~/Rig && set -a && . ./rig.env && set +a && nohup python3 cam.py > cam.log 2>&1 &`. `CAM_SERIAL` comes from `rig.env`; the phone's plain port dies with the phone's reboot, then the paired name goes in instead. The forwarder and the launcher run `adb connect` themselves and start a fresh adb server when the state is not `device`: an adb server that lost the phone once keeps answering "No route to host" while ping and `nc` reach the phone, a fresh one connects, started over SSH too (03.11., seen twice, healed twice). The loss itself: adb's mDNS auto-connect opened a second connection by the paired name, the phone keeps one, the first died with "error: closed"; with `ADB_MDNS=0` for the server (set in `rig.env`, the forwarder and the launcher) one connection held 6 of 6 shell calls over 30 s. Idle, the phone closes the connection after about 30 s (broken pipe in adb's log), while a stream keeps it busy; so the forwarder reconnects at `on` and at a failed battery read, with a shell call as the check, since the device state still says `device` after the drop. `CAM_SERIAL` is Wireless debugging's ip:port from the phone's screen; the port changes with a reboot or a toggle of Wireless debugging.
 - [ ] Bridge safety by hand: kill a client while a Bolt rolls, motors stop; `uv run bridge.py stop`, motors stop.
 - [x] Key file passes `grep -q '^ANTHROPIC_API_KEY=sk-' ~/Rig/secret.env`; never printed.
-- [ ] Workspace spend limit set in the console.
+- [ ] Workspace spend limit set in the console: 100 € for the month, Anthropic's free API budget for this project; the per-session budget is the start script's.
 - [x] The ntfy topic in `docs/private/rig.env` as `NTFY_TOPIC` (03.11.); a test post from the M4 reached the iPhone, title and high priority through the lock screen. The sync copies the file to `~/Rig/rig.env` for the start script.
 - [ ] Decide the speed cap in the bridge; today the floor is deadman plus motors-off. The agent drives the Bolts to their spots and back, so it drives more than the seek alone.
 
@@ -59,7 +59,7 @@ Later:
 
 `agent/Rig/run-agent.sh` and `prompt.md` are written (03.11.) and untested on the M1; each item below is proven by a run.
 
-- [ ] One argument, the budget: `run-agent.sh 10` passes it as `--max-budget-usd` and writes it as the one line of `Session.md`. The flag counts dollars and the Challenge's ceiling says euros; one unit for both.
+- [ ] One argument, the budget: `run-agent.sh 10` passes it as `--max-budget-usd` and writes it as the one line of `Session.md`. The flag counts dollars and the budget is said in euros, so the stop comes a little before the number. 10 € per session for now, to be evaluated after the first sessions.
 - [ ] Commits the synced workspace before the session, so the agent starts clean and its diff at the end is exactly its work.
 - [ ] Refuses to start while the last section of `brain/docs/questions.md` has no answer.
 - [ ] docker flags: firewall caps, host uid, `HOME=/claude-home`, `BRIDGE_HOST=192.168.5.2` (every script defaults to loopback and the README's headless command lacks it), nonessential traffic off, env-file, mounts for `container` and `claude-home`, `--strict-mcp-config`.
