@@ -16,6 +16,7 @@ the M5's stdout, or `error <reason>`.
   send <ch> [count] [gapMs]         send.send(ch), count frames gapMs apart
   frame <ch> <duty> [count]         beacon.frame(ch, duty), count frames
   beacon <far> <near> <seconds> [farDuty] [nearDuty]   beacon.run(...), blocks
+  beep [n]                          n tones on the speaker (GPIO 25), default 1; three mean "the agent stopped with a question"
 
 Channels are 0..7; the Bolt reads the low nibble as the channel. 7 is free of
 the ladders (0..6). Listens on loopback and the colima network only.
@@ -51,6 +52,9 @@ def code_for(command, args):
     if command == "frame":
         ch = int(args[0]); duty = int(args[1]); count = int(args[2]) if len(args) > 2 else 1
         return f"import beacon, time\nfor _ in range({count}):\n beacon.frame({ch}, {duty})\n time.sleep_ms(200)\nprint('framed', {count}, 'on', {ch}, 'duty', {duty})"
+    if command == "beep":
+        n = int(args[0]) if args else 1
+        return f"from machine import Pin, PWM\nimport time\np = PWM(Pin(25), freq=2000, duty=0)\nfor _ in range({n}):\n p.duty(512)\n time.sleep_ms(150)\n p.duty(0)\n time.sleep_ms(150)\np.deinit()\nprint('beeped', {n})"
     if command == "beacon":
         far = int(args[0]); near = int(args[1]); seconds = int(args[2])
         far_duty = int(args[3]) if len(args) > 3 else 33

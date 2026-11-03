@@ -96,37 +96,28 @@ First use in a fresh checkout, from a sandbox shell started with
 `ALLOW_DOMAINS="api.anthropic.com registry.npmjs.org"`: `npm install`, then build
 `@bolt/core` and `@bolt/node-socket`.
 
-## A headless agent (API key), watched over tmux
+## A session: `run-agent.sh`
 
-The image carries the Claude Code CLI. The agent runs in the container billed to
-the API key; you watch and steer it by attaching to its tmux over SSH. Put the
-key on the M1 as rig, mode 600:
+The image carries the Claude Code CLI. A session is a budget: `~/Rig/run-agent.sh 10`
+runs the agent in the firewalled container on the API key, print mode, the
+prompt from `~/Rig/prompt.md`, the stream and the result record under
+`~/Rig/sessions/<stamp>/`. Before the run it refuses while the last question in
+the workspace's `brain/docs/questions.md` has no answer, commits the workspace
+and writes the budget into `Session.md`. After the run it rings: a question, a
+budget stop or an error page the phone over ntfy and beep the M5 three times, a
+clean end beeps once and pages "done". `--interactive` runs the same with a
+terminal; run that inside tmux on the M1 (`agent/watch.sh` opens the session)
+and attach over SSH from anywhere, Ctrl-b d detaches. The script's header has
+the details.
 
-```
-~/Rig/secret.env      contains: ANTHROPIC_API_KEY=sk-ant-...
-```
+Files on the M1 that no sync writes: `~/Rig/secret.env` with
+`ANTHROPIC_API_KEY=sk-ant-...`, mode 600, and `~/Rig/claude-home`, Claude
+Code's HOME in the container, where its config, the workspace trust and the
+transcripts (`.claude/projects/-workspace/*.jsonl`) land as plain files owned
+by rig. `~/Rig/rig.env` with `NTFY_TOPIC` comes from the sync.
 
-A one-shot, firewalled, with telemetry off so nothing hangs on a blocked host:
-
-```
-docker run --rm \
-  --cap-add=NET_ADMIN --cap-add=NET_RAW \
-  -e HOST_UID=$(id -u) -e HOST_GID=$(id -g) \
-  -e HOME=/claude-home -e CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1 \
-  --env-file ~/Rig/secret.env \
-  -v /Users/rig/Rig/container:/workspace -v bolt_node_modules:/workspace/node_modules \
-  -v /Users/rig/Rig/claude-home:/claude-home -w /workspace \
-  bolt-sandbox claude --strict-mcp-config -p "Hi"
-```
-
-`/Users/rig/Rig/claude-home` is Claude Code's HOME in the container. Its config,
-workspace trust and the session transcripts (`.claude/projects/-workspace/*.jsonl`)
-land there as plain files on the M1, owned by rig. `--strict-mcp-config` keeps
-the container from starting the repo's `bolt-tools` MCP server (chrome-devtools-mcp,
-enabled by `.claude/settings.local.json`): the sandbox has no Chrome, and the npx
-install it triggers would fail at the firewall.
-For a session you watch and interfere with, add `-it`, run it inside tmux on the
-M1 (`tmux new -s agent ...`), and `tmux attach -t agent` over SSH from the M4 or
-phone. `capture-pane` and `send-keys` drive the same session non-interactively.
-Print mode asks no workspace trust; if an interactive run does, the answer
-persists in `claude-home`.
+`--strict-mcp-config` keeps the container from starting the repo's `bolt-tools`
+MCP server (chrome-devtools-mcp, enabled by `.claude/settings.local.json`): the
+sandbox has no Chrome, and the npx install it triggers would fail at the
+firewall. Print mode asks no workspace trust; if an interactive run does, the
+answer persists in `claude-home`.

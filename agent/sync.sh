@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # Lay the rig down on the M1 from the repo: the subset that sync.rules names
 # goes into ~/Rig/container (core, node-socket, the public docs, the package
-# files), then agent/Rig/ goes over ~/Rig as it is (bridge, forwarder, sandbox,
-# README, and container/CLAUDE.md the brief). Copies and overwrites, never
+# files, the floor plan, the two photos from the mount and rig.env for the start
+# script), then agent/Rig/ goes over ~/Rig as it is (bridge, forwarders, sandbox,
+# start script, README, and container/ with the brief, the challenge, the session). Copies and overwrites, never
 # deletes, so the key, claude-home and sessions on the M1 are never touched; a
 # stale file there is removed by hand. The target and the key come from
 # docs/private/rig.env (RIG_TARGET, RSYNC_RSH), which is not in the repo.
@@ -26,4 +27,8 @@ rsync -a --itemize-changes "$@" --filter="merge $here/sync.rules" "$repo/" "${de
 # the floor plan lives with the browser app, which loads it from its public folder;
 # the workspace gets a copy under docs/, the one place its documents point at
 rsync -a --itemize-changes "$@" "$repo/apps/browser/public/floor-plan.svg" "${dest}container/docs/"
+# the two photos from the mount, private since they show the room, go to the workspace root
+rsync -a --itemize-changes "$@" "$repo/docs/private/floor-ultra-wide.jpg" "$repo/docs/private/floor-main.jpg" "${dest}container/"
+# the start script on the M1 reads NTFY_TOPIC from its own copy of rig.env
+rsync -a --itemize-changes "$@" "$env" "${dest}rig.env"
 rsync -a --itemize-changes "$@" --exclude __pycache__/ --exclude .DS_Store "$here/Rig/" "$dest"

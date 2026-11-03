@@ -11,7 +11,7 @@ The session, as decided: a session is a budget, nothing else. The agent picks se
 - [x] First push (03.11., 85 files); the old `~/Rig/bolt` and `~/Rig/bridge/` are in rig's Trash. The bridge from `~/Rig/bridge.py` needs its first start from rig's GUI Terminal again: over SSH it gets no Bluetooth, the grant did not follow the move.
 - [x] Update the paths in `docs/private/m1-rig.md`.
 - [x] Git in the workspace (03.11.): `~/Rig/container` is a repo with the identity `operator <operator@hypatia.earth>` and a baseline commit of 81 files, the brain folder skeleton (`docs`, `utils`, `connectome/{motor,ring,observation}`, each with a `.gitkeep`) included. Never pulled; the agent's own checkpoints and history.
-- [ ] The sync carries the two floor photos from `docs/private/` to the workspace root, a line of its own like the plan's. Today they are there by hand and the next cleanup loses them.
+- [ ] The sync carries the two floor photos from `docs/private/` to the workspace root, a line of its own like the plan's. Written into `sync.sh` (03.11.), proven with the next push.
 - [x] Rebuild the image on the M1 from `~/Rig/sandbox` (03.11.; the firewall says 7000:7020).
 - [x] Built inside the container (03.11.): the old volume had folders from the first install under another uid and `npm install` failed with EACCES, so the volume was removed and made fresh, registry opened once: 115 packages, core and node-socket compiled, `sharp` arm64 and the decoders load. A volume belongs to one uid; recreate it rather than fix it.
 - [x] `npm run rig` from inside the container (03.11., new layout): both Bolts up through the bridge, SB-11DF at 4.24 V, the matrix char ran.
@@ -27,14 +27,14 @@ The session, as decided: a session is a budget, nothing else. The agent picks se
 - [ ] Bridge safety by hand: kill a client while a Bolt rolls, motors stop; `uv run bridge.py stop`, motors stop.
 - [x] Key file passes `grep -q '^ANTHROPIC_API_KEY=sk-' ~/Rig/secret.env`; never printed.
 - [ ] Workspace spend limit set in the console.
-- [ ] The ntfy topic in `docs/private/rig.env`; the paging commit names it there and the file holds only the two sync variables.
+- [ ] The ntfy topic in `docs/private/rig.env` as `NTFY_TOPIC`; the paging commit names it there and the file holds only the two sync variables. The sync copies the file to `~/Rig/rig.env` for the start script.
 - [ ] Decide the speed cap in the bridge; today the floor is deadman plus motors-off. The agent drives the Bolts to their spots and back, so it drives more than the seek alone.
 
 ## 3 M5: the bell first, menu and dashboard later
 
 Needed for session one:
 
-- [ ] `beep [n]` command in `m5.py`, a PWM tone on the M5 Fire's speaker (GPIO 25) over mpremote. Three beeps mean "the agent stopped with a question".
+- [ ] `beep [n]` command in `m5.py`, a PWM tone on the M5 Fire's speaker (GPIO 25) over mpremote. Three beeps mean "the agent stopped with a question". Written in `m5.py` (03.11.), not yet heard.
 - [ ] Heard from the host. The start script sends it on exit; the agent never touches the bell.
 
 Later:
@@ -57,6 +57,8 @@ Later:
 
 ## 5 Start script, `~/Rig/run-agent.sh`, documented in `agent/Rig/README.md`
 
+`agent/Rig/run-agent.sh` and `prompt.md` are written (03.11.) and untested on the M1; each item below is proven by a run.
+
 - [ ] One argument, the budget: `run-agent.sh 10` passes it as `--max-budget-usd` and writes it as the one line of `Session.md`. The flag counts dollars and the Challenge's ceiling says euros; one unit for both.
 - [ ] Commits the synced workspace before the session, so the agent starts clean and its diff at the end is exactly its work.
 - [ ] Refuses to start while the last section of `brain/docs/questions.md` has no answer.
@@ -70,16 +72,16 @@ Later:
 ## 6 The brief and the workspace documents
 
 - [x] Situation (03.11.): folded into the end of `Challenge.md` as "what is where", one line per file the brief does not name: the floor plan, the two photos from the mount, four pointers into the seek's code. The brief links the challenge, the challenge links `Session.md`; no file is named twice.
-- [ ] Challenge, tools and the measure: the camera and the beacon are the agent's instruments to find and place the Bolts; neither takes part in the seek; the measure is Bolt to Bolt. The agent picks seeker and sender. It drives the Bolts to start spots of its choosing inside the play area and resets them between runs; the plan's two start circles are one example pair, not a rule.
+- [x] Challenge (03.11.), tools and the measure: the camera and the beacon are the agent's instruments to find and place the Bolts; neither takes part in the seek; the measure is Bolt to Bolt. The agent picks seeker and sender. It drives the Bolts to start spots of its choosing inside the play area and resets them between runs; the plan's two start circles are one example pair, not a rule.
 - [ ] Challenge, the frame-to-sheet rule: four points visible in the ultrawide frame with their sheet coordinates, partition ends and wall corners, so a frame gives a position without the agent deriving the mapping. The mapping is rig work, the method is the agent's.
-- [ ] Challenge, the run record: start distance and how it was measured, time to the shared collision, result. The ledger lives in `brain/docs/`, and the next session reads the last report first.
-- [ ] Challenge, the battery floor: a session has no clock, only a budget; the voltage at which the agent sleeps the Bolts, writes the report and ends.
+- [x] Challenge (03.11.), the run record: start distance and how it was measured, time to the shared collision, result. The ledger lives in `brain/docs/`, and the next session reads the last report first.
+- [x] Challenge (03.11.), the battery floor: a session has no clock, only a budget; when a Bolt's battery state reports low the agent sleeps the Bolts, writes the report and ends.
 - [ ] Architecture: the connectome, the observation layer, the ring, the two skills, the diagnosis order; the channel and circuit file formats.
-- [ ] `Session.md` shrinks to one line, the budget, written by the start script. The beacon's spot is in the plan, the camera's address in the brief.
-- [ ] The question file, `brain/docs/questions.md`: the agent appends its question as the last section, sleeps the Bolts and ends the session; the answer goes under the question, on the M1 over the Rig share or here followed by a sync; the next session reads the file first. The brief's "In case of" says this instead of the beep. A short wait is a shell loop polling the file, ten minutes a call at most; the rule is end and ask.
-- [ ] Brief, one line: `recipes.md` says hider for sender.
-- [ ] Brief, one line: `docs/archive`, cited in some headers, is not in the workspace; the headers carry the numbers.
-- [ ] Brief: a Bolt off the play area is the agent's to bring back, the camera is its eye; a Bolt it cannot see or reach is a question.
+- [x] `Session.md` is one line, the budget, written by the start script (03.11.). The beacon's spot is in the plan, the camera's address in the brief.
+- [x] The question file (03.11.), `brain/docs/questions.md`: the agent appends its question as the last section, sleeps the Bolts and ends the session; the answer goes under the question, on the M1 over the Rig share or here followed by a sync; the next session reads the file first. The brief's "In case of" says this instead of the beep. A short wait is a shell loop polling the file, ten minutes a call at most; the rule is end and ask.
+- [x] Brief, one line (03.11.): `recipes.md` says hider for sender.
+- [x] Brief, one line (03.11.): `docs/archive`, cited in some headers, is not in the workspace; the headers carry the numbers.
+- [x] Challenge (03.11.): a Bolt off the play area is the agent's to bring back, the camera is its eye; a Bolt it cannot see or reach is a question.
 - [ ] The loop with no human in it: the agent places, runs, judges by the collision event, resets and repeats; reports are read afterwards.
 
 ## 7 Test runs, in order

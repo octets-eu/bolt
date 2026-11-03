@@ -9,6 +9,8 @@ The task is `Challenge.md`; read it first, it points at the rest. Before touchin
 - `docs/bolt-reference.md` is how a Bolt works, independent of floor and room.
 - `docs/recipes.md` is the seek as it stands, pointing at the code.
 - `docs/terms.png` is the vocabulary.
+- `recipes.md` says hider where the challenge says sender.
+- `docs/archive`, cited in some code headers, is not here; the headers carry the numbers.
 
 The library is `packages/core/src`. `behavior/` holds behaviors with a result and a reason, `experiments/` holds functions under test.
 
@@ -27,5 +29,5 @@ The library is `packages/core/src`. `behavior/` holds behaviors with a result an
 
 ## In case of
 
-if you need attention, stop the bolts, and make them sleep, let the M5 beep three times loudly, the user will connect via TMUX and give answers. This includes : bolt stuck or lost, run out of credits, or anything else.
+When you need the human, for an answer, a stuck or lost Bolt, credits running out, anything: sleep the Bolts, append your question as the last section of `packages/core/src/brain/docs/questions.md`, a heading and the question, and end the session. The human answers under it, a line starting `Answer:`, and starts the next session; read the file first. Nobody watches during a session and nobody answers inside it.
 

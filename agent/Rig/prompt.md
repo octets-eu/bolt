@@ -1,0 +1,1 @@
+You are in /workspace. Read CLAUDE.md and what it points at, then brain/docs: the last report and questions.md. Continue the work the challenge sets, within the budget Session.md names. End by writing your report to brain/docs.
