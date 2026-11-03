@@ -12,6 +12,9 @@ export PATH=/opt/homebrew/bin:$PATH
 cd ~/Rig || exit 1
 # shellcheck source=/dev/null
 [ -f ~/Rig/rig.env ] && . ~/Rig/rig.env   # CAM_SERIAL, the phone's adb address
+# adb's mDNS auto-connect opens a second connection to the phone by its paired name; the phone
+# keeps one, the first dies with "error: closed" and the server sticks. One connection only.
+export ADB_MDNS="${ADB_MDNS:-0}"
 
 ask () {  # <port> <line>: one line to a forwarder on the host, its first reply line
   ( exec 3<>/dev/tcp/127.0.0.1/$1 && printf '%s\n' "$2" >&3 && read -t 20 -r reply <&3 && echo "$reply" ) 2>/dev/null
@@ -34,9 +37,13 @@ uv run bridge.py status 2>/dev/null | jq -r '.[] | "\(.name) link \(if .link the
 uv run bridge.py battery
 m5=$(ask 7010 ping); echo "beacon: ${m5:-no answer on 7010}"
 cam=$(ask 7020 status); echo "camera: ${cam:-forwarder not running}"
-# a phone over Wi-Fi drops off adb with its reboot or Wi-Fi; a connect is idempotent, capped at 10 s
-[ -n "${CAM_SERIAL:-}" ] && perl -e 'alarm shift; exec @ARGV' 10 adb connect "$CAM_SERIAL" >/dev/null 2>&1
-phone=$(adb ${CAM_SERIAL:+-s "$CAM_SERIAL"} shell dumpsys battery 2>/dev/null | awk '/level:/{l=$2} /status:/{s=$2} END{if (l != "") printf "%s%% %s", l, (s == 2 || s == 5) ? "charging" : "discharging"}')
+# an adb server that lost the phone once keeps failing with "No route to host" while ping and nc
+# reach it; a fresh server connects. So: fresh server (it inherits ADB_MDNS), then connect
+if [ -n "${CAM_SERIAL:-}" ]; then
+  adb kill-server >/dev/null 2>&1
+  perl -e 'alarm shift; exec @ARGV' 10 adb connect "$CAM_SERIAL" >/dev/null 2>&1
+fi
+phone=$(adb ${CAM_SERIAL:+-s "$CAM_SERIAL"} shell dumpsys battery 2>/dev/null | awk '/^ *level:/{l=$2} /^ *status:/{s=$2} END{if (l != "") printf "%s%% %s", l, (s == 2 || s == 5) ? "charging" : "discharging"}')
 echo "phone: ${phone:-adb sees no phone}"
 echo "---"
 [ -n "${bridge:-}" ] && wait "$bridge"

@@ -21,7 +21,8 @@ CAM_SERIAL selects the adb device when more than one is attached (an address
 like <ip>:5555 or an adb mDNS name), CAM_ID the default camera id (2, the
 ultrawide; 0 is the main camera, half the floor at twice the detail),
 CAM_SIZE the longer side (1632), CAM_FPS the frames kept per second (2),
-CAM_PORT the port (7020). Run on the M1 as rig: python3 cam.py
+CAM_PORT the port (7020). ADB_MDNS defaults to 0 here, see below. Run on the M1 as
+rig: cd ~/Rig && set -a && . ./rig.env && set +a && nohup python3 cam.py > cam.log 2>&1 &
 """
 import os, signal, socket, socketserver, subprocess, sys, tempfile, threading, time
 
@@ -31,6 +32,9 @@ CAM_ID = os.environ.get("CAM_ID", "2")
 SIZE = os.environ.get("CAM_SIZE", "1632")
 FPS = os.environ.get("CAM_FPS", "2")
 ALLOWED = ("127.", "192.168.5.")
+# adb's mDNS auto-connect would open a second connection to the phone by its paired name; the
+# phone keeps one, the first dies with "error: closed" and the server sticks. One connection only.
+os.environ.setdefault("ADB_MDNS", "0")
 
 WORK = tempfile.mkdtemp(prefix="cam-")
 FIFO = os.path.join(WORK, "stream.mkv")
@@ -49,11 +53,7 @@ def start(cam_id=CAM_ID):
     global started, current
     if alive() and cam_id == current:
         return f"on {cam_id} already"
-    if SERIAL:  # a phone over Wi-Fi drops off adb with its reboot or Wi-Fi; a connect is idempotent
-        try:
-            subprocess.run(["adb", "connect", SERIAL], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=10)
-        except (OSError, subprocess.TimeoutExpired):
-            pass
+    ensure_phone()
     stop()
     if os.path.exists(FIFO):
         os.unlink(FIFO)
@@ -93,13 +93,35 @@ def frame_age_ms():
         return None
 
 
+def adb(*args, timeout=10):
+    """One adb call for the phone; its stdout, or "" on failure or timeout."""
+    try:
+        return subprocess.run(["adb"] + (["-s", SERIAL] if SERIAL else []) + list(args),
+                              capture_output=True, text=True, timeout=timeout).stdout
+    except (OSError, subprocess.TimeoutExpired):
+        return ""
+
+
+def ensure_phone():
+    """The phone on adb. A phone over Wi-Fi drops off with its reboot or a Wi-Fi change, and an adb
+    server that lost it once keeps failing with "No route to host" while the phone answers ping;
+    a fresh server connects. So: connect, and when the state is not `device`, fresh server and again."""
+    if not SERIAL:
+        return
+    for attempt in (1, 2):
+        if attempt == 2:
+            adb("kill-server")
+        try:
+            subprocess.run(["adb", "connect", SERIAL], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=10)
+        except (OSError, subprocess.TimeoutExpired):
+            pass
+        if adb("get-state").strip() == "device":
+            return
+
+
 def phone_battery():
     """The phone's battery as `<pct>% charging|discharging`, or `none` when adb has no phone."""
-    try:
-        out = subprocess.run(["adb"] + (["-s", SERIAL] if SERIAL else []) + ["shell", "dumpsys", "battery"],
-                             capture_output=True, text=True, timeout=5).stdout
-    except (OSError, subprocess.TimeoutExpired):
-        return "none"
+    out = adb("shell", "dumpsys", "battery", timeout=5)
     fields = dict(line.strip().split(": ", 1) for line in out.splitlines() if ": " in line)
     level, state = fields.get("level"), fields.get("status")
     if level is None:
