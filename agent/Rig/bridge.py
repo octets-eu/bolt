@@ -31,10 +31,10 @@ big-endian), payload.
 Data ports listen on every interface and accept loopback and the colima
 network only. The control port listens on loopback; one text line per
 command: status, stop, quit; battery [name] reads the volts through the bridge;
-signal [name] sends the connected sign as a client and prints the Bolt's answers.
+sign [name] sends the bridge's sign as a client and prints the Bolt's answers.
 
 Run:   uv run bridge.py                 serve
-       uv run bridge.py status|stop|quit|battery|signal [name]
+       uv run bridge.py status|stop|quit|battery|sign [name]
        uv run bridge.py probe SB-9129   one ping through the bridge
 """
 
@@ -433,8 +433,8 @@ def battery(name):
         print(name, "response without voltage:", result[1].hex())
 
 
-def signal(name):
-    """The connected sign as a client, each packet with a response: the Bolt's error code per command, 0 is accepted."""
+def sign(name):
+    """The bridge's sign as a client, each packet with a response: the Bolt's error code per command, 0 is accepted."""
     leds, char = connected_signal(name, response=True)
     for label, pkt, command, seq in (("leds", leds, 0x1C, 0x03), ("matrix char", char, 0x42, 0x04)):
         result = exchange(BOLTS[name], pkt, 0x1A, command, seq)
@@ -498,9 +498,9 @@ if __name__ == "__main__":
     elif args[0] == "battery":
         for name in (args[1:] or list(BOLTS)):
             battery(name)
-    elif args[0] == "signal":
+    elif args[0] == "sign":
         for name in (args[1:] or list(BOLTS)):
-            signal(name)
+            sign(name)
     elif args[0] == "probe" and len(args) == 2:
         probe(args[1])
     else:
