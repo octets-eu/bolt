@@ -14,6 +14,9 @@
 #   PROMPT=~/Rig/comprehension.md ~/Rig/run-agent.sh 3
 #                                          another prompt file than ~/Rig/prompt.md, for a test
 #
+# The print run skips the permission prompts, decided by the user on 04.11.: nobody is
+# there to answer them, and the sandbox is the boundary, only the workspace mounted, the
+# firewall on, no docker socket. The interactive run keeps the prompts.
 # Before the run: refuses while the last section of brain/docs/questions.md has no
 # answer; commits the workspace, so the agent's diff at the end is its work alone;
 # writes the budget as the one line of Session.md. The run: the firewalled
@@ -81,7 +84,8 @@ if [ "$mode" = "--interactive" ]; then
 else
   prompt="$(cat "${PROMPT:-$rig/prompt.md}")"
   docker run "${docker_flags[@]}" bolt-sandbox \
-    claude "${claude_flags[@]}" --max-budget-usd "$budget" -p "$prompt" --output-format stream-json --verbose \
+    claude "${claude_flags[@]}" --max-budget-usd "$budget" --dangerously-skip-permissions \
+      -p "$prompt" --output-format stream-json --verbose \
     > "$dir/stream.jsonl" 2> "$dir/stderr.log" || status=$?
 fi
 
