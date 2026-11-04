@@ -6,9 +6,11 @@
 Bolt bridge: the one process on this Mac that touches Bluetooth.
 
 Connects every Bolt in BOLTS by its advertised name, sends the anti-DoS
-unlock the firmware wants first, shows on the Bolt that the bridge holds it
-(both LEDs in the Bolt's colour, a B on the matrix; the wake's reset clears
-it, and a sleeping ST shows no matrix), and offers one TCP port per Bolt. A client
+unlock the firmware wants first, and offers one TCP port per Bolt. While no
+client holds a Bolt it wears the bridge's sign, both LEDs in its colour and a B
+on the matrix: painted at connect, again half a second after each awake
+notification (the wake's reset clears it, and a sleeping ST shows no matrix),
+and when the last client leaves; a client paints its own. A client
 writes packets and gets the Bolt's notifications back as bytes; the protocol
 stays with the client (packages/core). A Bolt that drops is scanned for and
 connected again, forever; clients see the link go down and come up.
@@ -28,10 +30,11 @@ big-endian), payload.
 
 Data ports listen on every interface and accept loopback and the colima
 network only. The control port listens on loopback; one text line per
-command: status, stop, quit; battery [name] reads the volts through the bridge.
+command: status, stop, quit; battery [name] reads the volts through the bridge;
+signal [name] sends the connected sign as a client and prints the Bolt's answers.
 
 Run:   uv run bridge.py                 serve
-       uv run bridge.py status|stop|quit|battery [name]
+       uv run bridge.py status|stop|quit|battery|signal [name]
        uv run bridge.py probe SB-9129   one ping through the bridge
 """
 
@@ -90,12 +93,13 @@ BATTERY = packet(0x1A, 0x11, 0x13, 0x03, 0x02, [])
 COLORS = {"SB-9129": (30, 240, 30), "SB-11DF": (30, 30, 240)}
 
 
-def connected_signal(name):
+def connected_signal(name, response=False):
     """Two packets: both LEDs in the Bolt's colour (set all LEDs, mask 0x3F, no target like core), and a B
-    in that colour on the matrix (matrix char, to the ST). Flags: no response, resets inactivity."""
+    in that colour on the matrix (matrix char, to the ST). Flags: resets inactivity, a response when asked."""
     r, g, b = COLORS.get(name, (200, 200, 200))
-    leds = packet(0x08, None, 0x1A, 0x1C, 0x03, [0x3F, r, g, b, r, g, b])
-    char = packet(0x18, 0x12, 0x1A, 0x42, 0x04, [r, g, b, ord("B")])
+    ask = 0x02 if response else 0x00
+    leds = packet(0x08 | ask, None, 0x1A, 0x1C, 0x03, [0x3F, r, g, b, r, g, b])
+    char = packet(0x18 | ask, 0x12, 0x1A, 0x42, 0x04, [r, g, b, ord("B")])
     return leds, char
 
 
@@ -116,6 +120,9 @@ class Bolt:
         self.write_lock = asyncio.Lock()
         self.frames = 0
         self.last_frame = None
+        self.loop = None
+        # reassembly of the notifications, to see the awake among them
+        self.buffer, self.in_packet, self.escaped = [], False, False
 
     # - - - - - the Bluetooth side - - - - - #
 
@@ -133,16 +140,13 @@ class Bolt:
                     continue
                 lost = asyncio.Event()
                 loop = asyncio.get_running_loop()
+                self.loop = loop
                 async with BleakClient(device, disconnected_callback=lambda _c: loop.call_soon_threadsafe(lost.set)) as client:
                     await client.start_notify(APIV2, self.on_frame)
                     await client.write_gatt_char(ANTIDOS, ANTIDOS_KEY, response=True)
                     self.client = client
                     log(self.name, "connected")
-                    try:
-                        for pkt in connected_signal(self.name):
-                            await self.write(pkt, False)
-                    except Exception as error:
-                        log(self.name, "signal failed:", repr(error))
+                    await self.show_sign()
                     self.broadcast(message(LINK, b"\x01"))
                     await lost.wait()
             except BleakBluetoothNotAvailableError as error:
@@ -161,6 +165,40 @@ class Bolt:
         self.frames += 1
         self.last_frame = time.time()
         self.broadcast(message(FRAME, bytes(data)))
+        for b in data:  # reassemble like core's PacketParser, for the awake notification
+            if b == 0x8D:
+                self.buffer, self.in_packet, self.escaped = [], True, False
+            elif not self.in_packet:
+                continue
+            elif b == 0xD8:
+                self.in_packet = False
+                try:
+                    device, command, _seq, _error = parse_packet(self.buffer)
+                except IndexError:
+                    continue
+                if device == 0x13 and command == 0x11 and self.loop is not None:
+                    log(self.name, "awake")
+                    self.loop.call_soon_threadsafe(self.loop.create_task, self.show_sign(0.5))
+            elif b == 0xAB:
+                self.escaped = True
+            elif self.escaped:
+                self.buffer.append(b | 0x88)
+                self.escaped = False
+            else:
+                self.buffer.append(b)
+
+    async def show_sign(self, delay=0.0):
+        """The bridge's sign on the Bolt, unless a client holds it or the link is gone."""
+        if delay:
+            await asyncio.sleep(delay)
+        if self.clients or self.client is None:
+            return
+        try:
+            for pkt in connected_signal(self.name):
+                await self.write(pkt, False)
+            log(self.name, "sign")
+        except Exception as error:
+            log(self.name, "sign failed:", repr(error))
 
     async def write(self, payload, with_response):
         async with self.write_lock:
@@ -239,6 +277,8 @@ class Bolt:
             writer.close()
             log(self.name, "client gone", peer)
             await self.motors_off()
+            if not self.clients:
+                await self.show_sign()
 
     def status(self):
         return {
@@ -337,7 +377,7 @@ def packet_payload(raw):
 
 
 def exchange(port, pkt, device, command, seq, timeout=4):
-    """One packet through the bridge as a client; the matching response's payload, None without one, a string for link down or a failed write."""
+    """One packet through the bridge as a client; the matching response as (error, payload), None without one, a string for link down or a failed write."""
     try:
         with socket.create_connection(("127.0.0.1", port), timeout=timeout + 1) as s:
             s.sendall(message(WRITE_RESP, pkt))
@@ -362,8 +402,9 @@ def exchange(port, pkt, device, command, seq, timeout=4):
                     elif not in_packet:
                         continue
                     elif b == 0xD8:
-                        if parse_packet(buffer)[:3] == (device, command, seq):
-                            return packet_payload(buffer)
+                        parsed = parse_packet(buffer)
+                        if parsed[:3] == (device, command, seq):
+                            return parsed[3], packet_payload(buffer)
                         in_packet = False
                     elif b == 0xAB:
                         escaped = True
@@ -384,10 +425,23 @@ def battery(name):
         print(name, result)
     elif result is None:
         print(name, "no response within 4 s")
-    elif len(result) >= 2:
-        print(name, f"{((result[0] << 8) | result[1]) / 100:.2f} V")
+    elif result[0]:
+        print(name, f"error {result[0]}")
+    elif len(result[1]) >= 2:
+        print(name, f"{((result[1][0] << 8) | result[1][1]) / 100:.2f} V")
     else:
-        print(name, "response without voltage:", result.hex())
+        print(name, "response without voltage:", result[1].hex())
+
+
+def signal(name):
+    """The connected sign as a client, each packet with a response: the Bolt's error code per command, 0 is accepted."""
+    leds, char = connected_signal(name, response=True)
+    for label, pkt, command, seq in (("leds", leds, 0x1C, 0x03), ("matrix char", char, 0x42, 0x04)):
+        result = exchange(BOLTS[name], pkt, 0x1A, command, seq)
+        if isinstance(result, str) or result is None:
+            print(name, label, result or "no response within 4 s")
+        else:
+            print(name, label, "error", result[0], "payload", result[1].hex() or "-")
 
 
 def probe(name):
@@ -444,6 +498,9 @@ if __name__ == "__main__":
     elif args[0] == "battery":
         for name in (args[1:] or list(BOLTS)):
             battery(name)
+    elif args[0] == "signal":
+        for name in (args[1:] or list(BOLTS)):
+            signal(name)
     elif args[0] == "probe" and len(args) == 2:
         probe(args[1])
     else:
