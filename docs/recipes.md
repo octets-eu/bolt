@@ -13,7 +13,7 @@ Two ladders, on channels of their own, so a frame names its ladder and its level
 | long | 2, 4, 8, 16 | 0 to 3 | the room; 16 reaches 4 m facing, 2 carries the last metre |
 | short | 1, 2, 4 | 4 to 6 | the last stretch, where the long ladder's 2 is heard all round |
 
-The strengths are chosen, not derived; the emitters go to 255.
+The strengths are chosen, not derived; the emitters go to 255. A round is the levels in turn plus the notify's scatter: 850 ms for the long ladder, 650 for the short.
 
 ## Negotiating the ladder: `referee/referee.ts`, `behavior/negotiate-ladder.ts`
 
