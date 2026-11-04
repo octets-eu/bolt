@@ -15,7 +15,7 @@ The library is `packages/core/src`. `behavior/` holds behaviors with a result an
 
 ## What the rig provides
 
-- **Two Bolts** through the bridge on the host: `SB-9129` on port 7001, `SB-11DF` on 7002, control on 7000, host `$BRIDGE_HOST` (192.168.5.2). The bridge holds the one Bluetooth link each and cuts the motors when your process disconnects, goes silent for 3 s, or on `stop`. `packages/node-socket/src/transport.ts` has the protocol in its header.
+- **Two Bolts** through the bridge on the host: `SB-9129` on port 7001, `SB-11DF` on 7002, host `$BRIDGE_HOST`, set in your environment to 192.168.5.2; read it as `connect.mjs` does, the scripts default to loopback. The bridge holds the one Bluetooth link each and cuts the motors when your process disconnects or goes silent for 3 s; letting go of a Bolt's socket is your stop. Its control port on 7000 is the host's and out of your reach. `packages/node-socket/src/transport.ts` has the protocol in its header.
 
 - **The M5 beacon** through the forwarder on port 7010 of the same host. One text line per request: `ping`, `send <ch> [count] [gapMs]`, `frame <ch> <duty> [count]`, `beacon <far> <near> <seconds>`. It sends Bolt-format frames on a channel; channel 7 is free of the ladders 0 to 6. `send` sends at a fixed strength; `frame` sends one frame at a carrier duty in percent, the duty standing in for strength; `beacon` sends two frames every 200 ms for that many seconds, one on channel `near` at 1 % and one on `far` at 33 %, a two-level ladder, the two duties optional after the seconds. The emitter is M5Stack's Unit IR, a 940 nm diode on a 38 kHz carrier, under 5 m by its maker; what distance a duty reaches on this floor, and how it compares to a Bolt's strength, is unmeasured.
 
