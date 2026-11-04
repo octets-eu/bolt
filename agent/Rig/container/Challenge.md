@@ -68,6 +68,8 @@ an example of the file format, the worm's circuit and sensory map, is in `./exam
     brain/connectome/ring
     brain/connectome/observation
 
+- your entry point lives in `brain/` too and runs like `connect.mjs`, through `tsx` against the built library.
+
 ## Situation: what is where
 
 One line per file, only what the brief does not name. The code is the ground truth; a doc that explains code is a sign the code needs a better header.
