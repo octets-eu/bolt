@@ -179,4 +179,4 @@ The light sensor reads lux on request, about 22 reads a second with an empty que
 
 ## 9 Battery and charger
 
-Battery voltage and battery state (unknown, ok, low, critical) are reads to the Nordic. Charger state (unknown, not charging, charging, charged) is a read and a notification; setting the ball in the cradle by hand raises it within about 2 s. The Bolt does not advertise while it sleeps in the cradle.
+Battery voltage and battery state (unknown, ok, low, critical) are reads to the Nordic. Charger state (unknown, not charging, charging, charged) is a read and a notification; setting the ball in the cradle by hand raises it within about 2 s. The Bolt does not advertise while it sleeps in the cradle. A full charge reads 4.25 V; the voltage at which a Bolt gives up is not measured yet, and a charge percentage will come from the two.
