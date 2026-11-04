@@ -10,7 +10,7 @@ export type Slot = 'motor' | 'infrared' | 'mark';
 
 export type LadderRange = 'long' | 'short';
 
-/** A ladder: channel k carries strength k; the channels name the ladder, so a frame says which ladder and which level it is. */
+/** A ladder: its k-th channel carries its k-th strength; the channels name the ladder, so a frame says which ladder and which level it is. */
 export interface Ladder {
   readonly range:     LadderRange;
   readonly channels:  readonly number[];
