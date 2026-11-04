@@ -8,7 +8,8 @@
 # camera delivering a frame, the phone reporting its battery, the sandbox image
 # and volume present and a container reaching the API through its firewall, the
 # key file in shape. The last line is the verdict, ALL GOOD or NOT GOOD with the
-# failed checks, and the window stays open on NOT GOOD until Enter. With a bridge
+# failed checks, the M5 beeps it, once or three times, and the window stays open
+# on NOT GOOD until Enter. With a bridge
 # already running it checks alone. The bridge's lines go to the window and to
 # ~/Rig/bridge.log; when the bridge ends, the window says so with the exit code
 # and stays open on a failure. Closing the window or Ctrl-C ends the bridge;
@@ -122,7 +123,7 @@ else
 fi
 if grep -q '^ANTHROPIC_API_KEY=sk-' ~/Rig/secret.env 2>/dev/null; then ok "key: in shape"; else bad "key: ~/Rig/secret.env missing or not ANTHROPIC_API_KEY=sk-..." "key"; fi
 
-if [ ${#failed[@]} -eq 0 ]; then echo "ALL GOOD"; else echo "NOT GOOD: ${failed[*]}"; fi
+if [ ${#failed[@]} -eq 0 ]; then echo "ALL GOOD"; ask 7010 "beep 1" >/dev/null; else echo "NOT GOOD: ${failed[*]}"; ask 7010 "beep 3" >/dev/null; fi
 echo "---"
 
 if [ -n "${bridge:-}" ]; then
