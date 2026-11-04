@@ -3,7 +3,9 @@
 # which carries the Bluetooth grant a process started over SSH never gets, waits
 # for both links, and prints the rig's state: links, Bolt batteries, whether the
 # M5 answers, the camera forwarder and the phone's battery. With a bridge already
-# running it prints the state alone. The adb call starts the adb server from this
+# running it prints the state alone. The bridge's lines go to the window and to
+# ~/Rig/bridge.log; when the bridge ends, the window says so with the exit code and
+# stays open on a failure until Enter. The adb call starts the adb server from this
 # GUI session when none runs, which is the start it needs. Closing the window or
 # Ctrl-C ends the bridge; `uv run bridge.py stop` from anywhere cuts the motors
 # and leaves it running. Not while a session drives: the battery read is a
@@ -23,10 +25,15 @@ ask () {  # <port> <line>: one line to a forwarder on the host, its first reply 
 if nc -z -w 2 127.0.0.1 7000 >/dev/null 2>&1; then
   echo "bridge: already running"
 else
-  uv run bridge.py &
+  echo "--- start $(date '+%Y-%m-%d %H:%M:%S')" >> ~/Rig/bridge.log
+  uv run bridge.py > >(tee -a ~/Rig/bridge.log) 2>&1 &
   bridge=$!
   for _ in $(seq 1 30); do  # both links, up to 60 s; a Bolt asleep in the cradle does not advertise
     sleep 2
+    if ! kill -0 "$bridge" 2>/dev/null; then
+      echo "bridge: ended during start, see above and ~/Rig/bridge.log"
+      break
+    fi
     links=$(uv run bridge.py status 2>/dev/null | jq -r '[.[] | select(.link)] | length' 2>/dev/null)
     [ "${links:-0}" = "2" ] && break
   done
@@ -46,4 +53,8 @@ fi
 phone=$(adb ${CAM_SERIAL:+-s "$CAM_SERIAL"} shell dumpsys battery 2>/dev/null | awk '/^ *level:/{l=$2} /^ *status:/{s=$2} END{if (l != "") printf "%s%% %s", l, (s == 2 || s == 5) ? "charging" : "discharging"}')
 echo "phone: ${phone:-adb sees no phone}"
 echo "---"
-[ -n "${bridge:-}" ] && wait "$bridge"
+if [ -n "${bridge:-}" ]; then
+  wait "$bridge"; code=$?
+  echo "bridge: ended with exit $code; log in ~/Rig/bridge.log"
+  [ "$code" -ne 0 ] && read -r -p "Enter closes this window " _
+fi

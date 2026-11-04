@@ -47,7 +47,7 @@ is denied, so **start it once from the rig user's own Terminal on screen** and
 approve the prompt. After that it survives and can be managed over SSH.
 
 ```
-Bridge.command on rig's Desktop            # double-click; a link to ~/Rig/Bridge.command
+Bridge.command on rig's Desktop            # double-click; a link to ~/Rig/Bridge.command, log in ~/Rig/bridge.log
 cd ~/Rig && uv run bridge.py               # the same by hand in rig's GUI Terminal
 uv run bridge.py status | stop | quit      # from anywhere, incl. SSH
 uv run bridge.py battery [SB-9129]         # the volts, through the bridge; not while a session drives
