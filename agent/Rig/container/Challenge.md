@@ -41,7 +41,7 @@ an example of the file format, the worm's circuit and sensory map, is in `./exam
 ### Extra points for:
 
 - The matrix visualizes the seeker state, eg the ring, in realtime
-- Minimal token usage; keep a ledger of what you spend against the session's budget.
+- Minimal token usage; the session's cost is recorded outside, by the start script, so keep your runs and your reading cheap.
 - Even works, when sender moves
 
 
