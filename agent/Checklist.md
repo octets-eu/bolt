@@ -27,7 +27,6 @@ The session, as decided: a session is a budget, nothing else. The agent picks se
 - [x] A Bolt no client holds wears the bridge's sign, both LEDs in its colour and a B on the matrix: at connect, half a second after each awake notification, and when the last client leaves (proven 04.11.: after the icon's restart and wake both Bolts showed the B). Seen 04.11.: the LEDs command is accepted asleep, error 0, the matrix command gets no answer while the ST sleeps, so the sign needs the wake; `bridge.py sign` sends both with responses.
 - [x] Bridge safety by hand: kill a client while a Bolt rolls, motors stop; `uv run bridge.py stop`, motors stop. `bridge.py roll <name> [seconds] [speed]` is the test, raw motors forward and then the client vanishes without stopping. Run 04.11. on SB-9129 at speed 40: client gone, motors off within the second; `stop` one second into a roll, motors off on both; the deadman at 3 s of silence, motors off again; the Bolt stopped each time and stayed put (the eye, 04.11.).
 - [x] Key file passes `grep -q '^ANTHROPIC_API_KEY=sk-' ~/Rig/secret.env`; never printed.
-- [ ] Workspace spend limit set in the console: $100, the monthly API credit Anthropic gives this project, linked 12.10. and renewing on the console's "next credit" date, 13.11. next, not on the 1st; the per-session budget is the start script's. The plan: the ten days and $100 to 13.11. are for the initial experiments, the evaluation comes after.
 - [x] The ntfy topic in `docs/private/rig.env` as `NTFY_TOPIC` (03.11.); a test post from the M4 reached the iPhone, title and high priority through the lock screen. The sync copies the file to `~/Rig/rig.env` for the start script.
 - [ ] Decide the speed cap in the bridge; today the floor is deadman plus motors-off. The agent drives the Bolts to their spots and back, so it drives more than the seek alone.
 
@@ -60,7 +59,7 @@ Later:
 
 `agent/Rig/run-agent.sh` and `prompt.md` are written (03.11.) and untested on the M1; each item below is proven by a run.
 
-- [ ] One argument, the budget: `run-agent.sh 10` passes it as `--max-budget-usd` and writes it as the one line of `Session.md`. Dollars throughout, as the flag and the monthly credit count. $10 per session for now, to be evaluated after the first sessions.
+- [ ] One argument, the budget: `run-agent.sh 10` passes it as `--max-budget-usd` and writes it as the one line of `Session.md`. Dollars throughout, as the flag and the monthly credit count. $10 per session for now, to be evaluated after the first sessions. The flag is the only limit: the monthly credit is $100, renewing 13.11., and no workspace limit is set (decided 04.11.; the Console UI offers one, the API for it is enterprise-only).
 - [ ] Commits the synced workspace before the session, so the agent starts clean and its diff at the end is exactly its work.
 - [ ] Refuses to start while the last section of `brain/docs/questions.md` has no answer.
 - [ ] docker flags: firewall caps, host uid, `HOME=/claude-home`, `BRIDGE_HOST=192.168.5.2` (every script defaults to loopback and the README's headless command lacks it), nonessential traffic off, env-file, mounts for `container` and `claude-home`, `--strict-mcp-config`.
