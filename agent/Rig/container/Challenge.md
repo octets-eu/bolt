@@ -71,7 +71,7 @@ One line per file, only what the brief does not name. The code is the ground tru
 
 ### The floor
 
-- `docs/floor-plan.svg`: the room on a 500 x 700 cm sheet, 1 unit = 1 cm, x right, y down. Walls on their centre lines, the partition with its 143 cm opening, furniture, danger zones where cables lie, two example start spots with their headings, magnetic north, and in the header the heading convention and the rule that turns a locator reading into a sheet position. The camera's frames lie like this sheet.
+- `docs/floor-plan.svg`: the room on a 500 x 700 cm sheet, 1 unit = 1 cm, x right, y down. Walls on their centre lines, the partition with its 143 cm opening, furniture, danger zones where cables lie, two example start spots with their headings, magnetic north, and in the header the heading convention, the rule that turns a locator reading into a sheet position, and the landmarks a frame shows too, the partition's ends, the beacon and the chest with their sheet positions. The camera's frames lie like this sheet.
 - `floor-ultra-wide.jpg`: the same floor as the camera's ultrawide sees it from its mount 2 m up, 1200x1600, turned to lie like the plan, the whole floor, the Bolts near the centre. What the plan draws, this shows.
 - `floor-main.jpg`: the same mount through the main camera, 1200x1600, turned the same way: the stretch between the two speakers at twice the detail, the matrix patterns readable.
 

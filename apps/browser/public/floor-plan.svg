@@ -23,6 +23,11 @@
   north lies at sheet heading 240, down and to the left; the sheet's top is
   bearing 120. Drawn as the arrow in the top-left corner, outside the room.
   The camera's frames lie like this sheet.
+  Landmarks the frames show as well as this sheet, in the room frame: the
+  partition's ends, the left part's at 151, 295 and the right part's at
+  294, 295, each a face from y 285.5 to 304.5; the beacon at 154, 295; the
+  chest, Truhe, furniture-1, with its two inner corners at 317, 229.5 and
+  317, 285.5. The other furniture lies outside the frames or in their dark.
   Furniture: three rectangles filling corners on the right wall; the label
   is the inner corner's distance from the horizontal wall x from the right
   wall, in cm (71x108 the other way round). Distances from the outer walls'
@@ -55,7 +60,7 @@
   <g transform="translate(30,22.5)">
     <use href="#outer-wall" fill="#c8c8c8"/>
 
-    <!-- furniture, under the walls' strokes -->
+    <!-- furniture, under the walls' strokes; furniture-1 is the chest, Truhe, the landmark the frames show -->
     <g id="furniture" fill="#8a8a8a">
       <rect id="furniture-1" x="317" y="229.5" width="123" height="56"/>
       <rect id="furniture-2" x="369" y="304.5" width="71"  height="108"/>
