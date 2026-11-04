@@ -11,6 +11,8 @@
 #                                          the model (alias or id), the thinking depth (low,
 #                                          medium, high, xhigh, max) and the context size at
 #                                          which compaction runs; unset, claude's defaults
+#   PROMPT=~/Rig/comprehension.md ~/Rig/run-agent.sh 3
+#                                          another prompt file than ~/Rig/prompt.md, for a test
 #
 # Before the run: refuses while the last section of brain/docs/questions.md has no
 # answer; commits the workspace, so the agent's diff at the end is its work alone;
@@ -77,7 +79,7 @@ status=0
 if [ "$mode" = "--interactive" ]; then
   docker run -it "${docker_flags[@]}" bolt-sandbox claude "${claude_flags[@]}" || status=$?
 else
-  prompt="$(cat "$rig/prompt.md")"
+  prompt="$(cat "${PROMPT:-$rig/prompt.md}")"
   docker run "${docker_flags[@]}" bolt-sandbox \
     claude "${claude_flags[@]}" --max-budget-usd "$budget" -p "$prompt" --output-format stream-json --verbose \
     > "$dir/stream.jsonl" 2> "$dir/stderr.log" || status=$?
