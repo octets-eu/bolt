@@ -49,6 +49,7 @@ an example of the file format, the worm's circuit and sensory map, is in `./exam
 
 - The camera and the beacon are your instruments to find and place the Bolts. Neither takes part in the seek; the measure is Bolt to Bolt.
 - You pick which Bolt seeks and which sends.
+- The play area is the floor the ultrawide frame shows, without the danger zones and the furniture of the plan.
 - You drive the Bolts to start spots of your choosing inside the play area and reset them between runs. The plan's two start circles are an example pair, 23 cm apart, a contact test's distance and too close for a seek.
 - A Bolt off the play area is yours to bring back; the camera is your eye. A Bolt you cannot see or reach is a question for the human.
 - Keep a ledger in `brain/docs`: per run the start distance, centre to centre, and how you measured it, the time to the shared collision, the result. Your report for the next session goes there too; a session begins by reading the last one.
