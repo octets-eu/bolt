@@ -2,9 +2,11 @@
 
 Read next: `Session.md`, this session's budget. What is where in this folder is at the end of this file.
 
-Needed is a simple brain simulation, that drives a bolt (seeker) to the other Bolt(sender). Sender emits constantly IR signals of different strength on multiple channels (code exists, the ladder). 
+Needed is a simple brain simulation, that drives a bolt (seeker) to the other Bolt (sender). Sender emits constantly IR signals of different strength on multiple channels, the ladder; the code shows how.
 
-Seeker needs to analyse incoming IR, determines direction to sender and drives towards sender until both collide. A shared collsion event on sender and seeker counts as found and should stop both bolts.
+Seeker needs to analyse incoming IR, determines direction to sender and drives towards sender until both collide. A shared collision event on sender and seeker, both reports within a moment of each other, counts as found and stops both Bolts.
+
+The library holds the traditional approach: the ladder, the referee that switches it, the sweep, the approach, the tag rule. Read all of it, to learn how a Bolt sends and hears and what the floor taught. Your solution is the new approach, inspired by biology, and it lives in `brain/`: it sends the ladder, reads the receivers, drives and calls the tag itself, through the library's lower layers as its hands. The traditional seek's own layer is to read, not to run.
 
 The task is to build a simple connectome (aka brain) with:
 
