@@ -11,7 +11,7 @@ The session, as decided: a session is a budget, nothing else. The agent picks se
 - [x] First push (03.11., 85 files); the old `~/Rig/bolt` and `~/Rig/bridge/` are in rig's Trash. The bridge from `~/Rig/bridge.py` needs its first start from rig's GUI Terminal again: over SSH it gets no Bluetooth, the grant did not follow the move.
 - [x] Update the paths in `docs/private/m1-rig.md`.
 - [x] Git in the workspace (03.11.): `~/Rig/container` is a repo with the identity `operator <operator@hypatia.earth>` and a baseline commit of 81 files, the brain folder skeleton (`docs`, `utils`, `connectome/{motor,ring,observation}`, each with a `.gitkeep`) included. Never pulled; the agent's own checkpoints and history.
-- [ ] The sync carries the two floor photos from `docs/private/` to the workspace root, a line of its own like the plan's (proven 04.11.: after the push the dry run has nothing left for them).
+- [x] The sync carries the two floor photos from `docs/private/` to the workspace root, a line of its own like the plan's (proven 04.11.: after the push the dry run has nothing left for them).
 - [x] Rebuild the image on the M1 from `~/Rig/sandbox` (03.11.; the firewall says 7000:7020).
 - [x] Built inside the container (03.11.): the old volume had folders from the first install under another uid and `npm install` failed with EACCES, so the volume was removed and made fresh, registry opened once: 115 packages, core and node-socket compiled, `sharp` arm64 and the decoders load. A volume belongs to one uid; recreate it rather than fix it.
 - [x] `npm run rig` from inside the container (03.11., new layout): both Bolts up through the bridge, SB-11DF at 4.24 V, the matrix char ran.
