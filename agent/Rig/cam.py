@@ -21,6 +21,8 @@ CAM_SERIAL selects the adb device when more than one is attached (an address
 like <ip>:5555 or an adb mDNS name), CAM_ID the default camera id (2, the
 ultrawide; 0 is the main camera, half the floor at twice the detail),
 CAM_SIZE the longer side (1632), CAM_FPS the frames kept per second (2),
+CAM_ROTATE the anticlockwise turn given to every frame in degrees (90, which
+lays the frame like the floor plan, x right and y down; 0, 180, 270 allowed),
 CAM_PORT the port (7020). ADB_MDNS defaults to 0 here, see below. Run on the M1 as
 rig: cd ~/Rig && set -a && . ./rig.env && set +a && nohup python3 cam.py > cam.log 2>&1 &
 """
@@ -31,6 +33,7 @@ SERIAL = os.environ.get("CAM_SERIAL", "")
 CAM_ID = os.environ.get("CAM_ID", "2")
 SIZE = os.environ.get("CAM_SIZE", "1632")
 FPS = os.environ.get("CAM_FPS", "2")
+ROTATE = os.environ.get("CAM_ROTATE", "90")
 ALLOWED = ("127.", "192.168.5.")
 # adb's mDNS auto-connect would open a second connection to the phone by its paired name; the
 # phone keeps one, the first dies with "error: closed" and the server sticks. One connection only.
@@ -64,7 +67,8 @@ def start(cam_id=CAM_ID):
         "--video-source=camera", f"--camera-id={cam_id}", "--camera-ar=sensor",
         f"--max-size={SIZE}", "--video-codec=h265", "--video-bit-rate=2M",
         "--no-playback", "--no-audio", "--record-format=mkv", f"--record={FIFO}"]
-    ffmpeg = ["ffmpeg", "-loglevel", "error", "-i", FIFO, "-vf", f"fps={FPS}",
+    turn = {"0": "", "90": ",transpose=2", "180": ",hflip,vflip", "270": ",transpose=1"}.get(ROTATE, "")
+    ffmpeg = ["ffmpeg", "-loglevel", "error", "-i", FIFO, "-vf", f"fps={FPS}{turn}",
               "-update", "1", "-atomic_writing", "1", "-q:v", "3", LATEST]
     # each in its own process group, so stop() also takes scrcpy's adb children
     procs["scrcpy"] = subprocess.Popen(scrcpy, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
