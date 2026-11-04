@@ -8,7 +8,6 @@ The task is `Challenge.md`; read it first, it points at the rest. Before touchin
 
 - `docs/bolt-reference.md` is how a Bolt works, independent of floor and room.
 - `docs/recipes.md` is the seek as it stands, pointing at the code.
-- `docs/terms.png` is the vocabulary.
 - `recipes.md` says hider where the challenge says sender.
 - `docs/archive`, cited in some code headers, is not here; the headers carry the numbers.
 
