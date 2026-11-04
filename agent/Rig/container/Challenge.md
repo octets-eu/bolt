@@ -18,11 +18,11 @@ The task is to build a simple connectome (aka brain) with:
 
 ### Observation Layer
 
-Understands how bolts emit and read IR. Which frames are useful. Understands the ladder, (more here)
+Understands how bolts emit and read IR. Which frames are useful. Understands the ladder. What it hears becomes the ring's input.
 
 ### Ring Attractor
 
-Encodes the assumed direction towards sender in the ring. Or none when no data.
+Fed by the observation layer, read by the motor neurons. Encodes the assumed direction towards the sender and the confidence in it. Or none when no data. What the ring does without input, and with input that names two directions, nose or tail, is yours to decide and to state.
 
 ### Motor neurons
 
