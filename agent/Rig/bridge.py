@@ -32,11 +32,13 @@ Data ports listen on every interface and accept loopback and the colima
 network only. The control port listens on loopback; one text line per
 command: status, stop, quit. As a client through the bridge: battery [name] reads
 the volts; wake [name] wakes and waits for the ST; awake [name] asks the ST; sign
-[name] sends the bridge's sign with responses. Each exits 0 only when every Bolt
-asked answered as wanted.
+[name] sends the bridge's sign with responses; roll <name> [seconds] [speed] is
+the safety test: it drives the Bolt forward slowly and then drops the connection
+without stopping it, so only the bridge's motors-off can. Each exits 0 only when
+every Bolt asked answered as wanted.
 
 Run:   uv run bridge.py                 serve
-       uv run bridge.py status|stop|quit|battery|wake|awake|sign [name]
+       uv run bridge.py status|stop|quit|battery|wake|awake|sign [name] | roll <name> [seconds] [speed]
        uv run bridge.py probe SB-9129   one ping through the bridge
 """
 
@@ -468,6 +470,19 @@ def wake(name):
     return False
 
 
+def roll(name, seconds=1.0, speed=40):
+    """The safety test. Raw motors forward at `speed` (of 255) for `seconds` while the client stays quiet, then the
+    socket is closed abruptly with the motors still commanded on. The bridge's client-gone floor must stop the Bolt;
+    nothing here does. With seconds past the deadman the silent-client floor fires first, as a test of that one."""
+    port = BOLTS[name]
+    forward = packet(0x18, 0x12, 0x16, 0x01, 0x07, [1, speed, 1, speed])  # raw motors, both forward, no response
+    with socket.create_connection(("127.0.0.1", port), timeout=5) as s:
+        s.sendall(message(WRITE_NORESP, forward))
+        print(name, f"rolling at {speed} for {seconds} s, then the client vanishes")
+        time.sleep(seconds)
+    print(name, "client gone; the bridge must have cut the motors")
+
+
 def sign(name):
     """The bridge's sign as a client, each packet with a response: the Bolt's error code per command, 0 is accepted."""
     leds, char = connected_signal(name, response=True)
@@ -539,6 +554,8 @@ if __name__ == "__main__":
     elif args[0] == "sign":
         for name in (args[1:] or list(BOLTS)):
             sign(name)
+    elif args[0] == "roll" and 2 <= len(args) <= 4:
+        roll(args[1], float(args[2]) if len(args) > 2 else 1.0, int(args[3]) if len(args) > 3 else 40)
     elif args[0] == "probe" and len(args) == 2:
         probe(args[1])
     else:
