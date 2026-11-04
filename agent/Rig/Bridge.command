@@ -111,7 +111,7 @@ if [ -n "$phone" ]; then ok "phone: $phone"; else bad "phone: adb sees no phone"
 if colima status >/dev/null 2>&1; then  # the sandbox: image, volume, and the API from inside the firewall
   docker image inspect bolt-sandbox >/dev/null 2>&1 && img=yes || img=no
   docker volume inspect bolt_node_modules >/dev/null 2>&1 && vol=yes || vol=no
-  code=$(docker run --rm --cap-add=NET_ADMIN --cap-add=NET_RAW bolt-sandbox bash -c 'curl -s -o /dev/null -m 15 -w "%{http_code}" https://api.anthropic.com/' 2>/dev/null)
+  code=$(docker run --rm --cap-add=NET_ADMIN --cap-add=NET_RAW bolt-sandbox bash -c 'curl -s -o /dev/null -m 15 -w "%{http_code}" https://api.anthropic.com/' 2>/dev/null | tail -1)  # the entrypoint prints its firewall line first
   if [ "$img" = yes ] && [ "$vol" = yes ] && [ -n "$code" ] && [ "$code" != 000 ]; then
     ok "sandbox: image, volume, api.anthropic.com answers $code from inside"
   else
