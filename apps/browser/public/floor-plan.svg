@@ -18,6 +18,11 @@
   241 - y, 317.5 - x and blue at 264 + y, 317.5 + x.
   Beacon: the M5, a 5.4 cm square centred 154, 295, at the left part's end
   on the partition's centre line, read from the mount's photo, 5 cm either way.
+  Headings on the sheet: clockwise from the top, 0 up, 90 right, 180 down.
+  North: a compass on the floor reads 300 looking down the sheet, so magnetic
+  north lies at sheet heading 240, down and to the left; the sheet's top is
+  bearing 120. Drawn as the arrow in the top-left corner, outside the room.
+  The camera's frames lie like this sheet.
   Furniture: three rectangles filling corners on the right wall; the label
   is the inner corner's distance from the horizontal wall x from the right
   wall, in cm (71x108 the other way round). Distances from the outer walls'
@@ -85,6 +90,16 @@
     <circle id="start-green" fill="#0a0" fill-opacity="0.35" cx="211" cy="295" r="3.65"/>
     <circle id="start-blue"  fill="#06f" fill-opacity="0.35" cx="234" cy="295" r="3.65"/>
     <rect id="beacon" fill="#c00" fill-opacity="0.6" x="151.3" y="292.3" width="5.4" height="5.4"/>
+  </g>
+
+  <!-- magnetic north, sheet heading 240; in sheet coordinates, outside the room's cut corner -->
+  <g id="north" stroke="#333" fill="#333" transform="translate(52,38) rotate(240)">
+    <line x1="0" y1="0" x2="0" y2="-22" stroke-width="1.2"/>
+    <polygon points="0,-27 -3,-19 3,-19" stroke="none"/>
+  </g>
+  <text x="37" y="62" font-family="sans-serif" font-size="9" fill="#333">N</text>
+
+  <g transform="translate(30,22.5)">
 
     <!-- wall lengths as labelled in the source, except the two noted above and the partition's thickness -->
     <g id="labels" font-family="Helvetica, Arial, sans-serif" font-size="9" font-weight="bold" text-anchor="middle">
