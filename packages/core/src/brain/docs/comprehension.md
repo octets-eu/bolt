@@ -1,41 +1,37 @@
-# Comprehension: reading test, 2026-11-04
+# Comprehension, 2026-11-04
 
-I read CLAUDE.md, Challenge.md, Session.md, docs/bolt-reference.md, docs/recipes.md, docs/terms.png, the floor-plan.svg header, the transport header and the headers of the ladder, referee, sweep and seek-to-collision code. I did not touch a Bolt or build anything.
+A reading only: no Bolt, beacon or camera was touched, nothing was built. I left `comprehension-1954.md` unread so this one would be my own reading.
 
-## The rig and how to reach each part
-- **Two Bolts** (SB-9129 on port 7001, SB-11DF on 7002, control on 7000) are reached through a Bluetooth bridge on `$BRIDGE_HOST` 192.168.5.2. `@bolt/node-socket`'s `SocketTransport` frames each message as type, length, payload and sends heartbeats. The bridge cuts the motors if my process disconnects, stays silent for 3 s, or sends `stop`. `npm run rig` is the pattern to follow: connect, read the battery, let go.
-- **M5 IR beacon** on port 7010. It takes one text line per request and sends Bolt-format frames, normally on channel 7, which no ladder uses. It is an instrument, not part of the seek.
-- **Camera** on port 7020, one line per connection. `on` gives the ultrawide (the whole floor) and `on 0` gives the main camera (the stretch between the speakers). `frame` returns a 1200x1600 JPEG oriented like the floor plan. I use it to find, place and measure the Bolts.
-- **Code:** the library is in `packages/core/src` and I may write only under `brain/`. After a sync I build core, then node-socket.
+## The rig and how to reach it
 
-## What the challenge asks, and how it is measured
-Build a small connectome in `brain/connectome` with three parts. The observation neurons read the IR ladder frames. A ring attractor holds the sender's direction and its confidence, or nothing when there is no data. The motor neurons turn the ring into roll commands and fall back to a search routine when there is no direction, or more than one. The seeker must reach the sender until both Bolts report a collision at the same moment (in the code: within 300 ms), and then both stop. I choose the roles and the start spots, and the Bolts must drive gently.
+All of it sits on host `$BRIDGE_HOST` (192.168.5.2) and is reached over TCP from this container.
+- **Two Sphero Bolts**: SB-9129 on port 7001, SB-11DF on 7002, control on 7000. The bridge holds the BLE link and cuts the motors on disconnect, on 3 s of silence, or on `stop`. `SocketTransport` (node-socket) sends the heartbeat. `connect.mjs` is the pattern to follow.
+- **M5 IR beacon** on port 7010, one text line per request (`ping`, `send`, `frame`, `beacon`). It sits at a known spot (154, 295 in the room frame) and sends Bolt-format frames. Channel 7 is clear of the ladders.
+- **Phone camera** 2 m up, on port 7020: `on [0|2]`, `frame`, `off`. It returns a 1200x1600 JPEG laid out like `docs/floor-plan.svg` (cm, x right, y down). Pixels map to cm through the landmarks in the SVG header: the partition ends, the beacon and the chest corners.
+- The camera and the beacon are instruments only. The seek itself runs Bolt to Bolt.
 
-How it is measured:
-- time to collision under 30 s per metre of start distance, measured Bolt to Bolt
-- behaviour that looks natural
-- code that is efficient and readable
+## The challenge and how success is measured
 
-Extra credit: the seeker's matrix shows the ring live, low token use with a budget ledger ($3 this session), and the seek still works when the sender moves. For each run, the ledger in `brain/docs` records the start distance and how it was measured, the time, and the result. Each session also leaves a handover report there.
+One program holds both Bolts. One sends the IR ladder. The other runs a connectome under `brain/` that steers it into the sender: observation neurons turn the frames into input for a ring attractor (direction and confidence), and motor neurons read the ring, or search when the ring has no single direction. The circuit and sensory map are data in the worm's format, and only code of mine runs them. The library is my hands, and its sweep/approach is for reading, not running. A tag means both Bolts report a collision within about 300 ms, and the tag stops both. Success means readable code, behaviour that looks natural, and time to the shared collision under 30 s per metre of start distance, centre to centre. Per run, the ledger records the distance, how I measured it, the time and the result. Extras: the ring shown on the matrix, a token ledger, and a sender that moves.
 
 ## What I would verify first, and why
-1. **Bridge up, both Bolts awake, battery ok** (`npm run rig`). Nothing else matters without this, and a low battery ends the session.
-2. **Camera to sheet mapping** (`on`, `frame`), checked against the landmarks in the floor-plan header: the partition ends, the beacon at 154,295 and the chest corners. I need this to measure start distance, keep the Bolts out of the danger zones and recover a lost Bolt.
-3. **IR reception on each Bolt** using the beacon on channel 7: does listen give notifies, and do the corner reads land? This tells a dead receiver apart from a brain bug.
-4. **The ladder Bolt to Bolt, on this floor:** which levels arrive at about 1 m and 2 m, and how wide each lobe is. The strengths are "chosen, not derived", and the observation layer rests on them.
-5. **Collision detection:** silent at rest on both Bolts, and both fire within 300 ms on a gentle contact. That event is the finish line.
-6. **Frames and signs:** after a wake, heading is clockwise while yaw is counter-clockwise, and the floor-plan's formula from locator to sheet position. Getting a sign wrong sends the seeker the wrong way.
-7. **One reference sweep (`behavior/sweep.ts`)** to see how long it takes on this floor. At 15 to 30 s per sweep, a single sweep can use up the whole 30 s/m budget at 1 m.
+
+1. **Rig liveness and battery.** Ping the bridge, beacon and camera, and read each Bolt's firmware battery state. If any part fails, the rules say end the session.
+2. **Camera to cm.** Fit pixels to the landmarks and find both Bolts in a frame. Every distance in the ledger and every reset depends on this.
+3. **Heading on the sheet.** After sleep/wake, drive a short slow leg and watch it on camera. The Bolt's own heading frame is arbitrary, so I need its offset to the sheet.
+4. **Hearing at the planned distance.** Run the ladder from the sender, or the beacon's ladder on channel 7. Check which levels arrive and whether the corner readings name a side. The lobes are "chosen, not derived" and depend on the room. The observation layer has nothing to stand on without this.
+5. **The tag.** At threshold 20, check that a gentle bump fires on both Bolts within 300 ms, and that starting off does not. The reference says threshold 20 also fires on starting off. If both Bolts start together, for example a moving sender, that could produce a false tag.
 
 ## Unclear, missing or contradictory
-- **Sweep:** terms.png defines it as "a standing turn through 180° in 15° steps". recipes.md and sweep.ts describe a belief that picks the most informative heading.
-- **Volley:** terms.png says the four receivers are read 6 ms apart. Panel 6 shows three reads, and recipes says "volleys".
-- **Round length:** a round is 0.85 s in terms.png. The long ladder is 4 × 200 ms, so about 0.8 s plus the notify scatter. The short ladder is 3 levels, so a shorter round.
-- **The bump:** recipes says it is "not built". But seek-to-collision.ts already has seekers (`seek`, `seekEdge`) that "drive into it", plus a pass rule. It is unclear which of these is current.
-- **Example start spots:** they are 23 cm apart and back to back. That is under the roughly 40 cm where recipes says no level has a lobe, so they are useless as a seek start except as a contact test.
-- **Distance:** "the measure is Bolt to Bolt", but it does not say whether centre to centre or surface to surface (7.3 cm apart).
-- **Battery:** "battery state low" ends the session, but the voltage at which a Bolt gives up is unmeasured.
-- **Undocumented:** the meaning of the beacon's `beacon <far> <near> <seconds>` and `frame <duty>`. Also how the sender is supposed to move for the "sender moves" extra.
-- **Folders:** the folder rule allows only `brain/*`. The sender's ladder and the referee live outside it, so I may use them but not change them.
-- **Missing:** `docs/archive` is cited but absent. The package.json workspaces list `apps/*`, which is not here, so the root `npm run build` would fail. Use the per-package builds.
-- **Wording:** "Ring attractor encodes ... or none" does not say how confidence should decay without input. Neither does it say what "multiple directions" means for the ring (two bumps, or the nose/tail ambiguity).
+
+- `terms.png` (cited by recipes) and `docs/archive` are missing. `Session.md` holds only the budget.
+- The `communication.ts` comment says "channel k carries strength k", but long channel 0 carries strength 2. The channel indexes the level, not the strength.
+- The reference calls the IR reading "four strengths" and in the same section says it "shows the channel heard". What the four values actually are is unclear.
+- How beacon duty % maps to Bolt strength 0–255 is not given. In `beacon`, "near" is the weak 1 % frame. That fits (weak means heard only near), but nothing says what distance either level reaches.
+- The rules do not say whether the brain may ask the program to switch the sender's ladder, as the referee does. That is a channel outside IR, and the challenge says the sender emits "constantly".
+- It is not defined when timing starts (program start, first ladder frame, first motion), or whether a run that leaves the play area counts.
+- "Play area" means the ultrawide view minus danger zones and furniture. The plan's danger zones are "no collision expected", yet they are excluded from play.
+- The locator-to-sheet rule in the SVG holds only for the two example starts. Other starts need the camera.
+- Matrix output for the ring shares the roughly 30 commands/s link with the timed IR reads.
+- Budget: $3 for reading, calibration, building and runs is tight. The library's sweep alone takes 15–30 s, about the whole time allowed for 1 m.
+- Folders: only `brain/*` may be written, but the runnable program, node-socket and the build output sit outside it. The entry point probably has to live in `brain/` and import `@bolt/node-socket`.
