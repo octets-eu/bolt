@@ -8,3 +8,5 @@ The placement test (`brain/docs/placement.md`) stopped after leg 2. In leg 1 the
 
 1. Did you see or hear it go, and is it touching or damaged against the speaker? Should I drive it back by the camera next session, or will you set it back?
 2. Before I drive again, may I spend some budget on a bench test: one short leg with every locator sample logged next to camera frames, to find where locator and floor part company?
+
+Answer: 1. Seen: the Bolt rolled about a metre east and got lost behind the right speaker, nothing damaged; the human sets it back on the floor inside the play area, not at a measured spot, find it by the camera. 2. No bench test. The locator drifts and is approximate, that is known; the camera is the only real position. Drive by the camera: short legs, each capped by time as well as by the locator, a frame after every leg, the locator a hint within a leg.
