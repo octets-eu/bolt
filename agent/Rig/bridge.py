@@ -30,11 +30,13 @@ big-endian), payload.
 
 Data ports listen on every interface and accept loopback and the colima
 network only. The control port listens on loopback; one text line per
-command: status, stop, quit; battery [name] reads the volts through the bridge;
-sign [name] sends the bridge's sign as a client and prints the Bolt's answers.
+command: status, stop, quit. As a client through the bridge: battery [name] reads
+the volts; wake [name] wakes and waits for the ST; awake [name] asks the ST; sign
+[name] sends the bridge's sign with responses. Each exits 0 only when every Bolt
+asked answered as wanted.
 
 Run:   uv run bridge.py                 serve
-       uv run bridge.py status|stop|quit|battery|sign [name]
+       uv run bridge.py status|stop|quit|battery|wake|awake|sign [name]
        uv run bridge.py probe SB-9129   one ping through the bridge
 """
 
@@ -89,6 +91,10 @@ MOTORS_OFF = packet(0x18, 0x12, 0x16, 0x01, 0xFE, [0, 0, 0, 0])
 PING = packet(0x0A, None, 0x10, 0x00, 0x01, [])
 # battery voltage from the Nordic, which answers asleep too; flags as the ping plus has target
 BATTERY = packet(0x1A, 0x11, 0x13, 0x03, 0x02, [])
+# power wake to the Nordic, which answers asleep; the ST boots and sends the awake notification
+WAKE = packet(0x1A, 0x11, 0x13, 0x0D, 0x05, [])
+# a ping aimed at the ST: answered awake only
+ST_PING = packet(0x1A, 0x12, 0x10, 0x00, 0x06, [])
 # the Bolts' colours, as the browser app and connect.mjs paint them
 COLORS = {"SB-9129": (30, 240, 30), "SB-11DF": (30, 30, 240)}
 
@@ -433,6 +439,35 @@ def battery(name):
         print(name, "response without voltage:", result[1].hex())
 
 
+def st_awake(port, timeout=2):
+    """Whether the Bolt's ST answers a ping, which it does awake only."""
+    result = exchange(port, ST_PING, 0x10, 0x00, 0x06, timeout=timeout)
+    return isinstance(result, tuple) and result[0] == 0
+
+
+def awake(name):
+    """Prints awake or asleep; True when awake."""
+    up = st_awake(BOLTS[name])
+    print(name, "awake" if up else "asleep")
+    return up
+
+
+def wake(name):
+    """Power wake to the Nordic, then the ST pinged once a second until it answers, 6 s at most; True when awake."""
+    result = exchange(BOLTS[name], WAKE, 0x13, 0x0D, 0x05)
+    if not isinstance(result, tuple) or result[0]:
+        print(name, "wake:", result if isinstance(result, str) else (f"error {result[0]}" if result else "no response within 4 s"))
+        return False
+    deadline = time.time() + 6
+    while time.time() < deadline:
+        time.sleep(1)
+        if st_awake(BOLTS[name], timeout=1):
+            print(name, "awake")
+            return True
+    print(name, "wake sent, ST silent after 6 s")
+    return False
+
+
 def sign(name):
     """The bridge's sign as a client, each packet with a response: the Bolt's error code per command, 0 is accepted."""
     leds, char = connected_signal(name, response=True)
@@ -498,6 +533,9 @@ if __name__ == "__main__":
     elif args[0] == "battery":
         for name in (args[1:] or list(BOLTS)):
             battery(name)
+    elif args[0] in ("wake", "awake"):
+        results = [(wake if args[0] == "wake" else awake)(name) for name in (args[1:] or list(BOLTS))]
+        sys.exit(0 if all(results) else 1)
     elif args[0] == "sign":
         for name in (args[1:] or list(BOLTS)):
             sign(name)

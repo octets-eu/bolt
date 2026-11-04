@@ -47,10 +47,11 @@ is denied, so **start it once from the rig user's own Terminal on screen** and
 approve the prompt. After that it survives and can be managed over SSH.
 
 ```
-Bridge.command on rig's Desktop            # double-click; a link to ~/Rig/Bridge.command, log in ~/Rig/bridge.log
+Bridge.command on rig's Desktop            # double-click: bridge, forwarders, colima up, both Bolts awake,
+                                           # every check proven, ALL GOOD or NOT GOOD; log in ~/Rig/bridge.log
 cd ~/Rig && uv run bridge.py               # the same by hand in rig's GUI Terminal
 uv run bridge.py status | stop | quit      # from anywhere, incl. SSH
-uv run bridge.py battery [SB-9129]         # the volts, through the bridge; not while a session drives
+uv run bridge.py battery|wake|awake|sign [SB-9129]   # as a client through the bridge; not while a session drives
 uv run bridge.py probe SB-9129             # one ping through the whole chain
 ```
 
