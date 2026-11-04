@@ -22,8 +22,9 @@ container (colima)            host (macOS, user rig)              Bolt
 ```
 
 - `bridge.py` is the only process that touches Bluetooth. It connects each Bolt
-  by name, does the anti-DoS unlock, reconnects on a drop, and serves one TCP
-  port per Bolt (SB-9129 on 7001, SB-11DF on 7002, control on 7000). It cuts the
+  by name, does the anti-DoS unlock, shows on the Bolt that it holds it (both
+  LEDs in the Bolt's colour, a B on the matrix), reconnects on a drop, and
+  serves one TCP port per Bolt (SB-9129 on 7001, SB-11DF on 7002, control on 7000). It cuts the
   motors when a client disconnects, when a client goes silent past its deadman,
   or on `stop`. Only loopback and the colima network may connect.
 - `@bolt/node-socket` is the core `Transport` over that socket. `connect.mjs`

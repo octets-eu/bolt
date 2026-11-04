@@ -6,7 +6,9 @@
 Bolt bridge: the one process on this Mac that touches Bluetooth.
 
 Connects every Bolt in BOLTS by its advertised name, sends the anti-DoS
-unlock the firmware wants first, and offers one TCP port per Bolt. A client
+unlock the firmware wants first, shows on the Bolt that the bridge holds it
+(both LEDs in the Bolt's colour, a B on the matrix; the wake's reset clears
+it, and a sleeping ST shows no matrix), and offers one TCP port per Bolt. A client
 writes packets and gets the Bolt's notifications back as bytes; the protocol
 stays with the client (packages/core). A Bolt that drops is scanned for and
 connected again, forever; clients see the link go down and come up.
@@ -84,6 +86,17 @@ MOTORS_OFF = packet(0x18, 0x12, 0x16, 0x01, 0xFE, [0, 0, 0, 0])
 PING = packet(0x0A, None, 0x10, 0x00, 0x01, [])
 # battery voltage from the Nordic, which answers asleep too; flags as the ping plus has target
 BATTERY = packet(0x1A, 0x11, 0x13, 0x03, 0x02, [])
+# the Bolts' colours, as the browser app and connect.mjs paint them
+COLORS = {"SB-9129": (30, 240, 30), "SB-11DF": (30, 30, 240)}
+
+
+def connected_signal(name):
+    """Two packets: both LEDs in the Bolt's colour (set all LEDs, mask 0x3F, no target like core), and a B
+    in that colour on the matrix (matrix char, to the ST). Flags: no response, resets inactivity."""
+    r, g, b = COLORS.get(name, (200, 200, 200))
+    leds = packet(0x08, None, 0x1A, 0x1C, 0x03, [0x3F, r, g, b, r, g, b])
+    char = packet(0x18, 0x12, 0x1A, 0x42, 0x04, [r, g, b, ord("B")])
+    return leds, char
 
 
 def message(kind, payload=b""):
@@ -125,6 +138,11 @@ class Bolt:
                     await client.write_gatt_char(ANTIDOS, ANTIDOS_KEY, response=True)
                     self.client = client
                     log(self.name, "connected")
+                    try:
+                        for pkt in connected_signal(self.name):
+                            await self.write(pkt, False)
+                    except Exception as error:
+                        log(self.name, "signal failed:", repr(error))
                     self.broadcast(message(LINK, b"\x01"))
                     await lost.wait()
             except BleakBluetoothNotAvailableError as error:
