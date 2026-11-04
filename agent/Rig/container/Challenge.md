@@ -6,7 +6,7 @@ Needed is a simple brain simulation, that drives a bolt (seeker) to the other Bo
 
 Seeker needs to analyse incoming IR, determines direction to sender and drives towards sender until both collide. A shared collision event on sender and seeker, both reports within a moment of each other, counts as found and stops both Bolts.
 
-The library holds the traditional approach: the ladder, the referee that switches it, the sweep, the approach, the tag rule. Read all of it, to learn how a Bolt sends and hears and what the floor taught. Your solution is the new approach, inspired by biology, and it lives in `brain/`: it sends the ladder, reads the receivers, drives and calls the tag itself, through the library's lower layers as its hands. The traditional seek's own layer is to read, not to run.
+The library holds the traditional approach: the ladder, the referee that switches it, the sweep, the approach, the tag rule. Read all of it, to learn how a Bolt sends and hears and what the floor taught. Your solution is the new approach, inspired by biology, and it lives in `brain/`: it sends the ladder, reads the receivers, drives and calls the tag itself, through the library's lower layers as its hands. The traditional seek's own layer is to read, not to run. One program of yours holds both Bolts through the bridge: the sender's ladder on one, the brain on the other, side by side; either Bolt can be either, chosen per run, and both roll. For the extra, the same program also rolls the sender on a slow pattern of your choosing while the seeker seeks.
 
 The task is to build a simple connectome (aka brain) with:
 
