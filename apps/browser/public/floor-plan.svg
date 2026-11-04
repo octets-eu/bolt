@@ -33,8 +33,8 @@
   is the inner corner's distance from the horizontal wall x from the right
   wall, in cm (71x108 the other way round). Distances from the outer walls'
   centre lines and from the partition's skirting board.
-  Danger zones: floor where navigation is hard but no collision is expected,
-  such as cables. 421,0 60 wide 120 high; from the left wall and the left
+  Danger zones: floor where a Bolt gets stuck, cables lie there, with nothing
+  to bump into; kept out of the play area. 421,0 60 wide 120 high; from the left wall and the left
   part's skirting board, 160 wide 80 high.
 -->
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 700" width="1000" height="1400">
