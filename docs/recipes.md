@@ -36,4 +36,4 @@ From a direction to the hider's doorstep, by holding the hider at the edge of th
 
 ## The bump: not built
 
-What is there: `experiments/seek-to-collision.ts` holds the tag rule, both Bolts' collision reports within 300 ms count as one contact, at the most sensitive collision threshold that stays quiet at rest. What the bump has to do: from the dash band's direction, drive straight at the hider until the contact, and tell a miss from a hit. A miss leaves the seeker past the hider with no level having an edge, so it has to back off along its line before it sweeps again.
+What is there: `seek` and `seekEdge` in `experiments/seek-to-collision.ts` are the first and the second seeker, superseded by the sweep and the approach; what stays current in that file is the tag rule, both Bolts' collision reports within 300 ms count as one contact, at the most sensitive collision threshold that stays quiet at rest. What the bump has to do: from the dash band's direction, drive straight at the hider until the contact, and tell a miss from a hit. A miss leaves the seeker past the hider with no level having an edge, so it has to back off along its line before it sweeps again.
