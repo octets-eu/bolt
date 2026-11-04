@@ -1,6 +1,6 @@
 # Recipes
 
-Know-how of the seek as it stands. An entry lives until it is a function with a header in `packages/core/src`, then it goes; where the code exists already the entry says only what the piece is for and names the file. Terms are in `terms.png`.
+Know-how of the seek as it stands. An entry lives until it is a function with a header in `packages/core/src`, then it goes; where the code exists already the entry says only what the piece is for and names the file.
 
 ## The ladder: `communication/communication.ts`
 
