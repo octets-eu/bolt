@@ -36,6 +36,8 @@
   Danger zones: floor where a Bolt gets stuck, cables lie there, with nothing
   to bump into; kept out of the play area. 421,0 60 wide 120 high; below the partition's left part,
   from the left wall and the lower skirting board, 160 wide 80 high.
+  The floor: planks with cracks, not even; a Bolt shifts a few centimetres
+  even when it only turns, and the locator shows it.
 -->
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 700" width="1000" height="1400">
 
