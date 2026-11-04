@@ -36,7 +36,7 @@ an example of the file format, the worm's circuit and sensory map, is in `./exam
 
 - efficient and readable code
 - natural observed behaviour of seeker (roaming or targeted or colliding)
-- time from start to collision with sender, under 30secs per meter distance
+- time from start to collision with sender, under 30secs per meter distance. The clock runs from the seeker's first motion to the shared collision; a run in which a Bolt leaves the play area is void.
 
 ### Extra points for:
 
