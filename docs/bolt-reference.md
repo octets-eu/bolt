@@ -161,7 +161,7 @@ The notification is 16 bytes: impact x, y, z as int16 over 4096 g, an axis bitma
 
 ## 7 Infrared
 
-Four emitter and receiver pairs. Send infrared message takes a code 0 to 7 and a strength 0 to 255 for each emitter, named front, left, right, rear. The readings come back as four strengths that the project reads as front left, front right, back right, back left: the receivers sit at the corners, 45° off the nose in front and 135° behind.
+Four emitter and receiver pairs. Send infrared message takes a code 0 to 7 and a strength 0 to 255 for each emitter, named front, left, right, rear. The readings come back as four values, the channel each receiver hears or 255 for none, that the project reads as front left, front right, back right, back left: the receivers sit at the corners, 45° off the nose in front and 135° behind.
 
 A message is its channel number and nothing else: the receiver reports the channel, not who sent it. The carrier is near 38 kHz; the encoding is Sphero's own.
 
