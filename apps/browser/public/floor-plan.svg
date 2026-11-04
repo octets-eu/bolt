@@ -13,8 +13,9 @@
   (y = 285.5 and 304.5), opening 143 cm.
   Bolt starts: on the partition's centre line, green 60 cm from the left
   part's end, blue 60 cm from the right part's end, 23 cm apart, circles of
-  the Bolt's diameter 7.3 cm. Green faces -x, blue +x, back to back. With
-  x, y a Bolt's locator after a reset there, on the sheet green is at
+  the Bolt's diameter 7.3 cm, at 211, 295 and 234, 295 in the room frame.
+  Green faces -x, blue +x, back to back. With x, y a Bolt's locator after a
+  reset there, on the sheet (room frame plus 30, 22.5) green is at
   241 - y, 317.5 - x and blue at 264 + y, 317.5 + x.
   Beacon: the M5, a 5.4 cm square centred 154, 295, at the left part's end
   on the partition's centre line, read from the mount's photo, 5 cm either way.

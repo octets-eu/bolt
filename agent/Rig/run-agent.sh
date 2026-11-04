@@ -85,8 +85,9 @@ else
     > "$dir/stream.jsonl" 2> "$dir/stderr.log" || status=$?
 fi
 
-# the result record: the last line of type result
-result="$(jq -c 'select(.type=="result")' "$dir/stream.jsonl" 2>/dev/null | tail -1 || true)"
+# the result record: the last line of type result; the container's entrypoint prints its firewall
+# line first, which is not JSON and would abort jq, so only lines that start a JSON object count
+result="$(grep '^{' "$dir/stream.jsonl" 2>/dev/null | jq -c 'select(.type=="result")' 2>/dev/null | tail -1 || true)"
 subtype="$(jq -r '.subtype // "none"' <<<"${result:-{}}" 2>/dev/null || echo none)"
 cost="$(jq -r '.total_cost_usd // "?"' <<<"${result:-{}}" 2>/dev/null || echo '?')"
 turns="$(jq -r '.num_turns // "?"' <<<"${result:-{}}" 2>/dev/null || echo '?')"

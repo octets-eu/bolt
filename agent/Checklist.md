@@ -60,12 +60,12 @@ Later:
 `agent/Rig/run-agent.sh` and `prompt.md` are written (03.11.) and untested on the M1; each item below is proven by a run.
 
 - [ ] One argument, the budget: `run-agent.sh 10` passes it as `--max-budget-usd` and writes it as the one line of `Session.md`. Dollars throughout, as the flag and the monthly credit count. $10 per session for now, to be evaluated after the first sessions. The flag is the only limit: the monthly credit is $100, renewing 13.11., and no workspace limit is set (decided 04.11.; the Console UI offers one, the API for it is enterprise-only).
-- [ ] Commits the synced workspace before the session, so the agent starts clean and its diff at the end is exactly its work.
+- [x] Commits the synced workspace before the session, so the agent starts clean and its diff at the end is exactly its work (04.11., `before session 2026-11-04_1947`).
 - [ ] Refuses to start while the last section of `brain/docs/questions.md` has no answer.
 - [ ] docker flags: firewall caps, host uid, `HOME=/claude-home`, `BRIDGE_HOST=192.168.5.2` (every script defaults to loopback and the README's headless command lacks it), nonessential traffic off, env-file, mounts for `container` and `claude-home`, `--strict-mcp-config`.
 - [ ] claude flags: `-p` with the prompt read from a file, `--output-format stream-json` into a log, `--max-budget-usd`, and from the environment `--model` (alias or id), `--effort` (low, medium, high, xhigh, max) and `--autocompact <size>`, all documented flags (checked 03.11.). Print mode is the session; a question goes through the file (section 6), so no interactive run is needed.
 - [ ] The result record, cost and turns, appended to the session's report.
-- [ ] Logs under `~/Rig/sessions/<date>/`, outside the container.
+- [x] Logs under `~/Rig/sessions/<stamp>/`, outside the container (04.11.: stream.jsonl, stderr.log, report.md). The stream's first line is the entrypoint's firewall message, not JSON; the script and any reader skip lines that do not start a JSON object.
 - [ ] Rings on exit: an unanswered question at the end of `questions.md`, a budget stop or an error page the phone over ntfy (one curl from the host, the topic from `rig.env`) and send `beep 3` to the forwarder; a clean end sends one beep and a page that says done.
 - [ ] An interactive variant with `-it` for the comprehension test and for a session you sit in. The budget flag is print mode only (docs, 03.11.), so this run is bounded by the console's limit alone.
 
@@ -87,7 +87,7 @@ Later:
 ## 7 Test runs, in order
 
 - [x] Smoke: `claude -p "Hi"` answers from the firewalled container.
-- [ ] Comprehension: the agent explains the rig, the environment and the challenge in its own words and says what it would verify first; no Bolt touched. Where it misreads, the brief is wrong.
+- [x] Comprehension (04.11., session 2026-11-04_1947, Opus, 9 turns, $0.39, 74 s): the agent explained the rig, the challenge and its first checks correctly and listed the cracks, saved in `brain/docs/comprehension.md`. Its Write was denied: print mode asks for permissions and nobody answers, so the print run needs a grant, a decision for the human (skip the prompts inside the sandbox, or an allowlist of tools). Its cracks: the play area is undefined; the start distance is undefined; `terms.png` describes an older sweep and differs from `recipes.md` on close range; whether the brain must be data in the worm's format or may be code is unsaid; the plan's header mixed the room frame and the sheet for a reader, now stated.
 - [ ] Chain: the agent brings up both Bolts, reads the batteries, pings the M5, hears channel 7, takes one camera frame and switches the camera off; numbers only, no motion.
 - [ ] Motion: one 90° turn and back, locator heading reported, then stop.
 - [ ] Placement: the agent picks a spot on the plan, drives one Bolt there by camera frames, reports the plan position against the locator. The tools and the mapping before any seek.
