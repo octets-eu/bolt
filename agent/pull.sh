@@ -10,6 +10,11 @@
 # frames/ at the repo's root, the path its reports cite; the folder is
 # gitignored, so they are here to look at and never in a commit. Only their
 # number is printed.
+# The record of the sessions comes along too, into agent/sessions/, gitignored
+# as well: ~/Rig/sessions (per session the stream, every command of the agent
+# with its output, and the report line), Claude Code's own transcripts from
+# the container's home under claude-transcripts/, and the rig's logs
+# (~/Rig/*.log). Again only the number of files is printed.
 #
 #   agent/pull.sh              pull; prints every file that changed
 #   agent/pull.sh --dry-run    show what would come, fetch nothing
@@ -35,3 +40,11 @@ rsync -a --itemize-changes "$@" --exclude .DS_Store "$src" "$repo/$sub"
 mkdir -p "$repo/frames"
 n="$(rsync -a --itemize-changes "$@" --exclude .DS_Store "${RIG_TARGET%/}/container/frames/" "$repo/frames/" | grep -c '^>f' || true)"
 echo "frames: $n new"
+
+rig="${RIG_TARGET%/}"
+mkdir -p "$here/sessions/claude-transcripts"
+n="$( { rsync -a --itemize-changes "$@" --exclude .DS_Store "$rig/sessions/" "$here/sessions/"
+        rsync -a --itemize-changes "$@" --exclude .DS_Store "$rig/claude-home/.claude/projects/-workspace/" "$here/sessions/claude-transcripts/"
+        rsync -a --itemize-changes "$@" --include '/*.log' --exclude '*' "$rig/" "$here/sessions/"
+      } | grep -c '^>f' || true)"
+echo "sessions: $n files new or changed"
