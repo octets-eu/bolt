@@ -13,3 +13,6 @@ sessions/
 __pycache__/
 *.pyc
 frames/
+
+# Claude Code conversation transcripts, copied from ~/.claude/projects
+diary/
