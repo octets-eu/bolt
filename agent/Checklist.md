@@ -4,6 +4,26 @@ What has to be in place and tested, in the order it is needed. `[x]` is proven, 
 
 The session, as decided: a session is a budget, nothing else. The agent picks seeker and sender, drives the Bolts to start spots of its own choosing inside the play area and resets them between runs; the camera and the beacon are its instruments for that, neither takes part in the seek, the measure is Bolt to Bolt. When it has a question it writes it to a file, sleeps the Bolts and ends; the start script rings the phone and the M5; the answer goes into the file and the next session starts from it.
 
+## Open
+
+The open items in short, by section; each stands in full below.
+
+- 2 Camera forwarder starts after a reboot through `Bridge.command`.
+- 2 Speed cap in the bridge, to decide.
+- 3 `page <reason>` as a forwarder command.
+- 3 The forwarder holds the M5's serial port open.
+- 3 The M5 stays dumb, the menu is a table in the forwarder.
+- 3 Stop button.
+- 3 First menu actions.
+- 3 Dashboard as the resting screen.
+- 3 Buttons A, B and C.
+- 3 FRITZ!App Fon as a real call.
+- 4 `pipe-pane` writes the screen to a log file.
+- 5 Interactive variant with `-it`.
+- 6 The loop with no human in it.
+- 7 Long run with a small `--autocompact` window.
+- 8 Nobody is needed during the session.
+
 ## 1 Repo and sync
 
 - [x] Layout: `agent/` stays here, `agent/Rig/` mirrors `~/Rig/` on the M1, `agent/Rig/container/` is the workspace the container mounts. `agent/sync.sh` pushes the subset that `sync.rules` names and lays `agent/Rig/` over `~/Rig`; it copies and overwrites, never deletes.
