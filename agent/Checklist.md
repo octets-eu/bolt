@@ -9,7 +9,6 @@ The session, as decided: a session is a budget, nothing else. The agent picks se
 The open items in short, by section; each stands in full below.
 
 - 2 Camera forwarder starts after a reboot through `Bridge.command`.
-- 3 FRITZ!App Fon as a real call.
 - 7 Long run with a small `--autocompact` window.
 - 8 Nobody is needed during the session.
 
@@ -47,7 +46,6 @@ Needed for session one:
 
 Later:
 
-- [ ] The FRITZ!App Fon as a real call, the later upgrade of the page.
 
 ## 4 tmux
 
