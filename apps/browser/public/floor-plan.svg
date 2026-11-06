@@ -17,8 +17,6 @@
   Green faces -x, blue +x, back to back. With x, y a Bolt's locator after a
   reset there, on the sheet (room frame plus 30, 22.5) green is at
   241 - y, 317.5 - x and blue at 264 + y, 317.5 + x.
-  Beacon: the M5, a 5.4 cm square centred 154, 295, at the left part's end
-  on the partition's centre line, read from the mount's photo, 5 cm either way.
   Headings on the sheet: clockwise from the top, 0 up, 90 right, 180 down.
   North: a compass on the floor reads 300 looking down the sheet, so magnetic
   north lies at sheet heading 240, down and to the left; the sheet's top is
@@ -26,8 +24,8 @@
   The camera's frames lie like this sheet.
   Landmarks the frames show as well as this sheet, in the room frame: the
   partition's ends, the left part's at 151, 295 and the right part's at
-  294, 295, each a face from y 285.5 to 304.5; the beacon at 154, 295; the
-  chest, Truhe, furniture-1, with its two inner corners at 317, 229.5 and
+  294, 295, each a face from y 285.5 to 304.5; the chest, Truhe,
+  furniture-1, with its two inner corners at 317, 229.5 and
   317, 285.5. The other furniture lies outside the frames or in their dark.
   Furniture: three rectangles filling corners on the right wall; the label
   is the inner corner's distance from the horizontal wall x from the right
@@ -97,7 +95,6 @@
     <!-- start points of the Bolts -->
     <circle id="start-green" fill="#0a0" fill-opacity="0.35" cx="211" cy="295" r="3.65"/>
     <circle id="start-blue"  fill="#06f" fill-opacity="0.35" cx="234" cy="295" r="3.65"/>
-    <rect id="beacon" fill="#c00" fill-opacity="0.6" x="151.3" y="292.3" width="5.4" height="5.4"/>
   </g>
 
   <!-- magnetic north, sheet heading 240; in sheet coordinates, outside the room's cut corner -->
