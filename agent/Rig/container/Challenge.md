@@ -49,13 +49,13 @@ an example of the file format, the worm's circuit and sensory map, is in `./exam
 
 ## Floor and tools
 
-- The camera and the beacon are your instruments to find and place the Bolts. Neither takes part in the seek; the measure is Bolt to Bolt.
+- The camera is your instrument to find and place the Bolts. It takes no part in the seek; the measure is Bolt to Bolt.
 - You pick which Bolt seeks and which sends.
 - The play area is the floor the ultrawide frame shows, without the danger zones and the furniture of the plan. The goal holds for Bolts in each other's line of sight; the partition blocks the infrared, and a seek without a signal is not asked for now.
 - You drive the Bolts to start spots of your choosing inside the play area and reset them between runs. The plan's two start circles are an example pair, 23 cm apart, a contact test's distance and too close for a seek.
 - A Bolt off the play area is yours to bring back; the camera is your eye. A Bolt you cannot see or reach is a question for the human.
 - Keep a ledger in `brain/docs`: per run the start distance, centre to centre, and how you measured it, the time to the shared collision, the result. Your report for the next session goes there too; a session begins by reading the last one.
-- A session has no clock, only the budget. When a Bolt's battery state, the firmware's own word and not a voltage, reports low, or when any part of the rig stops answering, a Bolt, the beacon or the camera, by battery or by connection, sleep the Bolts, write the report and end.
+- A session has no clock, only the budget. When a Bolt's battery state, the firmware's own word and not a voltage, reports low, or when any part of the rig stops answering, a Bolt or the camera, by battery or by connection, sleep the Bolts, write the report and end.
 
 ## Constraints
 
@@ -78,7 +78,7 @@ One line per file, only what the brief does not name. The code is the ground tru
 
 ### The floor
 
-- `docs/floor-plan.svg`: the room on a 500 x 700 cm sheet, 1 unit = 1 cm, x right, y down. Walls on their centre lines, the partition with its 143 cm opening, furniture, danger zones where cables lie, two example start spots with their headings, magnetic north, and in the header the heading convention, the rule that turns a locator reading into a sheet position, and the landmarks a frame shows too, the partition's ends, the beacon and the chest with their sheet positions. The camera's frames lie like this sheet.
+- `docs/floor-plan.svg`: the room on a 500 x 700 cm sheet, 1 unit = 1 cm, x right, y down. Walls on their centre lines, the partition with its 143 cm opening, furniture, danger zones where cables lie, two example start spots with their headings, magnetic north, and in the header the heading convention, the rule that turns a locator reading into a sheet position, and the landmarks a frame shows too, the partition's ends and the chest with their sheet positions. The camera's frames lie like this sheet.
 - `floor-ultra-wide.jpg`: the same floor as the camera's ultrawide sees it from its mount 2 m up, 1200x1600, turned to lie like the plan, the whole floor, the Bolts near the centre. What the plan draws, this shows.
 - `floor-main.jpg`: the same mount through the main camera, 1200x1600, turned the same way: the stretch between the two speakers at twice the detail, the matrix patterns readable.
 
