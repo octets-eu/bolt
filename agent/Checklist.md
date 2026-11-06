@@ -76,7 +76,6 @@ Later:
 - [x] Challenge (04.11.), the frame-to-sheet landmarks: the plan's header names what a frame shows as well, the partition's two ends, the beacon and the chest with its two inner corners, each with its room-frame position; the frames lie like the sheet. Finding them in a frame is the agent's.
 - [x] Challenge (03.11.), the run record: start distance and how it was measured, time to the shared collision, result. The ledger lives in `brain/docs/`, and the next session reads the last report first.
 - [x] Challenge (03.11.), the battery floor: a session has no clock, only a budget; when a Bolt's battery state reports low the agent sleeps the Bolts, writes the report and ends.
-- [ ] Architecture: the connectome, the observation layer, the ring, the two skills, the diagnosis order; the channel and circuit file formats.
 - [x] `Session.md` is one line, the budget, written by the start script (03.11.). The beacon's spot is in the plan, the camera's address in the brief.
 - [x] The question file (03.11.), `brain/docs/questions.md`: the agent appends its question as the last section, sleeps the Bolts and ends the session; the answer goes under the question, on the M1 over the Rig share or here followed by a sync; the next session reads the file first. The brief's "In case of" says this instead of the beep. A short wait is a shell loop polling the file, ten minutes a call at most; the rule is end and ask.
 - [x] Brief, one line (03.11.): `recipes.md` says hider for sender.
