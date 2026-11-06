@@ -1,8 +1,18 @@
-# A room from photos
+# Ways to get a room
 
-An alternative to the roaming step of the app: instead of the Bolts bumping their way round a new room, somebody takes photos and a model turns them into walls and furniture. Nothing here is tried yet; this is what exists, what it would cost on RunPod and how it would be set up.
+Alternatives to the roaming step of the app: instead of the Bolts bumping their way round a new room, somebody takes photos and a model turns them into walls and furniture, or the phone measures the room itself. Nothing here is tried yet; this is what exists, what it would cost and how it would be set up.
 
-## The two steps
+## Three routes to a room
+
+| Route | What happens | Gives | Needs | Cost |
+|---|---|---|---|---|
+| 1. The Bolts roam | both Bolts drive and every bump is a point | the room as a Bolt meets it, at floor level, in the Bolts' own units | time and battery | none |
+| 2. Photos and models | photos go to a server, two models turn them into a room | walls, doors, windows and furniture boxes, without size | a GPU server, a scale reference, glue code | 1 to 6 cents a room |
+| 3. The phone measures | the child walks to each corner and taps the floor | the room's outline in real centimetres | a phone or tablet that tracks itself | none |
+
+Routes 2 and 3 are described below; route 1 is the wireframe's "New room" screen. They combine: an outline from route 3 gives the size, the Bolts' bumps from route 1 fill in what stands on the floor.
+
+## Route 2: photos and models
 
 Photos become a room in two steps, each with an open model.
 
@@ -16,7 +26,7 @@ Photos become a room in two steps, each with an open model.
 - SpatialLM knows 59 furniture categories and can be asked for a subset.
 - On an iPhone or iPad with LiDAR, Apple's RoomPlan does both steps on the device and returns metres. It needs no server, but the app is a web app on Android, where it does not exist.
 
-## What the Bolts need that photos do not give
+### What the Bolts need that photos do not give
 
 - **Size.** Plain photos give the room's shape, not its size. Something of known length has to be in the pictures; a Bolt is 7.3 cm across.
 - **Floor level.** The models see the room at eye height. A Bolt meets it at 4 cm: chair legs, cables, the gap under a chest. A photo room shows furniture as boxes, not what is open underneath.
@@ -24,7 +34,7 @@ Photos become a room in two steps, each with an open model.
 
 So a photo room is a start, not the final map: the Bolts' bump points still correct it at floor level.
 
-## What has to be written
+### What has to be written
 
 Neither repository does these, by their READMEs:
 
@@ -33,7 +43,7 @@ Neither repository does these, by their READMEs:
 3. The cloud scaled to metres, from a Bolt in the pictures or one wall measured by hand.
 4. SpatialLM's text output turned into the app's room: a floor plan in centimetres with walls and furniture outlines.
 
-## Requirements, from the READMEs
+### Requirements, from the READMEs
 
 | | VGGT | SpatialLM |
 |---|---|---|
@@ -46,7 +56,7 @@ Neither repository does these, by their READMEs:
 - **VGGT's memory:** an earlier version of its README listed about 11 GB for 50 photos and 21 GB for 100; that is from memory and not verified, and the README now says a later update fits two to three times more photos into the same memory. A 24 GB card is the size assumed below.
 - **Licences:** `VGGT-1B` is non-commercial; the commercial checkpoint is given on application. SpatialLM 1.1 uses the Sonata encoder, whose weights are CC-BY-NC. Fine for this project, not for an app that is sold.
 
-## Cost on RunPod
+### Cost on RunPod
 
 Prices and stock are from RunPod's catalog as read on 2026-11-06, secure cloud, pods. Every 24 GB card with stock at that moment:
 
@@ -81,7 +91,7 @@ A room is scanned once and then kept, so the question is what it costs while nob
 - With no warm worker almost every scan is a cold start. RunPod's own measurements show both a wake-up in one to two seconds and, at times, a full boot of about four minutes; the app has to show a waiting screen for that.
 - A stopped pod is the cheap way to keep a trial setup between two afternoons. Terminating it, not stopping it, ends all charges.
 
-## Rough setup
+### Rough setup
 
 **To try it, on a pod:**
 
@@ -105,6 +115,42 @@ A room is scanned once and then kept, so the question is what it costs while nob
 - How much memory and time a real room takes; the first pod run gives both numbers.
 - Whether SpatialLM accepts a VGGT cloud at all; its README shows clouds from MASt3R-SLAM, RGBD and LiDAR.
 
+## Route 3: the phone measures
+
+This is how a measuring app on a phone works, turned into a way to enter a room. It measures from the phone's own movement, not from a picture.
+
+**How a phone gets centimetres:**
+
+- **Camera and motion sensors together.** While the phone moves, the camera follows small features in the scene and the accelerometer and gyroscope measure the phone's own motion. Fused, they give the phone's position in space many times a second.
+- **The scale comes from the motion sensors.** The accelerometer measures real acceleration against a known gravity, so the phone knows how far it moved in metres. Two views of one point from positions a known distance apart give the point's distance.
+- **Surfaces.** The phone detects the floor and walls and pins a tapped point onto them. A measurement is the distance between two such points.
+- **LiDAR, on some devices,** measures distance directly and makes this quicker and steadier.
+
+Apple publishes no accuracy figure for its Measure app and calls results approximate. Reports put LiDAR devices within about a centimetre at short range and devices without LiDAR less consistent.
+
+**What a web app gets of this on Android.** Chrome exposes the phone's tracking through WebXR on devices that support ARCore. By Google's own table, hit testing against surfaces, anchors and depth are shipped; plane detection is a developer trial.
+
+**The interaction:**
+
+1. The child points the tablet at the floor and moves it a little, until the floor is found.
+2. The child walks to a corner of the room, aims a mark on the screen at the corner on the floor and taps.
+3. Each tap is a dot on the map; the dots join into the room's outline as they come.
+4. Back at the first corner the outline closes, and the room is done.
+
+It is the same map as on every other screen of the wireframe, and the instruction fits a six-year-old: walk to a corner and tap.
+
+**What it does not give:**
+
+- **Furniture.** Only what is tapped is known. A sofa is four more taps, or it is left to the Bolts' bumps.
+- **Corners out of reach.** A corner behind a cupboard cannot be aimed at.
+
+**To check before building:**
+
+- Whether the tablet a child would use, and the moto g35 on the rig, support ARCore.
+- That WebXR reports positions in metres; that is the understanding here, not confirmed.
+- How far the tracking drifts over a walk round a whole room: whether the outline closes on its first corner, measured against the hand-measured floor plan in `apps/browser/public/floor-plan.svg`.
+- That the turn-the-map step is still needed: the outline is in the phone's frame of that moment, and the Bolts have their own.
+
 ## Sources
 
 - [VGGT repository](https://github.com/facebookresearch/vggt)
@@ -115,3 +161,7 @@ A room is scanned once and then kept, so the question is what it costs while nob
 - [RunPod pricing for Pods](https://docs.runpod.io/pods/pricing)
 - [RunPod pricing for Serverless](https://docs.runpod.io/serverless/pricing)
 - [RunPod: Pods or Serverless](https://runpod.io/blog/serverless-gpu-inference)
+- [Google: WebXR and ARCore feature comparison](https://developers.google.com/ar/develop/webxr/arcore-comparison?hl=en)
+- [Android developers: XR on the web](https://developer.android.com/develop/xr/web)
+- [SlashGear: How accurate is the iPhone's measuring app](https://www.slashgear.com/1884872/how-accurate-iphone-measuring-app/)
+- [Apple Support Communities: Accuracy of measurements](https://discussions.apple.com/thread/252625062)
