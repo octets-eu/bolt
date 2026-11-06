@@ -9,7 +9,6 @@ The session, as decided: a session is a budget, nothing else. The agent picks se
 The open items in short, by section; each stands in full below.
 
 - 7 Long run with a small `--autocompact` window.
-- 8 Nobody is needed during the session.
 
 ## 1 Repo and sync
 
@@ -94,7 +93,7 @@ Later:
 ## 8 The floor before every session
 
 - [x] Bolts charged above 4.0 V and set in the partition's opening, near its two ends, the frame's reference points; beacon on its spot, powered, USB to the M1; camera on its mount; floor clear. The exact start spots are the agent's. (06.11.: session 2026-11-06_1652 started from this floor, 4.18 V and 4.22 V.)
-- [ ] Nobody is needed during the session. A Bolt off the area is the agent's to bring back; the page is the fallback.
+- [x] Nobody is needed during the session. A Bolt off the area is the agent's to bring back; the page is the fallback. (06.11., by the user's word: sessions 1 and 2 ran without the human. Session 2, 123 minutes, brought SB-9129 back from the cabinet twice by the camera and `place.mjs`; session 1 lost SB-9129 from the camera's sight, slept the Bolts and ended on a question, the page rang.)
 
 ## 9 Camera: the moto g35 as the agent's eye on the floor
 
