@@ -151,35 +151,35 @@
   <section class="step">
     <svg class="screen" viewBox="0 0 800 500">
       <use href="#tablet"/>
-      <use href="#home" x="28" y="28"/>
-      <use href="#sound" x="716" y="28"/>
-      <text x="400" y="66" font-size="28" font-weight="600" text-anchor="middle">The Bolts look around</text>
-      <rect x="110" y="92" width="470" height="360" rx="18" fill="#fafafa" stroke="#bbb" stroke-width="2"/>
-      <!-- a half-found cloud -->
-      <g fill="#777" transform="translate(150 120) scale(1.4)">
-        <circle cx="12" cy="20" r="3"/><circle cx="30" cy="12" r="3"/><circle cx="52" cy="9" r="3"/><circle cx="76" cy="8" r="3"/><circle cx="100" cy="10" r="3"/><circle cx="126" cy="8" r="3"/>
-        <circle cx="8" cy="40" r="3"/><circle cx="10" cy="60" r="3"/><circle cx="7" cy="84" r="3"/><circle cx="11" cy="108" r="3"/>
-        <circle cx="206" cy="40" r="3"/><circle cx="222" cy="44" r="3"/><circle cx="212" cy="58" r="3"/>
-        <circle cx="96" cy="178" r="3"/><circle cx="120" cy="180" r="3"/><circle cx="146" cy="177" r="3"/>
-        <circle cx="268" cy="118" r="3"/><circle cx="270" cy="142" r="3"/>
+      <!-- the map fills the screen, whole; what is found so far -->
+      <g fill="#777" transform="translate(125 70) scale(2)">
+        <circle cx="12" cy="20" r="2.2"/><circle cx="30" cy="12" r="2.2"/><circle cx="52" cy="9" r="2.2"/><circle cx="76" cy="8" r="2.2"/><circle cx="100" cy="10" r="2.2"/><circle cx="126" cy="8" r="2.2"/><circle cx="150" cy="10" r="2.2"/>
+        <circle cx="8" cy="40" r="2.2"/><circle cx="10" cy="60" r="2.2"/><circle cx="7" cy="84" r="2.2"/><circle cx="11" cy="108" r="2.2"/><circle cx="8" cy="132" r="2.2"/>
+        <circle cx="206" cy="40" r="2.2"/><circle cx="222" cy="44" r="2.2"/><circle cx="212" cy="58" r="2.2"/>
+        <circle cx="96" cy="178" r="2.2"/><circle cx="120" cy="180" r="2.2"/><circle cx="146" cy="177" r="2.2"/><circle cx="170" cy="180" r="2.2"/>
+        <circle cx="268" cy="94" r="2.2"/><circle cx="270" cy="118" r="2.2"/><circle cx="268" cy="142" r="2.2"/>
+        <circle cx="140" cy="86" r="2.2"/><circle cx="140" cy="100" r="2.2"/>
       </g>
-      <path d="M300 300 q40 -70 90 -40 t70 -60" fill="none" stroke="#999" stroke-width="2.5" stroke-dasharray="6 6"/>
-      <use href="#bolt-small" x="460" y="200"/>
-      <path d="M260 250 q-30 50 20 80 t60 30" fill="none" stroke="#999" stroke-width="2.5" stroke-dasharray="6 6"/>
-      <use href="#bolt-small" x="342" y="362"/>
-      <!-- side: how much, done, stop -->
-      <text x="678" y="140" font-size="20" text-anchor="middle">bumps</text>
-      <rect x="648" y="152" width="60" height="150" rx="12" fill="#fff" stroke="#555" stroke-width="2.5"/>
-      <rect x="652" y="232" width="52" height="66" rx="8" fill="#777"/>
-      <rect x="610" y="330" width="140" height="64" rx="20" fill="#222"/>
-      <text x="680" y="372" font-size="26" text-anchor="middle" style="fill:#fff">Done ✓</text>
-      <use href="#stop" x="680" y="440" transform="translate(680 440) scale(0.8) translate(-680 -440)"/>
+      <path d="M330 330 q60 -110 130 -70 t70 -60" fill="none" stroke="#999" stroke-width="2.5" stroke-dasharray="6 6"/>
+      <use href="#bolt-small" x="530" y="200"/>
+      <path d="M250 250 q-40 70 40 100 t90 22" fill="none" stroke="#999" stroke-width="2.5" stroke-dasharray="6 6"/>
+      <use href="#bolt-small" x="380" y="372"/>
+      <!-- overlays -->
+      <use href="#home" x="28" y="24"/>
+      <use href="#sound" x="716" y="24"/>
+      <rect x="230" y="22" width="340" height="46" rx="23" fill="#fff" stroke="#bbb" stroke-width="2"/>
+      <text x="400" y="54" font-size="24" font-weight="600" text-anchor="middle">The Bolts look around</text>
+      <circle cx="78" cy="424" r="46" fill="#fff" stroke="#ccc" stroke-width="10"/>
+      <circle cx="78" cy="424" r="46" fill="none" stroke="#222" stroke-width="10" stroke-dasharray="185 289" transform="rotate(-90 78 424)"/>
+      <text x="78" y="424" font-size="24" font-weight="600" text-anchor="middle">64%</text>
+      <text x="78" y="442" font-size="12" text-anchor="middle">explored</text>
+      <use href="#stop" x="734" y="436"/>
     </svg>
     <h2><span>3</span>New room</h2>
     <p>Both Bolts roam. Every bump leaves a dot, and the dots slowly draw the walls and the furniture.</p>
     <ul>
-      <li>The bar fills as bumps come in; “Done” ends it when the shape looks like the room.</li>
-      <li>Then the child picks a picture for the room.</li>
+      <li>The ring is the exploration indicator: it grows while they roam. At 100 % the Bolts stop on their own and the ring becomes the dark “Next ▶”.</li>
+      <li>Then the child picks a picture for the room. Stop ends the exploring early; the room is kept as far as it got.</li>
       <li>The round button stops both Bolts at once, on every screen where they move.</li>
     </ul>
   </section>
@@ -188,29 +188,28 @@
   <section class="step">
     <svg class="screen" viewBox="0 0 800 500">
       <use href="#tablet"/>
-      <use href="#home" x="28" y="28"/>
-      <use href="#sound" x="716" y="28"/>
-      <text x="400" y="66" font-size="28" font-weight="600" text-anchor="middle">Turn the map like the room</text>
-      <!-- the dial: the map turns inside, the knob is dragged round -->
-      <circle cx="300" cy="285" r="182" fill="#fafafa" stroke="#555" stroke-width="3"/>
-      <g transform="rotate(-24 300 285)">
-        <use href="#cloud" transform="translate(165 195)"/>
-        <!-- the leg Star just rolled, drawn on the map -->
-        <path d="M250 300 h70 M320 300 l-12 -8 M320 300 l-12 8" fill="none" stroke="#222" stroke-width="4"/>
-        <use href="#bolt-small" x="250" y="300"/>
+      <!-- the ring fills the height; the map fits inside it at every angle -->
+      <circle cx="400" cy="272" r="212" fill="#fafafa" stroke="#555" stroke-width="3"/>
+      <g transform="rotate(-24 400 272)">
+        <use href="#cloud" transform="translate(229 154) scale(1.25)"/>
+        <path d="M340 300 h84 M424 300 l-13 -9 M424 300 l-13 9" fill="none" stroke="#222" stroke-width="4"/>
+        <use href="#bolt-small" x="340" y="300"/>
       </g>
-      <!-- the knob on the rim, with the way it can go -->
-      <circle cx="455" cy="190" r="26" fill="#222"/>
-      <path d="M445 190 h20 M455 180 v20" stroke="#fff" stroke-width="3"/>
-      <path d="M487 215 a190 190 0 0 1 4 50 M491 265 l-9 -8 M491 265 l7 -10" fill="none" stroke="#777" stroke-width="3"/>
-      <path d="M425 150 a190 190 0 0 0 -40 -28 M385 122 l12 0 M385 122 l4 11" fill="none" stroke="#777" stroke-width="3"/>
-      <!-- right: the cue and the confirm -->
-      <text x="640" y="150" font-size="20" text-anchor="middle">Star rolls</text>
-      <text x="640" y="176" font-size="20" text-anchor="middle">straight ahead</text>
-      <rect x="535" y="200" width="210" height="72" rx="20" fill="#fff" stroke="#555" stroke-width="2.5"/>
-      <text x="640" y="245" font-size="22" text-anchor="middle">Roll again ↻</text>
-      <rect x="535" y="372" width="210" height="88" rx="24" fill="#222"/>
-      <text x="640" y="426" font-size="30" text-anchor="middle" style="fill:#fff">It fits ✓</text>
+      <!-- the knob on the rim, with the two ways it can go -->
+      <circle cx="605" cy="217" r="27" fill="#222"/>
+      <path d="M594 217 h22 M605 206 v22" stroke="#fff" stroke-width="3"/>
+      <path d="M632 260 A232 232 0 0 1 626 324 M626 324 l-8 -9 M626 324 l7 -10" fill="none" stroke="#777" stroke-width="3"/>
+      <path d="M607 167 A232 232 0 0 0 570 114 M570 114 l12 2 M570 114 l1 12" fill="none" stroke="#777" stroke-width="3"/>
+      <!-- overlays -->
+      <use href="#home" x="28" y="24"/>
+      <use href="#sound" x="716" y="24"/>
+      <rect x="210" y="22" width="380" height="46" rx="23" fill="#fff" stroke="#bbb" stroke-width="2"/>
+      <text x="400" y="54" font-size="24" font-weight="600" text-anchor="middle">Turn the map like the room</text>
+      <text x="124" y="392" font-size="17" text-anchor="middle">Star rolls straight ahead</text>
+      <rect x="28" y="408" width="192" height="64" rx="22" fill="#fff" stroke="#555" stroke-width="2.5"/>
+      <text x="124" y="448" font-size="22" text-anchor="middle">Roll again ↻</text>
+      <rect x="580" y="400" width="192" height="76" rx="24" fill="#222"/>
+      <text x="676" y="448" font-size="28" text-anchor="middle" style="fill:#fff">It fits ✓</text>
     </svg>
     <h2><span>4</span>Turn the map</h2>
     <p>The map has to lie like the room. One Bolt rolls a short way straight ahead on the floor; the map shows the same roll as an arrow.</p>
@@ -225,31 +224,30 @@
   <section class="step">
     <svg class="screen" viewBox="0 0 800 500">
       <use href="#tablet"/>
-      <use href="#home" x="28" y="28"/>
-      <use href="#sound" x="716" y="28"/>
-      <text x="400" y="66" font-size="28" font-weight="600" text-anchor="middle">Who hides, who seeks?</text>
-      <rect x="40" y="92" width="470" height="380" rx="18" fill="#fafafa" stroke="#bbb" stroke-width="2"/>
-      <use href="#cloud" transform="translate(84 130) scale(1.4)"/>
-      <use href="#bolt-small" x="230" y="300"/>
-      <text x="230" y="336" font-size="18" text-anchor="middle">Star</text>
-      <use href="#bolt-small" x="330" y="250"/>
-      <text x="330" y="286" font-size="18" text-anchor="middle">Moon</text>
-      <!-- turn the map -->
-      <circle cx="466" cy="136" r="26" fill="#fff" stroke="#555" stroke-width="2.5"/>
-      <path d="M452 136 a14 14 0 1 1 6 11 M452 136 l-2 -9 M452 136 l9 -1" fill="none" stroke="#555" stroke-width="2.5"/>
-      <!-- roles -->
-      <rect x="540" y="96" width="210" height="110" rx="20" fill="#fff" stroke="#555" stroke-width="3"/>
-      <use href="#bolt-small" x="584" y="151"/>
-      <text x="680" y="145" font-size="22" text-anchor="middle">Star</text>
-      <text x="680" y="172" font-size="20" text-anchor="middle" fill="#555">seeks</text>
-      <rect x="617" y="214" width="56" height="50" rx="14" fill="#fff" stroke="#555" stroke-width="2.5"/>
-      <text x="645" y="248" font-size="26" text-anchor="middle">⇅</text>
-      <rect x="540" y="272" width="210" height="110" rx="20" fill="#fff" stroke="#555" stroke-width="3"/>
-      <use href="#bolt-small" x="584" y="327"/>
-      <text x="680" y="321" font-size="22" text-anchor="middle">Moon</text>
-      <text x="680" y="348" font-size="20" text-anchor="middle" fill="#555">hides</text>
-      <rect x="540" y="396" width="210" height="76" rx="24" fill="#222"/>
-      <text x="645" y="445" font-size="30" text-anchor="middle" style="fill:#fff">Play ▶</text>
+      <use href="#cloud" transform="translate(125 70) scale(2)"/>
+      <use href="#bolt-small" x="325" y="310"/>
+      <text x="325" y="346" font-size="18" text-anchor="middle">Star</text>
+      <use href="#bolt-small" x="465" y="210"/>
+      <text x="465" y="246" font-size="18" text-anchor="middle">Moon</text>
+      <!-- overlays -->
+      <use href="#home" x="28" y="24"/>
+      <use href="#sound" x="716" y="24"/>
+      <rect x="230" y="22" width="340" height="46" rx="23" fill="#fff" stroke="#bbb" stroke-width="2"/>
+      <text x="400" y="54" font-size="24" font-weight="600" text-anchor="middle">Who hides, who seeks?</text>
+      <circle cx="744" cy="124" r="26" fill="#fff" stroke="#555" stroke-width="2.5"/>
+      <path d="M730 124 a14 14 0 1 1 6 11 M730 124 l-2 -9 M730 124 l9 -1" fill="none" stroke="#555" stroke-width="2.5"/>
+      <rect x="28" y="420" width="170" height="60" rx="20" fill="#fff" stroke="#555" stroke-width="2.5"/>
+      <use href="#bolt-small" x="60" y="450"/>
+      <text x="130" y="445" font-size="18" text-anchor="middle">Star</text>
+      <text x="130" y="466" font-size="16" text-anchor="middle" fill="#555">seeks</text>
+      <rect x="206" y="422" width="56" height="56" rx="16" fill="#fff" stroke="#555" stroke-width="2.5"/>
+      <text x="234" y="459" font-size="26" text-anchor="middle">⇄</text>
+      <rect x="270" y="420" width="170" height="60" rx="20" fill="#fff" stroke="#555" stroke-width="2.5"/>
+      <use href="#bolt-small" x="302" y="450"/>
+      <text x="372" y="445" font-size="18" text-anchor="middle">Moon</text>
+      <text x="372" y="466" font-size="16" text-anchor="middle" fill="#555">hides</text>
+      <rect x="580" y="404" width="192" height="76" rx="24" fill="#222"/>
+      <text x="676" y="452" font-size="30" text-anchor="middle" style="fill:#fff">Play ▶</text>
     </svg>
     <h2><span>5</span>Get ready</h2>
     <p>The room with both Bolts on it, and the two roles. This is also where a Bolt is put in its place.</p>
@@ -264,21 +262,21 @@
   <section class="step">
     <svg class="screen" viewBox="0 0 800 500">
       <use href="#tablet"/>
-      <use href="#sound" x="716" y="28"/>
-      <text x="400" y="66" font-size="28" font-weight="600" text-anchor="middle">Moon is hiding…</text>
-      <rect x="40" y="92" width="560" height="380" rx="18" fill="#fafafa" stroke="#bbb" stroke-width="2"/>
-      <use href="#cloud" transform="translate(110 122) scale(1.5)"/>
+      <use href="#cloud" transform="translate(125 70) scale(2)"/>
       <!-- seeker waits, eyes shut -->
-      <use href="#bolt-small" x="280" y="330"/>
-      <text x="280" y="366" font-size="18" text-anchor="middle">Star waits</text>
-      <rect x="250" y="270" width="60" height="34" rx="10" fill="#fff" stroke="#555" stroke-width="2"/>
-      <text x="280" y="294" font-size="20" text-anchor="middle">3…</text>
+      <use href="#bolt-small" x="325" y="310"/>
+      <text x="325" y="346" font-size="18" text-anchor="middle">Star waits</text>
+      <rect x="295" y="252" width="60" height="34" rx="10" fill="#fff" stroke="#555" stroke-width="2"/>
+      <text x="325" y="276" font-size="20" text-anchor="middle">3…</text>
       <!-- hider rolls away -->
-      <path d="M312 320 q80 -20 110 -80 t40 -70" fill="none" stroke="#999" stroke-width="2.5" stroke-dasharray="6 6"/>
-      <use href="#bolt-small" x="462" y="168"/>
-      <text x="432" y="163" font-size="18" text-anchor="end">Moon</text>
-      <use href="#stop" x="690" y="400"/>
-      <text x="690" y="462" font-size="18" text-anchor="middle">stop</text>
+      <path d="M347 304 q110 -10 150 -50 t70 -36" fill="none" stroke="#999" stroke-width="2.5" stroke-dasharray="6 6"/>
+      <use href="#bolt-small" x="571" y="214"/>
+      <text x="571" y="250" font-size="18" text-anchor="middle">Moon</text>
+      <!-- overlays -->
+      <use href="#sound" x="716" y="24"/>
+      <rect x="260" y="22" width="280" height="46" rx="23" fill="#fff" stroke="#bbb" stroke-width="2"/>
+      <text x="400" y="54" font-size="24" font-weight="600" text-anchor="middle">Moon is hiding…</text>
+      <use href="#stop" x="734" y="436"/>
     </svg>
     <h2><span>6</span>Hiding</h2>
     <p>The hider rolls away to a spot of its own. The seeker stays, its matrix shows closed eyes and counts.</p>
@@ -292,30 +290,30 @@
   <section class="step">
     <svg class="screen" viewBox="0 0 800 500">
       <use href="#tablet"/>
-      <use href="#sound" x="716" y="28"/>
-      <text x="400" y="66" font-size="28" font-weight="600" text-anchor="middle">Star is seeking!</text>
-      <rect x="40" y="92" width="560" height="380" rx="18" fill="#fafafa" stroke="#bbb" stroke-width="2"/>
-      <use href="#cloud" transform="translate(110 122) scale(1.5)"/>
+      <use href="#cloud" transform="translate(125 70) scale(2)"/>
       <!-- hider calls -->
-      <circle cx="462" cy="168" r="26" fill="none" stroke="#bbb" stroke-width="2"/>
-      <circle cx="462" cy="168" r="40" fill="none" stroke="#ddd" stroke-width="2"/>
-      <use href="#bolt-small" x="462" y="168"/>
+      <circle cx="571" cy="214" r="28" fill="none" stroke="#bbb" stroke-width="2"/>
+      <circle cx="571" cy="214" r="44" fill="none" stroke="#ddd" stroke-width="2"/>
+      <use href="#bolt-small" x="571" y="214"/>
       <!-- seeker's path, with its turns -->
-      <path d="M280 330 l40 -6 l-10 -40 l50 4 l14 -44 l40 10" fill="none" stroke="#777" stroke-width="3" stroke-linejoin="round"/>
-      <use href="#bolt-small" x="414" y="254"/>
-      <path d="M426 242 l16 -22 M442 220 l-10 2 M442 220 l-1 10" fill="none" stroke="#222" stroke-width="3"/>
-      <!-- time as a bar that fills -->
-      <text x="690" y="130" font-size="20" text-anchor="middle">time</text>
-      <rect x="660" y="142" width="60" height="170" rx="12" fill="#fff" stroke="#555" stroke-width="2.5"/>
-      <rect x="664" y="250" width="52" height="58" rx="8" fill="#777"/>
-      <use href="#stop" x="690" y="400"/>
-      <text x="690" y="462" font-size="18" text-anchor="middle">stop</text>
+      <path d="M325 310 l50 14 l60 -4 l10 -60 l40 6 l16 -56" fill="none" stroke="#777" stroke-width="3" stroke-linejoin="round"/>
+      <use href="#bolt-small" x="501" y="210"/>
+      <path d="M516 210 l20 2 M536 212 l-9 -6 M536 212 l-8 6" fill="none" stroke="#222" stroke-width="3"/>
+      <!-- overlays -->
+      <use href="#sound" x="716" y="24"/>
+      <rect x="260" y="22" width="280" height="46" rx="23" fill="#fff" stroke="#bbb" stroke-width="2"/>
+      <text x="400" y="54" font-size="24" font-weight="600" text-anchor="middle">Star is seeking!</text>
+      <text x="48" y="446" font-size="16">time</text>
+      <rect x="28" y="454" width="200" height="26" rx="13" fill="#fff" stroke="#555" stroke-width="2.5"/>
+      <rect x="32" y="458" width="84" height="18" rx="9" fill="#777"/>
+      <use href="#stop" x="734" y="436"/>
     </svg>
     <h2><span>7</span>Seeking</h2>
     <p>Both Bolts move on the map as they move on the floor. The seeker draws its path; a small arrow shows where it believes the hider is.</p>
     <ul>
       <li>Rings around the hider show it is calling.</li>
       <li>Time is a bar that fills, not a number.</li>
+      <li>The map fills the screen; title, time and stop float on top of it.</li>
       <li>The map turns with the tablet; it is not turned by hand here.</li>
     </ul>
   </section>
@@ -360,6 +358,7 @@
     <h2>Built for six and up</h2>
     <ul>
       <li>One dark button per screen: the next thing to do.</li>
+      <li>The map is the screen. It is always shown whole, never cut off at an edge, also when it turns; buttons float over it in the corners.</li>
       <li>Every button is at least a thumb wide; nothing sits in a menu.</li>
       <li>Few words, short ones; a picture or a sign wherever one will do. No typing anywhere.</li>
       <li>A Bolt on the screen and the Bolt on the floor carry the same sign, so the child knows which is which.</li>
@@ -384,6 +383,7 @@
       <li>A Bolt that is lost, stuck or low on battery in the middle of a game.</li>
       <li>Only one Bolt awake.</li>
       <li>Choosing the room's picture after exploring.</li>
+      <li>What 100 % explored means: the rule that decides the room is known well enough is not defined yet.</li>
       <li>Anything for a grown-up: forgetting a Bolt, deleting a room.</li>
     </ul>
   </section>
