@@ -1,14 +1,14 @@
 #!/bin/bash
 # Double-click on rig's Desktop: the rig's bring-up after a reboot and its check
 # at any time. Starts the Bolt bridge in this Terminal window, which carries the
-# Bluetooth grant a process started over SSH never gets, starts the M5 and camera
-# forwarders and colima when they are down, waits for both links, wakes both
+# Bluetooth grant a process started over SSH never gets, starts the camera
+# forwarder and colima when they are down, waits for both links, wakes both
 # Bolts, then checks the rig with each line proven by the thing itself: the link,
-# the ST answering a ping, the volts, the M5 answering through mpremote, the
-# camera delivering a frame, the phone reporting its battery, the sandbox image
-# and volume present and a container reaching the API through its firewall, the
-# key file in shape. The last line is the verdict, ALL GOOD or NOT GOOD with the
-# failed checks, the M5 beeps it, once or three times, and the window stays open
+# the ST answering a ping, the volts, the camera delivering a frame, the phone
+# reporting its battery, the sandbox image and volume present and a container
+# reaching the API through its firewall, the key file in shape. The last line is
+# the verdict, ALL GOOD or NOT GOOD with the failed checks, the M1's speaker
+# rings it, once or three times, and the window stays open
 # on NOT GOOD until Enter. With a bridge
 # already running it checks alone. The bridge's lines go to the window and to
 # ~/Rig/bridge.log; when the bridge ends, the window says so with the exit code
@@ -30,6 +30,9 @@ bad () { echo "$1"; failed+=("$2"); }
 ask () {  # <port> <line> [seconds]: one line to a forwarder on the host, its first reply line
   ( exec 3<>/dev/tcp/127.0.0.1/$1 && printf '%s\n' "$2" >&3 && read -t "${3:-20}" -r reply <&3 && echo "$reply" ) 2>/dev/null
 }
+bell () {  # <n>: the M1's speaker, n times
+  for _ in $(seq 1 "$1"); do afplay /System/Library/Sounds/Glass.aiff 2>/dev/null; done
+}
 
 # --- the bridge, in this window
 if nc -z -w 2 127.0.0.1 7000 >/dev/null 2>&1; then
@@ -49,17 +52,12 @@ else
   done
 fi
 
-# --- the forwarders and colima, when down
-started=
-if ! nc -z -w 2 127.0.0.1 7010 >/dev/null 2>&1; then
-  echo "m5 forwarder: starting, log in ~/Rig/m5.log"
-  nohup uv run m5.py >> ~/Rig/m5.log 2>&1 & disown; started=1
-fi
+# --- the camera forwarder and colima, when down
 if ! nc -z -w 2 127.0.0.1 7020 >/dev/null 2>&1; then
   echo "camera forwarder: starting, log in ~/Rig/cam.log"
-  nohup python3 cam.py >> ~/Rig/cam.log 2>&1 & disown; started=1
+  nohup python3 cam.py >> ~/Rig/cam.log 2>&1 & disown
+  sleep 3
 fi
-[ -n "$started" ] && sleep 3
 if ! colima status >/dev/null 2>&1; then
   echo "docker: colima stopped, starting"
   colima start >/dev/null 2>&1
@@ -81,8 +79,6 @@ done < <(uv run bridge.py wake 2>/dev/null)
 while read -r line; do  # "SB-9129 4.24 V", or what went wrong
   case "$line" in "") ;; *" V") ok "$line";; *) bad "$line" "${line%% *} battery";; esac
 done < <(uv run bridge.py battery 2>/dev/null)
-m5=$(ask 7010 ping)  # runs on the M5 itself, through mpremote
-if [ "$m5" = "m5 ok" ]; then ok "beacon: m5 ok"; else bad "beacon: ${m5:-no answer on 7010}" "beacon"; fi
 on=$(ask 7020 on 40)  # the camera: on, a frame within 20 s, off
 if [ -z "$on" ]; then
   bad "camera: forwarder not running" "camera"
@@ -123,7 +119,7 @@ else
 fi
 if grep -q '^ANTHROPIC_API_KEY=sk-' ~/Rig/secret.env 2>/dev/null; then ok "key: in shape"; else bad "key: ~/Rig/secret.env missing or not ANTHROPIC_API_KEY=sk-..." "key"; fi
 
-if [ ${#failed[@]} -eq 0 ]; then echo "ALL GOOD"; ask 7010 "beep 1" >/dev/null; else echo "NOT GOOD: ${failed[*]}"; ask 7010 "beep 3" >/dev/null; fi
+if [ ${#failed[@]} -eq 0 ]; then echo "ALL GOOD"; bell 1; else echo "NOT GOOD: ${failed[*]}"; bell 3; fi
 echo "---"
 
 if [ -n "${bridge:-}" ]; then

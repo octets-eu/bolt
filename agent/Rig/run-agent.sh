@@ -23,8 +23,8 @@
 # container, claude in print mode with the prompt from ~/Rig/prompt.md, the stream
 # into ~/Rig/sessions/<stamp>/stream.jsonl. After the run: the result record (cost,
 # turns, subtype) goes to the session's report.md, then the bell: an unanswered
-# question, a budget stop or an error page the phone over ntfy and beep the M5
-# three times; a clean end beeps once and pages "done". NTFY_TOPIC (and NTFY_URL,
+# question, a budget stop or an error page the phone over ntfy and ring the M1's
+# speaker three times; a clean end rings once and pages "done". NTFY_TOPIC (and NTFY_URL,
 # default https://ntfy.sh) come from ~/Rig/rig.env, the API key from ~/Rig/secret.env.
 set -euo pipefail
 
@@ -48,8 +48,8 @@ page () {  # <text>
   [ -n "${NTFY_TOPIC:-}" ] || return 0
   curl -s -o /dev/null -m 10 -d "$1" "$NTFY_URL/$NTFY_TOPIC" || true
 }
-beep () {  # <n>
-  ( exec 3<>/dev/tcp/127.0.0.1/7010 && printf 'beep %s\n' "$1" >&3 && read -t 10 -r _ <&3 ) 2>/dev/null || true
+bell () {  # <n>: the M1's speaker, n times
+  for _ in $(seq 1 "$1"); do afplay /System/Library/Sounds/Glass.aiff 2>/dev/null || true; done
 }
 
 if unanswered; then
@@ -103,13 +103,13 @@ turns="$(jq -r '.num_turns // "?"' <<<"$result" 2>/dev/null || echo '?')"
 } >> "$dir/report.md"
 
 if unanswered; then
-  reason="question: $(last_question)"; beep 3
+  reason="question: $(last_question)"; bell 3
 elif [ "$subtype" = "error_max_budget_usd" ]; then
-  reason="budget stop at $cost"; beep 3
+  reason="budget stop at $cost"; bell 3
 elif [ "$status" -ne 0 ] || [ "$subtype" != "success" ]; then
-  reason="error: result $subtype, exit $status"; beep 3
+  reason="error: result $subtype, exit $status"; bell 3
 else
-  reason="done: cost $cost, $turns turns"; beep 1
+  reason="done: cost $cost, $turns turns"; bell 1
 fi
 page "agent $stamp $reason"
 echo "run-agent: $reason; log in $dir"

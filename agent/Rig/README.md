@@ -109,8 +109,8 @@ prompt from `~/Rig/prompt.md`, the stream and the result record under
 `~/Rig/sessions/<stamp>/`. Before the run it refuses while the last question in
 the workspace's `brain/docs/questions.md` has no answer, commits the workspace
 and writes the budget into `Session.md`. After the run it rings: a question, a
-budget stop or an error page the phone over ntfy and beep the M5 three times, a
-clean end beeps once and pages "done". `MODEL`, `EFFORT` and `AUTOCOMPACT` in
+budget stop or an error page the phone over ntfy and ring the M1's speaker three
+times, a clean end rings once and pages "done". `MODEL`, `EFFORT` and `AUTOCOMPACT` in
 the environment pick the model (alias or id), the thinking depth (low to max)
 and the context size at which compaction runs; unset, claude's defaults.
 `--interactive` runs the same with a terminal; run that inside tmux on the M1
