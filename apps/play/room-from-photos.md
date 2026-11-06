@@ -67,10 +67,19 @@ The estimates below multiply those prices by assumed times. The times are assump
 | Trying it out | one pod with a 24 GB card for 4 hours of setting up and experiments | $2.30 to $3.60 |
 | One room, serverless, cold | 5 minutes of worker time: start, load both models, run, at $0.75 an hour | about 6 cents |
 | One room, serverless, warm | 1 minute of worker time at $0.75 an hour | about 1 cent |
-| A pod left on for a month | 24 hours a day at $0.57 an hour | about $410 |
 
-- Storage for the models, a few GB of container or volume disk, is not in these figures; its price was not read.
-- A room is scanned once and then kept, so almost every job is a cold start, and a pod kept running makes no sense. Serverless with no warm worker costs nothing while idle.
+A room is scanned once and then kept, so the question is what it costs while nobody scans. Storage prices are from RunPod's pricing pages; 10 GB for both models is an assumption.
+
+| While idle | What is billed | Per month |
+|---|---|---|
+| Serverless, models baked into the image | nothing: a worker that has scaled down is not billed | $0 |
+| Serverless, models on a network volume | the volume, $0.07 per GB a month | about $0.70 for 10 GB |
+| A stopped pod | its volume disk, $0.20 per GB a month while stopped | about $2 for 10 GB |
+| A pod left running | the GPU, 24 hours a day at $0.57 an hour | about $410 |
+
+- Serverless is the fit: it bills per second from a worker's start until it stops, which includes loading the models and a short wait after the job (5 seconds by default), and nothing in between.
+- With no warm worker almost every scan is a cold start. RunPod's own measurements show both a wake-up in one to two seconds and, at times, a full boot of about four minutes; the app has to show a waiting screen for that.
+- A stopped pod is the cheap way to keep a trial setup between two afternoons. Terminating it, not stopping it, ends all charges.
 
 ## Rough setup
 
@@ -103,3 +112,6 @@ The estimates below multiply those prices by assumed times. The times are assump
 - [SpatialLM repository](https://github.com/manycore-research/SpatialLM)
 - [SpatialLM paper](https://arxiv.org/html/2506.07491v2)
 - [Review of feed-forward 3D reconstruction, DUSt3R to VGGT](https://aitopics.org/doc/arxivorg:86D921B1)
+- [RunPod pricing for Pods](https://docs.runpod.io/pods/pricing)
+- [RunPod pricing for Serverless](https://docs.runpod.io/serverless/pricing)
+- [RunPod: Pods or Serverless](https://runpod.io/blog/serverless-gpu-inference)
