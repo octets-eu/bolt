@@ -14,6 +14,8 @@ The task is to build a simple connectome (aka brain) with:
 - observation layer, consisting of neurons rading and processing the IR signals
 - motor neurons, reading the ring and drive the bolt towards target
 
+The three parts are the minimum; what else the brain needs, neurons or layers, is yours to add and to state.
+
 ## Connectome
 
 ### Observation Layer
