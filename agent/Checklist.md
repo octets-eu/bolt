@@ -97,7 +97,7 @@ Later:
 
 ## 8 The floor before every session
 
-- [ ] Bolts charged above 4.0 V and anywhere inside the play area; beacon on its spot, powered, USB to the M1; camera on its mount; floor clear. The exact spots are the agent's.
+- [x] Bolts charged above 4.0 V and set in the partition's opening, near its two ends, the frame's reference points; beacon on its spot, powered, USB to the M1; camera on its mount; floor clear. The exact start spots are the agent's. (06.11.: session 2026-11-06_1652 started from this floor, 4.18 V and 4.22 V.)
 - [ ] Nobody is needed during the session. A Bolt off the area is the agent's to bring back; the page is the fallback.
 
 ## 9 Camera: the moto g35 as the agent's eye on the floor
