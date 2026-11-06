@@ -15,6 +15,8 @@
 # with its output, and the report line), Claude Code's own transcripts from
 # the container's home under claude-transcripts/, and the rig's logs
 # (~/Rig/*.log). Again only the number of files is printed.
+# Last, the daily brain: the pulled circuit drawn as agent/brains/<date>.svg
+# by connectome_svg.py, tracked, so the day's last pull leaves that day's brain.
 #
 #   agent/pull.sh              pull; prints every file that changed
 #   agent/pull.sh --dry-run    show what would come, fetch nothing
@@ -48,3 +50,9 @@ n="$( { rsync -a --itemize-changes "$@" --exclude .DS_Store "$rig/sessions/" "$h
         rsync -a --itemize-changes "$@" --include '/*.log' --exclude '*' "$rig/" "$here/sessions/"
       } | grep -c '^>f' || true)"
 echo "sessions: $n files new or changed"
+
+circuit="$repo/${sub}connectome/circuit.json"
+if [ -f "$circuit" ] && [ "${1:-}" != "--dry-run" ]; then
+  mkdir -p "$here/brains"
+  python3 "$here/connectome_svg.py" "$circuit" "$here/brains/$(date +%F).svg" "$(date +%F)"
+fi
