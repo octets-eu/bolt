@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bolt hide and seek: wireframe</title>
+<style>
+  :root { --ink: #222; --line: #555; --soft: #999; --fill: #ececec; --paper: #fff; }
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 32px 40px 64px; font: 15px/1.45 -apple-system, "Helvetica Neue", Arial, sans-serif; color: var(--ink); background: #f6f6f4; }
+  h1 { font-size: 26px; margin: 0 0 4px; }
+  .lead { margin: 0 0 28px; color: #555; max-width: 900px; }
+  .flow { display: grid; grid-template-columns: repeat(auto-fill, minmax(430px, 1fr)); gap: 28px 28px; }
+  .step { background: var(--paper); border: 1px solid #ddd; border-radius: 10px; padding: 16px 16px 14px; }
+  .step h2 { font-size: 17px; margin: 12px 0 4px; }
+  .step h2 span { display: inline-block; width: 26px; height: 26px; line-height: 26px; text-align: center; border-radius: 50%; background: var(--ink); color: #fff; font-size: 14px; margin-right: 8px; }
+  .step p { margin: 0 0 6px; }
+  .step ul { margin: 0; padding-left: 18px; color: #444; }
+  .step li { margin: 2px 0; }
+  svg.screen { width: 100%; height: auto; display: block; }
+  svg text { font-family: -apple-system, "Helvetica Neue", Arial, sans-serif; fill: var(--ink); }
+  .notes { display: grid; grid-template-columns: repeat(auto-fill, minmax(430px, 1fr)); gap: 28px; margin-top: 36px; }
+  .note { background: var(--paper); border: 1px solid #ddd; border-radius: 10px; padding: 14px 18px; }
+  .note h2 { font-size: 17px; margin: 0 0 6px; }
+  .note ul { margin: 0; padding-left: 18px; }
+  .note li { margin: 4px 0; }
+</style>
+</head>
+<body>
+
+<h1>Bolt hide and seek: wireframe</h1>
+<p class="lead">Seven screens on a tablet held sideways, in the order a child meets them. Boxes and words only: no colours, no final shapes. A dark button is the one thing to tap next. Assumptions that need a yes or no are at the bottom.</p>
+
+<svg width="0" height="0" style="position:absolute">
+  <defs>
+    <!-- the tablet -->
+    <g id="tablet">
+      <rect x="4" y="4" width="792" height="492" rx="26" fill="#fff" stroke="#555" stroke-width="3"/>
+    </g>
+    <!-- a Bolt: ball with its matrix -->
+    <g id="bolt">
+      <circle r="22" fill="#fff" stroke="#555" stroke-width="3"/>
+      <rect x="-9" y="-9" width="18" height="18" rx="3" fill="#ececec" stroke="#555" stroke-width="1.5"/>
+    </g>
+    <g id="bolt-small">
+      <circle r="13" fill="#fff" stroke="#555" stroke-width="2.5"/>
+      <rect x="-5" y="-5" width="10" height="10" rx="2" fill="#ececec" stroke="#555" stroke-width="1"/>
+    </g>
+    <!-- home, sound, stop -->
+    <g id="home">
+      <rect width="56" height="56" rx="14" fill="#fff" stroke="#555" stroke-width="2"/>
+      <path d="M14 30 L28 16 L42 30 M19 27 V41 H37 V27" fill="none" stroke="#555" stroke-width="2.5" stroke-linejoin="round"/>
+    </g>
+    <g id="sound">
+      <rect width="56" height="56" rx="14" fill="#fff" stroke="#555" stroke-width="2"/>
+      <path d="M16 24 H23 L31 17 V39 L23 32 H16 Z M36 22 Q42 28 36 34" fill="none" stroke="#555" stroke-width="2.5" stroke-linejoin="round"/>
+    </g>
+    <g id="stop">
+      <circle r="38" fill="#fff" stroke="#222" stroke-width="4"/>
+      <rect x="-13" y="-13" width="26" height="26" rx="4" fill="#222"/>
+    </g>
+    <!-- the room as a cloud of bump points -->
+    <g id="cloud" fill="#777">
+      <circle cx="12" cy="20" r="3"/><circle cx="30" cy="12" r="3"/><circle cx="52" cy="9" r="3"/><circle cx="76" cy="8" r="3"/><circle cx="100" cy="10" r="3"/><circle cx="126" cy="8" r="3"/><circle cx="150" cy="10" r="3"/><circle cx="176" cy="9" r="3"/><circle cx="200" cy="12" r="3"/><circle cx="224" cy="10" r="3"/><circle cx="246" cy="14" r="3"/><circle cx="262" cy="24" r="3"/>
+      <circle cx="268" cy="46" r="3"/><circle cx="270" cy="70" r="3"/><circle cx="266" cy="94" r="3"/><circle cx="270" cy="118" r="3"/><circle cx="268" cy="142" r="3"/><circle cx="262" cy="164" r="3"/>
+      <circle cx="244" cy="174" r="3"/><circle cx="220" cy="178" r="3"/><circle cx="196" cy="176" r="3"/><circle cx="170" cy="180" r="3"/><circle cx="146" cy="177" r="3"/><circle cx="120" cy="180" r="3"/><circle cx="96" cy="178" r="3"/><circle cx="70" cy="180" r="3"/><circle cx="46" cy="176" r="3"/><circle cx="24" cy="172" r="3"/>
+      <circle cx="10" cy="156" r="3"/><circle cx="8" cy="132" r="3"/><circle cx="11" cy="108" r="3"/><circle cx="7" cy="84" r="3"/><circle cx="10" cy="60" r="3"/><circle cx="8" cy="40" r="3"/>
+      <!-- furniture -->
+      <circle cx="206" cy="40" r="3"/><circle cx="222" cy="44" r="3"/><circle cx="212" cy="58" r="3"/><circle cx="230" cy="60" r="3"/><circle cx="240" cy="42" r="3"/>
+      <circle cx="60" cy="130" r="3"/><circle cx="76" cy="126" r="3"/><circle cx="68" cy="144" r="3"/><circle cx="86" cy="140" r="3"/>
+      <circle cx="140" cy="86" r="3"/><circle cx="140" cy="100" r="3"/><circle cx="140" cy="114" r="3"/>
+    </g>
+  </defs>
+</svg>
+
+<div class="flow">
+
+  <!-- 1 -->
+  <section class="step">
+    <svg class="screen" viewBox="0 0 800 500">
+      <use href="#tablet"/>
+      <use href="#sound" x="716" y="28"/>
+      <text x="400" y="78" font-size="30" font-weight="600" text-anchor="middle">Wake up your Bolts</text>
+      <!-- slot A: connected -->
+      <rect x="130" y="120" width="240" height="230" rx="24" fill="#fff" stroke="#555" stroke-width="3"/>
+      <use href="#bolt" x="250" y="205" transform="translate(250 205) scale(2.2) translate(-250 -205)"/>
+      <text x="250" y="300" font-size="22" text-anchor="middle">Bolt “Star”</text>
+      <rect x="205" y="314" width="90" height="16" rx="4" fill="#ececec" stroke="#555" stroke-width="1.5"/>
+      <rect x="207" y="316" width="62" height="12" rx="3" fill="#777"/>
+      <circle cx="345" cy="143" r="17" fill="#222"/><path d="M337 143 l6 6 l11 -12" fill="none" stroke="#fff" stroke-width="3.5"/>
+      <!-- slot B: searching -->
+      <rect x="430" y="120" width="240" height="230" rx="24" fill="#fff" stroke="#999" stroke-width="3" stroke-dasharray="10 8"/>
+      <circle cx="550" cy="205" r="48" fill="none" stroke="#999" stroke-width="3" stroke-dasharray="8 8"/>
+      <text x="550" y="300" font-size="22" text-anchor="middle" fill="#777">looking…</text>
+      <!-- add by hand -->
+      <rect x="130" y="384" width="240" height="72" rx="20" fill="#fff" stroke="#555" stroke-width="2.5"/>
+      <text x="250" y="429" font-size="22" text-anchor="middle">+ Find a Bolt</text>
+      <!-- next: waits for two -->
+      <rect x="490" y="376" width="240" height="88" rx="24" fill="#ececec" stroke="#999" stroke-width="2.5"/>
+      <text x="610" y="430" font-size="28" text-anchor="middle" fill="#999">Next ▶</text>
+    </svg>
+    <h2><span>1</span>Bolts</h2>
+    <p>The app opens here. Bolts it knows connect on their own; each shows its sign on its matrix, the same sign as on its card.</p>
+    <ul>
+      <li>“Find a Bolt” opens the Bluetooth picker for a new one.</li>
+      <li>“Next” turns dark when two Bolts are awake.</li>
+      <li>The bar under a Bolt is its battery.</li>
+    </ul>
+  </section>
+
+  <!-- 2 -->
+  <section class="step">
+    <svg class="screen" viewBox="0 0 800 500">
+      <use href="#tablet"/>
+      <use href="#home" x="28" y="28"/>
+      <use href="#sound" x="716" y="28"/>
+      <text x="400" y="78" font-size="30" font-weight="600" text-anchor="middle">Where do we play?</text>
+      <!-- room cards -->
+      <g>
+        <rect x="60" y="130" width="210" height="260" rx="24" fill="#fff" stroke="#222" stroke-width="5"/>
+        <use href="#cloud" transform="translate(84 160) scale(0.6)"/>
+        <rect x="100" y="300" width="50" height="50" rx="10" fill="#ececec" stroke="#555" stroke-width="2"/>
+        <text x="125" y="333" font-size="20" text-anchor="middle">sofa</text>
+        <text x="215" y="333" font-size="20" text-anchor="middle">Living</text>
+      </g>
+      <g>
+        <rect x="295" y="130" width="210" height="260" rx="24" fill="#fff" stroke="#555" stroke-width="3"/>
+        <use href="#cloud" transform="translate(319 160) scale(0.6) "/>
+        <rect x="335" y="300" width="50" height="50" rx="10" fill="#ececec" stroke="#555" stroke-width="2"/>
+        <text x="360" y="333" font-size="20" text-anchor="middle">bed</text>
+        <text x="450" y="333" font-size="20" text-anchor="middle">My room</text>
+      </g>
+      <g>
+        <rect x="530" y="130" width="210" height="260" rx="24" fill="#fff" stroke="#999" stroke-width="3" stroke-dasharray="10 8"/>
+        <text x="635" y="255" font-size="64" text-anchor="middle" fill="#777">+</text>
+        <text x="635" y="333" font-size="22" text-anchor="middle" fill="#555">New room</text>
+      </g>
+      <rect x="490" y="404" width="240" height="72" rx="24" fill="#222"/>
+      <text x="610" y="450" font-size="28" text-anchor="middle" fill="#fff" style="fill:#fff">Next ▶</text>
+    </svg>
+    <h2><span>2</span>Rooms</h2>
+    <p>One card per room the Bolts know, shown as its cloud of bump points and a picture the child chose.</p>
+    <ul>
+      <li>A tap picks a room (thick frame), “Next” goes on.</li>
+      <li>“New room” starts the exploring.</li>
+      <li>No typing: a room gets a picture, a name is optional.</li>
+    </ul>
+  </section>
+
+  <!-- 3 -->
+  <section class="step">
+    <svg class="screen" viewBox="0 0 800 500">
+      <use href="#tablet"/>
+      <use href="#home" x="28" y="28"/>
+      <use href="#sound" x="716" y="28"/>
+      <text x="400" y="66" font-size="28" font-weight="600" text-anchor="middle">The Bolts look around</text>
+      <rect x="110" y="92" width="470" height="360" rx="18" fill="#fafafa" stroke="#bbb" stroke-width="2"/>
+      <!-- a half-found cloud -->
+      <g fill="#777" transform="translate(150 120) scale(1.4)">
+        <circle cx="12" cy="20" r="3"/><circle cx="30" cy="12" r="3"/><circle cx="52" cy="9" r="3"/><circle cx="76" cy="8" r="3"/><circle cx="100" cy="10" r="3"/><circle cx="126" cy="8" r="3"/>
+        <circle cx="8" cy="40" r="3"/><circle cx="10" cy="60" r="3"/><circle cx="7" cy="84" r="3"/><circle cx="11" cy="108" r="3"/>
+        <circle cx="206" cy="40" r="3"/><circle cx="222" cy="44" r="3"/><circle cx="212" cy="58" r="3"/>
+        <circle cx="96" cy="178" r="3"/><circle cx="120" cy="180" r="3"/><circle cx="146" cy="177" r="3"/>
+        <circle cx="268" cy="118" r="3"/><circle cx="270" cy="142" r="3"/>
+      </g>
+      <path d="M300 300 q40 -70 90 -40 t70 -60" fill="none" stroke="#999" stroke-width="2.5" stroke-dasharray="6 6"/>
+      <use href="#bolt-small" x="460" y="200"/>
+      <path d="M260 250 q-30 50 20 80 t60 30" fill="none" stroke="#999" stroke-width="2.5" stroke-dasharray="6 6"/>
+      <use href="#bolt-small" x="342" y="362"/>
+      <!-- side: how much, done, stop -->
+      <text x="678" y="140" font-size="20" text-anchor="middle">bumps</text>
+      <rect x="648" y="152" width="60" height="150" rx="12" fill="#fff" stroke="#555" stroke-width="2.5"/>
+      <rect x="652" y="232" width="52" height="66" rx="8" fill="#777"/>
+      <rect x="610" y="330" width="140" height="64" rx="20" fill="#222"/>
+      <text x="680" y="372" font-size="26" text-anchor="middle" style="fill:#fff">Done ✓</text>
+      <use href="#stop" x="680" y="440" transform="translate(680 440) scale(0.8) translate(-680 -440)"/>
+    </svg>
+    <h2><span>3</span>New room</h2>
+    <p>Both Bolts roam. Every bump leaves a dot, and the dots slowly draw the walls and the furniture.</p>
+    <ul>
+      <li>The bar fills as bumps come in; “Done” ends it when the shape looks like the room.</li>
+      <li>Then the child picks a picture for the room.</li>
+      <li>The round button stops both Bolts at once, on every screen where they move.</li>
+    </ul>
+  </section>
+
+  <!-- 4 -->
+  <section class="step">
+    <svg class="screen" viewBox="0 0 800 500">
+      <use href="#tablet"/>
+      <use href="#home" x="28" y="28"/>
+      <use href="#sound" x="716" y="28"/>
+      <text x="400" y="66" font-size="28" font-weight="600" text-anchor="middle">Who hides, who seeks?</text>
+      <rect x="40" y="92" width="470" height="380" rx="18" fill="#fafafa" stroke="#bbb" stroke-width="2"/>
+      <use href="#cloud" transform="translate(84 130) scale(1.4)"/>
+      <use href="#bolt-small" x="230" y="300"/>
+      <text x="230" y="336" font-size="18" text-anchor="middle">Star</text>
+      <use href="#bolt-small" x="330" y="250"/>
+      <text x="330" y="286" font-size="18" text-anchor="middle">Moon</text>
+      <!-- turn the map -->
+      <circle cx="466" cy="136" r="26" fill="#fff" stroke="#555" stroke-width="2.5"/>
+      <path d="M452 136 a14 14 0 1 1 6 11 M452 136 l-2 -9 M452 136 l9 -1" fill="none" stroke="#555" stroke-width="2.5"/>
+      <!-- roles -->
+      <rect x="540" y="96" width="210" height="110" rx="20" fill="#fff" stroke="#555" stroke-width="3"/>
+      <use href="#bolt-small" x="584" y="151"/>
+      <text x="680" y="145" font-size="22" text-anchor="middle">Star</text>
+      <text x="680" y="172" font-size="20" text-anchor="middle" fill="#555">seeks</text>
+      <rect x="617" y="214" width="56" height="50" rx="14" fill="#fff" stroke="#555" stroke-width="2.5"/>
+      <text x="645" y="248" font-size="26" text-anchor="middle">⇅</text>
+      <rect x="540" y="272" width="210" height="110" rx="20" fill="#fff" stroke="#555" stroke-width="3"/>
+      <use href="#bolt-small" x="584" y="327"/>
+      <text x="680" y="321" font-size="22" text-anchor="middle">Moon</text>
+      <text x="680" y="348" font-size="20" text-anchor="middle" fill="#555">hides</text>
+      <rect x="540" y="396" width="210" height="76" rx="24" fill="#222"/>
+      <text x="645" y="445" font-size="30" text-anchor="middle" style="fill:#fff">Play ▶</text>
+    </svg>
+    <h2><span>4</span>Get ready</h2>
+    <p>The room with both Bolts on it, and the two roles. This is also where the map is turned to match the room and where a Bolt is put in its place.</p>
+    <ul>
+      <li>The arrows swap seeker and hider.</li>
+      <li>Two fingers, or the round arrow, turn the map until it lies like the room. After that it stays right when the child turns with the tablet.</li>
+      <li>A Bolt carried by hand is dragged to its new spot on the map.</li>
+    </ul>
+  </section>
+
+  <!-- 5 -->
+  <section class="step">
+    <svg class="screen" viewBox="0 0 800 500">
+      <use href="#tablet"/>
+      <use href="#sound" x="716" y="28"/>
+      <text x="400" y="66" font-size="28" font-weight="600" text-anchor="middle">Moon is hiding…</text>
+      <rect x="40" y="92" width="560" height="380" rx="18" fill="#fafafa" stroke="#bbb" stroke-width="2"/>
+      <use href="#cloud" transform="translate(110 122) scale(1.5)"/>
+      <!-- seeker waits, eyes shut -->
+      <use href="#bolt-small" x="280" y="330"/>
+      <text x="280" y="366" font-size="18" text-anchor="middle">Star waits</text>
+      <rect x="250" y="270" width="60" height="34" rx="10" fill="#fff" stroke="#555" stroke-width="2"/>
+      <text x="280" y="294" font-size="20" text-anchor="middle">3…</text>
+      <!-- hider rolls away -->
+      <path d="M312 320 q80 -20 110 -80 t40 -70" fill="none" stroke="#999" stroke-width="2.5" stroke-dasharray="6 6"/>
+      <use href="#bolt-small" x="462" y="168"/>
+      <text x="432" y="163" font-size="18" text-anchor="end">Moon</text>
+      <use href="#stop" x="690" y="400"/>
+      <text x="690" y="462" font-size="18" text-anchor="middle">stop</text>
+    </svg>
+    <h2><span>5</span>Hiding</h2>
+    <p>The hider rolls away to a spot of its own. The seeker stays, its matrix shows closed eyes and counts.</p>
+    <ul>
+      <li>When the hider stands still it starts calling, and the seeker sets off.</li>
+      <li>Nothing to tap but stop: the child watches the floor.</li>
+    </ul>
+  </section>
+
+  <!-- 6 -->
+  <section class="step">
+    <svg class="screen" viewBox="0 0 800 500">
+      <use href="#tablet"/>
+      <use href="#sound" x="716" y="28"/>
+      <text x="400" y="66" font-size="28" font-weight="600" text-anchor="middle">Star is seeking!</text>
+      <rect x="40" y="92" width="560" height="380" rx="18" fill="#fafafa" stroke="#bbb" stroke-width="2"/>
+      <use href="#cloud" transform="translate(110 122) scale(1.5)"/>
+      <!-- hider calls -->
+      <circle cx="462" cy="168" r="26" fill="none" stroke="#bbb" stroke-width="2"/>
+      <circle cx="462" cy="168" r="40" fill="none" stroke="#ddd" stroke-width="2"/>
+      <use href="#bolt-small" x="462" y="168"/>
+      <!-- seeker's path, with its turns -->
+      <path d="M280 330 l40 -6 l-10 -40 l50 4 l14 -44 l40 10" fill="none" stroke="#777" stroke-width="3" stroke-linejoin="round"/>
+      <use href="#bolt-small" x="414" y="254"/>
+      <path d="M426 242 l16 -22 M442 220 l-10 2 M442 220 l-1 10" fill="none" stroke="#222" stroke-width="3"/>
+      <!-- time as a bar that fills -->
+      <text x="690" y="130" font-size="20" text-anchor="middle">time</text>
+      <rect x="660" y="142" width="60" height="170" rx="12" fill="#fff" stroke="#555" stroke-width="2.5"/>
+      <rect x="664" y="250" width="52" height="58" rx="8" fill="#777"/>
+      <use href="#stop" x="690" y="400"/>
+      <text x="690" y="462" font-size="18" text-anchor="middle">stop</text>
+    </svg>
+    <h2><span>6</span>Seeking</h2>
+    <p>Both Bolts move on the map as they move on the floor. The seeker draws its path; a small arrow shows where it believes the hider is.</p>
+    <ul>
+      <li>Rings around the hider show it is calling.</li>
+      <li>Time is a bar that fills, not a number.</li>
+      <li>The map can still be turned with two fingers.</li>
+    </ul>
+  </section>
+
+  <!-- 7 -->
+  <section class="step">
+    <svg class="screen" viewBox="0 0 800 500">
+      <use href="#tablet"/>
+      <use href="#home" x="28" y="28"/>
+      <use href="#sound" x="716" y="28"/>
+      <text x="400" y="110" font-size="46" font-weight="700" text-anchor="middle">Found!</text>
+      <!-- the two Bolts touching, a burst -->
+      <g stroke="#999" stroke-width="3">
+        <path d="M400 150 v-22 M400 290 v22 M300 220 h-24 M500 220 h24 M330 165 l-16 -16 M470 165 l16 -16 M330 275 l-16 16 M470 275 l16 16"/>
+      </g>
+      <use href="#bolt" x="372" y="220" transform="translate(372 220) scale(1.3) translate(-372 -220)"/>
+      <use href="#bolt" x="428" y="220" transform="translate(428 220) scale(1.3) translate(-428 -220)"/>
+      <!-- stars for speed -->
+      <g fill="#222" font-size="34" text-anchor="middle">
+        <text x="350" y="346">★</text><text x="400" y="346">★</text><text x="450" y="346" fill="#bbb" style="fill:#bbb">★</text>
+      </g>
+      <rect x="90" y="384" width="190" height="80" rx="24" fill="#fff" stroke="#555" stroke-width="2.5"/>
+      <text x="185" y="434" font-size="24" text-anchor="middle">End</text>
+      <rect x="305" y="384" width="190" height="80" rx="24" fill="#fff" stroke="#555" stroke-width="2.5"/>
+      <text x="400" y="434" font-size="24" text-anchor="middle">Swap ⇅</text>
+      <rect x="520" y="384" width="190" height="80" rx="24" fill="#222"/>
+      <text x="615" y="434" font-size="26" text-anchor="middle" style="fill:#fff">Again ▶</text>
+    </svg>
+    <h2><span>7</span>Found</h2>
+    <p>The seeker bumped into the hider and both felt it. A sound plays, on the tablet and on the Bolts.</p>
+    <ul>
+      <li>Stars for how quick it was, never a fail screen.</li>
+      <li>“Again” plays the same roles, “Swap” the other way round, “End” goes back to the rooms.</li>
+      <li>If the seeker gives up, the same screen says “Not found this time” with the same three buttons.</li>
+    </ul>
+  </section>
+
+</div>
+
+<div class="notes">
+  <section class="note">
+    <h2>Built for six and up</h2>
+    <ul>
+      <li>One dark button per screen: the next thing to do.</li>
+      <li>Every button is at least a thumb wide; nothing sits in a menu.</li>
+      <li>Few words, short ones; a picture or a sign wherever one will do. No typing anywhere.</li>
+      <li>A Bolt on the screen and the Bolt on the floor carry the same sign, so the child knows which is which.</li>
+      <li>Stop is always in the same corner and stops both Bolts.</li>
+      <li>Nothing can be broken by a wrong tap: every step can be gone back from, and no screen says “wrong”.</li>
+    </ul>
+  </section>
+  <section class="note">
+    <h2>Assumed, to confirm</h2>
+    <ul>
+      <li><b>Device:</b> a tablet or phone held sideways, touch. Web Bluetooth needs Chrome on Android or a computer; it does not run on iPad or iPhone.</li>
+      <li><b>Who drives away:</b> the hider (the sender) rolls off and hides; the seeker waits. The request said “seeker drives away”.</li>
+      <li><b>Map in sync:</b> by the tablet's own sensors, so the map lies like the room when the child turns.</li>
+      <li><b>Words:</b> “hider” for the sender; Bolts get a sign and a short name instead of “SB-9129”.</li>
+      <li><b>Placing by hand:</b> the child carries a Bolt and drags its picture to the new spot on the map.</li>
+    </ul>
+  </section>
+  <section class="note">
+    <h2>Not drawn yet</h2>
+    <ul>
+      <li>A Bolt that is lost, stuck or low on battery in the middle of a game.</li>
+      <li>Only one Bolt awake.</li>
+      <li>Choosing the room's picture after exploring.</li>
+      <li>Anything for a grown-up: forgetting a Bolt, deleting a room.</li>
+    </ul>
+  </section>
+</div>
+
+</body>
+</html>
