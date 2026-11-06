@@ -58,7 +58,7 @@ export async function light (entry, on) {
   else await matrix.clear();
 }
 
-/** Each Bolt lit in turn against one dark frame: { map, at: { name: plan point } }. Throws when one is not seen. */
+/** Each Bolt lit in turn against one dark frame: { map, at: { name: plan point }, dark }. Throws when one is not seen. */
 export async function locate (entries, label = 'find') {
   for (const e of entries) await light(e, false);
   const dark = await frameAfter(Date.now());
@@ -75,7 +75,7 @@ export async function locate (entries, label = 'find') {
     if (!blob.found) throw new Error(`camera: ${e.name} not seen (rise ${blob.rise})`);
     at[e.name] = map.toPlan(blob);
   }
-  return { map, at };
+  return { map, at, dark };
 }
 
 /** Roll on `heading` at `speed` (0..255) for `ms`, a roll every 100 ms, then stop and let the ball settle. */

@@ -16,9 +16,11 @@
     // the sender's beat: one frame per 200.44 ms, the notify 45 ms after the frame;
     // a read lands only while the frame is in the air, 7.5 ms (behavior/beat.ts)
     "beatMs": 200.44, "learnFrom": 10,
-    // over the bridge a read lands at a 40 ms lead (utils/read-timing.mjs, 2026-11-06: 3 of 15,
-    // none at 20, 4 of 15 at 45 and 55 turning in place); two reads span that
-    "volley": { "leadMs": 56, "reads": 2, "stepMs": 8 },
+    // over the bridge a read lands at a 40 to 55 ms lead (utils/read-timing.mjs, 2026-11-06), and
+    // commands reach the Bolt on a 15 ms grid: three reads 7 ms apart, leads 60 to 46, span a grid
+    // slot (behavior/beat.ts: three land in 35 to 39 % of frames, five in 43 %); five loaded the link
+    // so that the seeker's collision report came 400 ms after the sender's (2026-11-06)
+    "volley": { "leadMs": 60, "reads": 3, "stepMs": 7 },
     // the carrier: the weakest level heard at least `minFrames` times in `windowMs`;
     // the level that is just arriving has an edge, nose or tail (recipes.md)
     "carrier": { "windowMs": 3000, "minFrames": 2 },
@@ -39,20 +41,23 @@
 
     // a frame of the carrier: the sender within the lobe, ahead or behind
     { "drive": "IR_AX", "source": "frame.carrier", "pipeline": [] },
+    // a whole round of the ladder heard without its carrier: the sender is outside the lobe;
+    // without it, the nose confirmed itself anywhere in a wide lobe and runs passed 20 cm off (2026-11-06)
+    { "drive": "IR_MISS", "source": "frame.miss", "pipeline": [] },
 
-    // the gradient, a klinokinesis cue: while driving ahead, a weaker level
-    // starting to arrive says the sender is ahead, the carrier fading says behind
-    { "drive": "IR_APPROACH", "source": "carrier.down", "pipeline": [ { "op": "mul", "by": "self.forward" } ] },
-    { "drive": "IR_RECEDE",   "source": "carrier.up",   "pipeline": [ { "op": "mul", "by": "self.forward" } ] },
+    // no carrier step: a weaker level arriving is as often the nose turning into the
+    // lobe as the sender coming closer; it tipped the ring to the nose wrongly (2026-11-06, run 17:06)
 
     // the gradient, the worm's way: closeness, log2(32 / strength) summed per
     // second over the frames heard, against its own mean over 4 s; rising while
     // driving ahead says ahead, falling says behind. Its noise is about 2 per s,
-    // so only what stands out of it counts.
+    // so only what stands out of it counts. It weighs carrier frames only, toward
+    // the nose or the tail: fed on its own it pinned the ring to the nose wherever
+    // that pointed, and runs aimed 20 cm off and passed (2026-11-06).
     { "drive": "IR_APPROACH", "source": "frame.closeness", "pipeline": [ { "op": "rate", "tauMs": 1500 }, { "op": "adapt", "tauMs": 4000 },
-        { "op": "mul", "by": "self.forward" }, { "op": "mul", "by": "ladder.settled" }, { "op": "sub", "k": 1.5 }, { "op": "gain", "k": 0.15 }, { "op": "clamp", "lo": 0, "hi": 1 } ] },
+        { "op": "mul", "by": "self.forward" }, { "op": "mul", "by": "ladder.settled" }, { "op": "sub", "k": 1.5 }, { "op": "gain", "k": 0.15 }, { "op": "clamp", "lo": 0, "hi": 1 }, { "op": "mul", "by": "frame.carrier" } ] },
     { "drive": "IR_RECEDE", "source": "frame.closeness", "pipeline": [ { "op": "rate", "tauMs": 1500 }, { "op": "adapt", "tauMs": 4000 }, { "op": "gain", "k": -1 },
-        { "op": "mul", "by": "self.forward" }, { "op": "mul", "by": "ladder.settled" }, { "op": "sub", "k": 1.5 }, { "op": "gain", "k": 0.15 }, { "op": "clamp", "lo": 0, "hi": 1 } ] },
+        { "op": "mul", "by": "self.forward" }, { "op": "mul", "by": "ladder.settled" }, { "op": "sub", "k": 1.5 }, { "op": "gain", "k": 0.15 }, { "op": "clamp", "lo": 0, "hi": 1 }, { "op": "mul", "by": "frame.carrier" } ] },
 
     // anything of the ladder: the sender is in range at all; frames per second
     { "drive": "IR_ANY", "source": "frame.any", "pipeline": [ { "op": "rate", "tauMs": 3000 } ] },

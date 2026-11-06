@@ -18,8 +18,9 @@ const TAU_MS   = 250;    // ring time constant
 // term keeps the axis through one sweep past the sender. b keeps the total down, so bumps compete.
 const A1 = Number(process.env.A1 ?? 0.24), A2 = Number(process.env.A2 ?? 0.12), B = Number(process.env.B ?? 0.03);
 const CORNER   = 2.0;    // a corner that heard, onto the ring around its own direction, cos^2 over +-90
-const AXIAL    = 1.0;    // a carrier frame: the sender inside the lobe, nose or tail, cos^4 at 0 and 180
-const GRADIENT = 1.2;    // the carrier moved down (up) while driving: the sender is ahead (behind), cos over +-90
+const AXIAL    = 1.5;    // a carrier frame: the sender inside the lobe, nose or tail, cos^4 at 0 and 180; 1.0 scanned 10 s before a bump
+const MISS     = 0.6;    // a round of the ladder without its carrier: the sender is not at nose or tail, cos^4 inhibition
+const GRADIENT = 2.0;    // a carrier frame while the closeness rises (falls) driving: the sender is ahead (behind), cos over +-90
 // motor: F, B, R, L read the ring's vector; SEARCH is on unless that vector has a length;
 // ROAM is the part of search with nothing heard at all
 const SEARCH_K = 3.0;    // |F-B| + |R-L| of 1/3 switches search off
@@ -40,6 +41,7 @@ const edge = (pre, post, w) => { if (Math.abs(w) >= 0.001) edges.push([pre, post
 const CORNERS = { IR_FL: -45, IR_FR: 45, IR_BR: 135, IR_BL: -135 };
 for (const [c, a] of Object.entries(CORNERS)) neuron(c, 'corner', { angle: a });
 neuron('IR_AX', 'axial');
+neuron('IR_MISS', 'axial');
 neuron('IR_APPROACH', 'gradient', { angle: 0 });
 neuron('IR_RECEDE', 'gradient', { angle: 180 });
 neuron('IR_ANY', 'presence');
@@ -55,6 +57,7 @@ for (let j = 0; j < N; j++) {
   const a = ringAngle(j);
   for (const [c, ca] of Object.entries(CORNERS)) edge(c, id(j), CORNER * lobe(a - ca, 2));
   edge('IR_AX', id(j), AXIAL * (lobe(a, 4) + lobe(a - 180, 4)));
+  edge('IR_MISS', id(j), -MISS * (lobe(a, 4) + lobe(a - 180, 4)));
   edge('IR_APPROACH', id(j), GRADIENT * lobe(a, 1));
   edge('IR_RECEDE', id(j), GRADIENT * lobe(a - 180, 1));
 }

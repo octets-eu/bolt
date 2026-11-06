@@ -31,13 +31,14 @@ export class Observation {
     this.learn = [];
     this.carrier = null;         // strength of the carrier
     this.near = false;
-    this.stats = { frames: 0, reads: 0, landed: 0, named: 0, flooded: 0 };
+    this.stats = { misses: 0, frames: 0, reads: 0, landed: 0, named: 0, flooded: 0 };
   }
 
-  fresh () { return { carrier: 0, any: 0, closeness: 0, corners: new Set(), down: 0, up: 0 }; }
+  fresh () { return { miss: 0, carrier: 0, any: 0, closeness: 0, corners: new Set(), down: 0, up: 0 }; }
 
   async start () {
     this.running = true;
+    this.switchedAt = performance.now();   // the closeness has no mean yet: as after a switch of ladder
     this.release = await this.bolt.sensors.infrared.subscribe(({ payload }) => this.onNotify(payload[0] ?? 255));
     await this.bolt.sensors.listenInfrared(true);
     void this.volleys();
@@ -58,7 +59,11 @@ export class Observation {
     this.heard.push({ t, channel, ...level });
     this.events.any = 1;
     this.events.closeness += Math.log2(32 / level.strength);   // 16 says 1, 1 says 5: weaker frames arrive only near
-    if (level.strength === this.carrier && level.range === this.range()) this.events.carrier = 1;
+    if (level.strength === this.carrier && level.range === this.range()) { this.events.carrier = 1; this.carrierAt = t; }
+    else if (level.strength > this.carrier && this.carrier !== null) {   // a stronger level: was the carrier's frame of this round missed?
+      const roundMs = 200 * [...this.channels.values()].filter((c) => c.range === level.range).length;
+      if (t - (this.carrierAt ?? t) > 1.2 * roundMs && t - (this.missAt ?? -Infinity) > roundMs) { this.events.miss = 1; this.missAt = t; this.stats.misses++; }
+    }
     this.followBeat(t);
   }
 
@@ -146,7 +151,7 @@ export class Observation {
     this.update(performance.now());
     const e = this.events;
     this.events = this.fresh();
-    const s = { 'frame.carrier': e.carrier, 'frame.any': e.any, 'carrier.down': e.down, 'carrier.up': e.up,
+    const s = { 'frame.carrier': e.carrier, 'frame.miss': e.miss, 'frame.any': e.any, 'carrier.down': e.down, 'carrier.up': e.up,
       'ladder.near': this.near ? 1 : 0, 'self.forward': forward,
       'frame.closeness': e.closeness, 'ladder.settled': performance.now() - (this.switchedAt ?? -Infinity) > this.ir.settleMs ? 1 : 0 };
     for (const c of CORNER_NAMES) s[`corner.${c}`] = e.corners.has(c) ? 1 : 0;
