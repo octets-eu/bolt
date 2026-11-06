@@ -18,7 +18,6 @@ The open items in short, by section; each stands in full below.
 - 3 Dashboard as the resting screen.
 - 3 Buttons A, B and C.
 - 3 FRITZ!App Fon as a real call.
-- 4 `pipe-pane` writes the screen to a log file.
 - 5 Interactive variant with `-it`.
 - 6 The loop with no human in it.
 - 7 Long run with a small `--autocompact` window.
@@ -73,7 +72,7 @@ Later:
 - [x] tmux 3.8 on the M1; `send-keys` and `capture-pane` proven over SSH.
 - [x] The agent session runs inside `tmux new -d -s agent` (proven 28.10. with an interactive `docker run -it ... claude` inside); `agent/watch.sh` from here attaches to it over SSH, Ctrl-b d detaches.
 - [x] The session lives on the M1's tmux server, not on the SSH connection: it was driven from five separate SSH connections (28.10.).
-- [ ] `pipe-pane` writes the screen to a log file.
+- [x] `pipe-pane` writes the screen to a log file (06.11.): in a scratch session on the M1, `tmux pipe-pane -o -t <session> "cat >> <file>"` logged the typed command and its output, the prompt's escape codes among them. A print mode session shows only the start script's last lines on the screen, its stream is in `stream.jsonl`; the log is for an interactive session.
 
 ## 5 Start script, `~/Rig/run-agent.sh`, documented in `agent/Rig/README.md`
 
