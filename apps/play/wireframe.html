@@ -29,7 +29,7 @@
 <body>
 
 <h1>Bolt hide and seek: wireframe</h1>
-<p class="lead">Seven screens on a tablet held sideways, in the order a child meets them. Boxes and words only: no colours, no final shapes. A dark button is the one thing to tap next. Assumptions that need a yes or no are at the bottom.</p>
+<p class="lead">Eight screens on a tablet held sideways, in the order a child meets them. Boxes and words only: no colours, no final shapes. A dark button is the one thing to tap next. Assumptions that need a yes or no are at the bottom.</p>
 
 <svg width="0" height="0" style="position:absolute">
   <defs>
@@ -190,6 +190,43 @@
       <use href="#tablet"/>
       <use href="#home" x="28" y="28"/>
       <use href="#sound" x="716" y="28"/>
+      <text x="400" y="66" font-size="28" font-weight="600" text-anchor="middle">Turn the map like the room</text>
+      <!-- the dial: the map turns inside, the knob is dragged round -->
+      <circle cx="300" cy="285" r="182" fill="#fafafa" stroke="#555" stroke-width="3"/>
+      <g transform="rotate(-24 300 285)">
+        <use href="#cloud" transform="translate(165 195)"/>
+        <!-- the leg Star just rolled, drawn on the map -->
+        <path d="M250 300 h70 M320 300 l-12 -8 M320 300 l-12 8" fill="none" stroke="#222" stroke-width="4"/>
+        <use href="#bolt-small" x="250" y="300"/>
+      </g>
+      <!-- the knob on the rim, with the way it can go -->
+      <circle cx="455" cy="190" r="26" fill="#222"/>
+      <path d="M445 190 h20 M455 180 v20" stroke="#fff" stroke-width="3"/>
+      <path d="M487 215 a190 190 0 0 1 4 50 M491 265 l-9 -8 M491 265 l7 -10" fill="none" stroke="#777" stroke-width="3"/>
+      <path d="M425 150 a190 190 0 0 0 -40 -28 M385 122 l12 0 M385 122 l4 11" fill="none" stroke="#777" stroke-width="3"/>
+      <!-- right: the cue and the confirm -->
+      <text x="640" y="150" font-size="20" text-anchor="middle">Star rolls</text>
+      <text x="640" y="176" font-size="20" text-anchor="middle">straight ahead</text>
+      <rect x="535" y="200" width="210" height="72" rx="20" fill="#fff" stroke="#555" stroke-width="2.5"/>
+      <text x="640" y="245" font-size="22" text-anchor="middle">Roll again ↻</text>
+      <rect x="535" y="372" width="210" height="88" rx="24" fill="#222"/>
+      <text x="640" y="426" font-size="30" text-anchor="middle" style="fill:#fff">It fits ✓</text>
+    </svg>
+    <h2><span>4</span>Turn the map</h2>
+    <p>The map has to lie like the room. One Bolt rolls a short way straight ahead on the floor; the map shows the same roll as an arrow.</p>
+    <ul>
+      <li>The child drags the dark knob round the ring, and the map turns with it, until the arrow points the way the Bolt rolled.</li>
+      <li>“Roll again” repeats the roll, as often as needed.</li>
+      <li>“It fits” confirms. From then on the map stays right when the child turns with the tablet.</li>
+    </ul>
+  </section>
+
+  <!-- 5 -->
+  <section class="step">
+    <svg class="screen" viewBox="0 0 800 500">
+      <use href="#tablet"/>
+      <use href="#home" x="28" y="28"/>
+      <use href="#sound" x="716" y="28"/>
       <text x="400" y="66" font-size="28" font-weight="600" text-anchor="middle">Who hides, who seeks?</text>
       <rect x="40" y="92" width="470" height="380" rx="18" fill="#fafafa" stroke="#bbb" stroke-width="2"/>
       <use href="#cloud" transform="translate(84 130) scale(1.4)"/>
@@ -214,16 +251,16 @@
       <rect x="540" y="396" width="210" height="76" rx="24" fill="#222"/>
       <text x="645" y="445" font-size="30" text-anchor="middle" style="fill:#fff">Play ▶</text>
     </svg>
-    <h2><span>4</span>Get ready</h2>
-    <p>The room with both Bolts on it, and the two roles. This is also where the map is turned to match the room and where a Bolt is put in its place.</p>
+    <h2><span>5</span>Get ready</h2>
+    <p>The room with both Bolts on it, and the two roles. This is also where a Bolt is put in its place.</p>
     <ul>
       <li>The arrows swap seeker and hider.</li>
-      <li>Two fingers, or the round arrow, turn the map until it lies like the room. After that it stays right when the child turns with the tablet.</li>
+      <li>The round arrow goes back to “Turn the map”, should the map lie wrong.</li>
       <li>A Bolt carried by hand is dragged to its new spot on the map.</li>
     </ul>
   </section>
 
-  <!-- 5 -->
+  <!-- 6 -->
   <section class="step">
     <svg class="screen" viewBox="0 0 800 500">
       <use href="#tablet"/>
@@ -243,7 +280,7 @@
       <use href="#stop" x="690" y="400"/>
       <text x="690" y="462" font-size="18" text-anchor="middle">stop</text>
     </svg>
-    <h2><span>5</span>Hiding</h2>
+    <h2><span>6</span>Hiding</h2>
     <p>The hider rolls away to a spot of its own. The seeker stays, its matrix shows closed eyes and counts.</p>
     <ul>
       <li>When the hider stands still it starts calling, and the seeker sets off.</li>
@@ -251,7 +288,7 @@
     </ul>
   </section>
 
-  <!-- 6 -->
+  <!-- 7 -->
   <section class="step">
     <svg class="screen" viewBox="0 0 800 500">
       <use href="#tablet"/>
@@ -274,16 +311,16 @@
       <use href="#stop" x="690" y="400"/>
       <text x="690" y="462" font-size="18" text-anchor="middle">stop</text>
     </svg>
-    <h2><span>6</span>Seeking</h2>
+    <h2><span>7</span>Seeking</h2>
     <p>Both Bolts move on the map as they move on the floor. The seeker draws its path; a small arrow shows where it believes the hider is.</p>
     <ul>
       <li>Rings around the hider show it is calling.</li>
       <li>Time is a bar that fills, not a number.</li>
-      <li>The map can still be turned with two fingers.</li>
+      <li>The map turns with the tablet; it is not turned by hand here.</li>
     </ul>
   </section>
 
-  <!-- 7 -->
+  <!-- 8 -->
   <section class="step">
     <svg class="screen" viewBox="0 0 800 500">
       <use href="#tablet"/>
@@ -307,7 +344,7 @@
       <rect x="520" y="384" width="190" height="80" rx="24" fill="#222"/>
       <text x="615" y="434" font-size="26" text-anchor="middle" style="fill:#fff">Again ▶</text>
     </svg>
-    <h2><span>7</span>Found</h2>
+    <h2><span>8</span>Found</h2>
     <p>The seeker bumped into the hider and both felt it. A sound plays, on the tablet and on the Bolts.</p>
     <ul>
       <li>Stars for how quick it was, never a fail screen.</li>
@@ -335,7 +372,8 @@
     <ul>
       <li><b>Device:</b> a tablet or phone held sideways, touch. Web Bluetooth needs Chrome on Android or a computer; it does not run on iPad or iPhone.</li>
       <li><b>Who drives away:</b> the hider (the sender) rolls off and hides; the seeker waits. The request said “seeker drives away”.</li>
-      <li><b>Map in sync:</b> by the tablet's own sensors, so the map lies like the room when the child turns.</li>
+      <li><b>Map in sync:</b> the child turns the map once by dragging and confirms; after that the tablet's own sensors keep it lying like the room.</li>
+      <li><b>The cue for turning:</b> a Bolt rolls straight ahead and the map shows that roll as an arrow. Without a cue a child cannot tell when a cloud of dots fits.</li>
       <li><b>Words:</b> “hider” for the sender; Bolts get a sign and a short name instead of “SB-9129”.</li>
       <li><b>Placing by hand:</b> the child carries a Bolt and drags its picture to the new spot on the map.</li>
     </ul>
