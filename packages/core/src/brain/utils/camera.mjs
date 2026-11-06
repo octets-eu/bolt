@@ -35,7 +35,7 @@ export function cam (line) {
  */
 export async function frameAfter (since = Date.now(), settleMs = 2500) {
   for (let i = 0; i < 60; i++) {
-    const r = await cam('frame');
+    const r = await cam('frame').catch(() => ({ text: '' }));   // a lost reply is one more try
     if (r.text.startsWith('frame')) {
       const [, size, age] = r.text.split(' ').map(Number);
       const t = Date.now() - age;
