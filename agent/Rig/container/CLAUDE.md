@@ -1,6 +1,6 @@
 # Bolt agent workspace
 
-You run inside the sandbox container on the rig. This folder is the part of the Bolt project an agent needs, assembled by the project's sync; the browser app, the session history and the git history stay outside. Two Bolts and an infrared beacon are on a floor next to the rig. 
+You run inside the sandbox container on the rig. This folder is the part of the Bolt project an agent needs, assembled by the project's sync; the browser app, the session history and the git history stay outside. Two Bolts are on a floor next to the rig. 
 
 ## Know-how
 
@@ -17,11 +17,9 @@ The library is `packages/core/src`. `behavior/` holds behaviors with a result an
 
 - **Two Bolts** through the bridge on the host: `SB-9129` on port 7001, `SB-11DF` on 7002, host `$BRIDGE_HOST`, set in your environment to 192.168.5.2; read it as `connect.mjs` does, the scripts default to loopback. The bridge holds the one Bluetooth link each and cuts the motors when your process disconnects or goes silent for 3 s; letting go of a Bolt's socket is your stop. Its control port on 7000 is the host's and out of your reach. `packages/node-socket/src/transport.ts` has the protocol in its header.
 
-- **The M5 beacon** through the forwarder on port 7010 of the same host. One text line per request: `ping`, `send <ch> [count] [gapMs]`, `frame <ch> <duty> [count]`, `beacon <far> <near> <seconds>`. It sends Bolt-format frames on a channel; channel 7 is free of the ladders 0 to 6. `send` sends at a fixed strength; `frame` sends one frame at a carrier duty in percent, the duty standing in for strength; `beacon` sends two frames every 200 ms for that many seconds, one on channel `near` at 1 % and one on `far` at 33 %, a two-level ladder, the two duties optional after the seconds. The emitter is M5Stack's Unit IR, a 940 nm diode on a 38 kHz carrier, under 5 m by its maker; what distance a duty reaches on this floor, and how it compares to a Bolt's strength, is unmeasured.
-
 - **The camera** over the floor, through the camera forwarder on port 7020 of the same host, one text line per connection: `ping`, `on [id]`, `off`, `status`, `frame`. `on` alone streams the ultrawide, id 2, the whole floor; `on 0` streams the main camera, the stretch between the speakers at twice the detail; `floor-ultra-wide.jpg` and `floor-main.jpg` show each. After `on` the phone streams and `frame` answers `frame <bytes> <age_ms>` followed by the JPEG, 1200x1600, turned to lie like the floor plan, x right and y down, about two a second; `off` stops the camera. `npm run camtest` (`packages/node-socket/camtest.mjs`) fetches one frame into `frames/`. The workspace has `jpeg-js`, `sharp` and `@techstark/opencv-js` for whatever you do with a frame. The frames are where a Bolt is on the floor; its locator is dead reckoned and drifts.
 
-- **The Node path.** `@bolt/node-socket` is the core `Transport` over the bridge socket. `npm run rig` (`packages/node-socket/connect.mjs`) brings the Bolts up, reads the battery and lets go; it is the pattern to follow. `npm run m5test` crosses both bridges.
+- **The Node path.** `@bolt/node-socket` is the core `Transport` over the bridge socket. `npm run rig` (`packages/node-socket/connect.mjs`) brings the Bolts up, reads the battery and lets go; it is the pattern to follow.
 
 - **Builds.** `node_modules` is prebuilt. After a sync, build the library before running anything: `npm run build --workspace packages/core && npm run build --workspace packages/node-socket`
 
