@@ -34,11 +34,6 @@ container (colima)            host (macOS, user rig)              Bolt
   through adb, runs scrcpy on its ultrawide camera into ffmpeg, and keeps one
   JPEG current; the container asks on 7020 (`on`, `frame`, `off`). Nothing is
   recorded; the camera runs only between `on` and `off`.
-- `m5.py` is the same split for the M5 beacon: it owns the M5's USB serial port
-  and runs the `mpremote` sends; the container asks over TCP (7010). The M5
-  sends a Bolt-format frame on a channel, channel 7 being free of the ladders.
-  `m5test.mjs` crosses both bridges: a Bolt listens while the container tells
-  the M5 to send, and counts what was heard.
 
 ## The one manual step
 
@@ -79,7 +74,7 @@ built and run on the host (colima), where a container reaches the host as
 ```
 ~/Rig/sandbox/run.sh                    a shell in the sandbox
 ~/Rig/sandbox/run.sh npm run rig        bring up the Bolts from inside
-~/Rig/sandbox/run.sh npm run m5test     a Bolt hears the M5, across both bridges
+~/Rig/sandbox/run.sh npm run camtest    one camera frame into frames/, from inside
 ```
 
 - **Filesystem.** Only the repo is mounted (`/workspace`); `node_modules` is a
@@ -88,8 +83,7 @@ built and run on the host (colima), where a container reaches the host as
   reach another container. The command runs as the host user, so files it
   writes into the repo belong to that user.
 - **Network.** `init-firewall.sh` drops all egress but DNS, the host on
-  `192.168.5.2:7000-7020` (the Bolt bridge, the M5 forwarder and the camera
-  forwarder), and the
+  `192.168.5.2:7000-7020` (the Bolt bridge and the camera forwarder), and the
   allowlisted domains, by default `api.anthropic.com` alone, so an agent cannot
   install packages. `ALLOW_DOMAINS` in the environment overrides the list for one
   run. It needs `NET_ADMIN`, which `run.sh` grants. Proven: the bridge and

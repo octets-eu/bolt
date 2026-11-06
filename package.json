@@ -16,7 +16,6 @@
     "typecheck": "npm run typecheck --workspaces --if-present",
     "lint": "eslint .",
     "rig": "tsx packages/node-socket/connect.mjs",
-    "m5test": "tsx packages/node-socket/m5test.mjs",
     "camtest": "tsx packages/node-socket/camtest.mjs"
   },
   "engines": {
