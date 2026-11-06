@@ -9,7 +9,6 @@ The session, as decided: a session is a budget, nothing else. The agent picks se
 The open items in short, by section; each stands in full below.
 
 - 2 Camera forwarder starts after a reboot through `Bridge.command`.
-- 2 Speed cap in the bridge, to decide.
 - 3 `page <reason>` as a forwarder command.
 - 3 The forwarder holds the M5's serial port open.
 - 3 The M5 stays dumb, the menu is a table in the forwarder.
@@ -18,8 +17,6 @@ The open items in short, by section; each stands in full below.
 - 3 Dashboard as the resting screen.
 - 3 Buttons A, B and C.
 - 3 FRITZ!App Fon as a real call.
-- 5 Interactive variant with `-it`.
-- 6 The loop with no human in it.
 - 7 Long run with a small `--autocompact` window.
 - 8 Nobody is needed during the session.
 
@@ -47,7 +44,6 @@ The open items in short, by section; each stands in full below.
 - [x] Bridge safety by hand: kill a client while a Bolt rolls, motors stop; `uv run bridge.py stop`, motors stop. `bridge.py roll <name> [seconds] [speed]` is the test, raw motors forward and then the client vanishes without stopping. Run 04.11. on SB-9129 at speed 40: client gone, motors off within the second; `stop` one second into a roll, motors off on both; the deadman at 3 s of silence, motors off again; the Bolt stopped each time and stayed put (the eye, 04.11.).
 - [x] Key file passes `grep -q '^ANTHROPIC_API_KEY=sk-' ~/Rig/secret.env`; never printed.
 - [x] The ntfy topic in `docs/private/rig.env` as `NTFY_TOPIC` (03.11.); a test post from the M4 reached the iPhone, title and high priority through the lock screen. The sync copies the file to `~/Rig/rig.env` for the start script.
-- [ ] Decide the speed cap in the bridge; today the floor is deadman plus motors-off. The agent drives the Bolts to their spots and back, so it drives more than the seek alone.
 
 ## 3 M5: the bell first, menu and dashboard later
 
@@ -86,7 +82,6 @@ Later:
 - [x] The result record, cost and turns, appended to the session's report (04.11., session 2028: `budget 3, cost 0.2625, turns 6, result success, exit 0`; the first two runs had doubled every field through a brace leaking from the parameter expansion).
 - [x] Logs under `~/Rig/sessions/<stamp>/`, outside the container (04.11.: stream.jsonl, stderr.log, report.md). The stream's first line is the entrypoint's firewall message, not JSON; the script and any reader skip lines that do not start a JSON object.
 - [x] Rings on exit: an unanswered question at the end of `questions.md`, a budget stop or an error page the phone over ntfy (one curl from the host, the topic from `rig.env`) and send `beep 3` to the forwarder; a clean end sends one beep and a page that says done (04.11., session 2028 rang done with the cost and the turns; the question and the error cases ring with their reasons, the ask test proves the first).
-- [ ] An interactive variant with `-it` for the comprehension test and for a session you sit in. The budget flag is print mode only (docs, 03.11.), so this run is bounded by the console's limit alone.
 
 ## 6 The brief and the workspace documents
 
@@ -100,7 +95,6 @@ Later:
 - [x] Brief, one line (03.11.): `recipes.md` says hider for sender.
 - [x] Brief, one line (03.11.): `docs/archive`, cited in some headers, is not in the workspace; the headers carry the numbers.
 - [x] Challenge (03.11.): a Bolt off the play area is the agent's to bring back, the camera is its eye; a Bolt it cannot see or reach is a question.
-- [ ] The loop with no human in it: the agent places, runs, judges by the collision event, resets and repeats; reports are read afterwards.
 
 ## 7 Test runs, in order
 
