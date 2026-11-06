@@ -17,3 +17,5 @@ In the last seek of this session (ledger, 16:33) SB-9129 drove off and the camer
 
 1. Please set SB-9129 back on the open floor, anywhere inside the play area the camera sees.
 2. Is the space under the chest open to a Bolt? If so, I would add a geofence by the camera for the seeker (a frame every few seconds, stop when it nears the chest or the partition ends) before the next seek. Is that the right way, or would you rather I keep seeks to the floor south of the partition?
+
+Answer: 1. SB-9129 is back on the floor, between the two partition parts. 2. There was an obstruction on the camera's lens, now removed. Bolts cannot go under the chest.
