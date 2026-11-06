@@ -9,13 +9,6 @@ The session, as decided: a session is a budget, nothing else. The agent picks se
 The open items in short, by section; each stands in full below.
 
 - 2 Camera forwarder starts after a reboot through `Bridge.command`.
-- 3 `page <reason>` as a forwarder command.
-- 3 The forwarder holds the M5's serial port open.
-- 3 The M5 stays dumb, the menu is a table in the forwarder.
-- 3 Stop button.
-- 3 First menu actions.
-- 3 Dashboard as the resting screen.
-- 3 Buttons A, B and C.
 - 3 FRITZ!App Fon as a real call.
 - 7 Long run with a small `--autocompact` window.
 - 8 Nobody is needed during the session.
@@ -54,13 +47,6 @@ Needed for session one:
 
 Later:
 
-- [ ] `page <reason>` as a forwarder command beside the beep, so a process in the container can page too. For session one the start script pages from the host.
-- [ ] The forwarder holds the serial port open: a loop on the M5 pushes button events up and takes draw commands down, beacon sends go through the same link. The forwarder is then the only process on the port; the CLI `uv run m5.py send` goes away.
-- [ ] The M5 stays dumb: it draws lines and reports A, B, C and long presses. Menu items are a table in the forwarder, label to function; a new item is one line there and nothing on the M5.
-- [ ] Stop button: `stop` to the bridge's control port (motors off on both Bolts), `docker pause` on the agent's container, a beep, "STOPPED" on the screen; a second press resumes the container, the motors stay off until the agent commands them.
-- [ ] First actions: stop and resume; beacon on channel 7 on and off, long or short ladder; Bolts to sleep and awake; agent start, stop, "I am here" clearing the attention; restart the bridge, restart the forwarder.
-- [ ] Dashboard as the resting screen, refreshed every second or two: per Bolt link, client, age of the last frame from the bridge's status; battery once something polls it; agent running, elapsed, cost from its log, last report line; beacon idle or sending, channel, frames; camera up, frames per second; the attention reason until a button clears it.
-- [ ] Buttons: A and C move, B selects, a long press on B goes back to the dashboard. The menu appears on the first press.
 - [ ] The FRITZ!App Fon as a real call, the later upgrade of the page.
 
 ## 4 tmux
