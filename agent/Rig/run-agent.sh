@@ -22,7 +22,8 @@
 # writes the budget as the one line of Session.md. The run: the firewalled
 # container, claude in print mode with the prompt from ~/Rig/prompt.md, the stream
 # into ~/Rig/sessions/<stamp>/stream.jsonl. After the run: the result record (cost,
-# turns, subtype) goes to the session's report.md, then the bell: an unanswered
+# turns, subtype) goes to the session's report.md, brain/ is made readable for the
+# user's share (sed -i on the mount leaves files at 600), then the bell: an unanswered
 # question, a budget stop or an error page the phone over ntfy and ring the M1's
 # speaker three times; a clean end rings once and pages "done". NTFY_TOPIC (and NTFY_URL,
 # default https://ntfy.sh) come from ~/Rig/rig.env, the API key from ~/Rig/secret.env.
@@ -101,6 +102,9 @@ turns="$(jq -r '.num_turns // "?"' <<<"$result" 2>/dev/null || echo '?')"
   echo
   echo "budget $budget, cost $cost, turns $turns, result $subtype, exit $status"
 } >> "$dir/report.md"
+# sed -i in the container writes new files, which the virtiofs mount leaves at mode 600,
+# unreadable on the user's share of the workspace; open them up
+chmod -R go+rX "$workspace/packages/core/src/brain" 2>/dev/null || true
 
 if unanswered; then
   reason="question: $(last_question)"; bell 3

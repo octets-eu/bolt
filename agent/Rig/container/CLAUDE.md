@@ -23,6 +23,8 @@ The library is `packages/core/src`. `behavior/` holds behaviors with a result an
 
 - **Builds.** `node_modules` is prebuilt. After a sync, build the library before running anything: `npm run build --workspace packages/core && npm run build --workspace packages/node-socket`
 
+- **Tools.** Node 22, jq, sed, git and the workspace's packages; no Python.
+
 
 ## In case of
 
