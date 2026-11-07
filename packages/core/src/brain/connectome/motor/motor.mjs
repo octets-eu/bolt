@@ -9,35 +9,58 @@
 //   `castMs`, as a moth casts across a plume. The ring is shifted by the yaw,
 //   so carrier frames heard at one end of the swing pile up on that side and
 //   tip the axis the gradient leaves open; the swing also widens the catch
-//   at contact, where straight drives passed the sender by a few cm.
-// - Search, M_SEARCH over half: turn on the spot at `scanDegPerS`, the lobes
-//   sweeping past the sender; with nothing heard at all, M_ROAM, roll a
-//   wide circle instead, to come into range.
+//   at contact, where straight drives passed the sender by a few cm. Near,
+//   on the short ladder (IR_NEAR), the weave narrows to `nearCastDeg` and a
+//   sender more than `nearDriveDeg` off is turned to in place: the full weave
+//   and arcs of up to 60 deg circled the sender at 13 to 20 cm for 30 s, where
+//   a hit needs the nose within about 14 deg at 30 cm (2026-11-07).
+// - The axis, M_AXIS on, the ring holding nose and tail with no side: stand
+//   and listen for `listenMs`, the sender in the lobe, for a corner read to
+//   name the side; then probe ahead for the gradient. Turning or driving, the
+//   corner reads hardly land: in one scan none of 102 did, standing facing
+//   the sender six in seven volleys (2026-11-07).
+// - Search, M_SEARCH over half: turn on the spot in steps of `scanStep`,
+//   standing `scanHoldMs` after each, as the sweep listens a round per
+//   heading; with nothing heard at all, M_ROAM, roll a wide circle instead,
+//   to come into range.
 
 export const MOTOR = {
   seekSpeed:   32,    // roll speed, about 17 cm/s (40 gave 22); at 21 cm/s runs passed 15 cm off, at 13 a touch went unreported
   probeSpeed:  28,
+  listenMs:    2500,  // standing on the axis before the probe
+  scanStep:    45,    // deg per turn of the scan
+  scanHoldMs:  1300,  // standing after each, a round and a half of the long ladder
   roamSpeed:   25,
   maxTurn:     35,    // deg per command
-  scanDegPerS: 70,
   castDeg:     45,    // weave amplitude while targeting: past the edge of the carrier's lobe
   castMs:      2500,  // weave period
+  nearCastDeg: 15,
+  nearDriveDeg: 30,
 };
 
-const cast = () => MOTOR.castDeg * Math.sin(2 * Math.PI * Date.now() / MOTOR.castMs);
+const state = { axisSince: null, scanAt: 0 };
+const cast = (deg) => deg * Math.sin(2 * Math.PI * Date.now() / MOTOR.castMs);
 
-/** `heading`: where the nose points; `commanded`: the last roll's heading, which a scan advances; `dtMs` since that roll. */
+/** `heading`: where the nose points; `commanded`: the last roll's heading, which listening and the scan's stand hold; `dtMs` since that roll. */
 export function motorCommand (net, heading, commanded, dtMs) {
   const F = net.get('M_FWD'), B = net.get('M_BACK'), R = net.get('M_RIGHT'), L = net.get('M_LEFT');
   const search = net.get('M_SEARCH'), roam = net.get('M_ROAM');
   if (search <= 0.5) {
     const dir = Math.atan2(R - L, F - B) * 180 / Math.PI;
-    const driving = Math.abs(dir) <= 60;
-    const turn = Math.max(-MOTOR.maxTurn, Math.min(MOTOR.maxTurn, dir + (driving ? cast() : 0)));
+    const near = net.get('IR_NEAR') > 0.5;
+    const driving = Math.abs(dir) <= (near ? MOTOR.nearDriveDeg : 60);
+    const turn = Math.max(-MOTOR.maxTurn, Math.min(MOTOR.maxTurn, dir + (driving ? cast(near ? MOTOR.nearCastDeg : MOTOR.castDeg) : 0)));
     const ahead = Math.max(0, Math.cos(dir * Math.PI / 180)) ** 2;
     return { mode: 'target', dir, heading: heading + turn, speed: driving ? MOTOR.seekSpeed * ahead : 0 };
   }
-  if (net.get('M_AXIS') > 0) return { mode: 'probe', dir: 0, heading, speed: MOTOR.probeSpeed };
-  if (roam > 0.5) return { mode: 'roam', dir: null, heading: commanded + MOTOR.scanDegPerS * dtMs / 2000, speed: MOTOR.roamSpeed };
-  return { mode: 'scan', dir: null, heading: commanded + MOTOR.scanDegPerS * dtMs / 1000, speed: 0 };
+  const now = Date.now();
+  if (net.get('M_AXIS') > 0) {
+    state.axisSince ??= now;
+    return now - state.axisSince < MOTOR.listenMs ? { mode: 'listen', dir: 0, heading: commanded, speed: 0 } : { mode: 'probe', dir: 0, heading, speed: MOTOR.probeSpeed };
+  }
+  state.axisSince = null;
+  if (roam > 0.5) return { mode: 'roam', dir: null, heading: commanded + 35 * dtMs / 1000, speed: MOTOR.roamSpeed };
+  if (now - state.scanAt < MOTOR.scanHoldMs) return { mode: 'scan', dir: null, heading: commanded, speed: 0 };
+  state.scanAt = now;
+  return { mode: 'scan', dir: null, heading: heading + MOTOR.scanStep, speed: 0 };
 }

@@ -58,3 +58,21 @@ Notes on the rows: the 16:20 row started 18.6 cm apart by mistake (no reset afte
 | 2026-11-06T18:56 | SB-9129 | SB-11DF | 100.6 | camera, lit blobs | found | 25.2 | 30.2 | yes | 58.8 | 70 frames, 7/327 reads named; tag gap 97 ms  end distance after the seeker rolled on during the stop (sender stopped first, fixed); camera track 23 cm and closing at 23.5 s, sender felt x 10 at 25.4 s |
 
 Notes on the rows of 2026-11-06 from 17:02 (the second session of the day; report-2026-11-06-2.md): the brain changed between rows, the report lists what changed when. From 17:26 the trace holds the seeker's camera track; the fence stops a run when the track enters a no-go part. Rows marked VOID are not seeks. The configuration of the session's end is that of the rows from 18:20 on.
+| 2026-11-07T10:12 | SB-9129 | SB-11DF | 105.1 | camera, lit blobs | found | 22.7 | 31.5 | yes | 5.4 | 71 frames, 16/231 reads named; tag gap 341 ms |
+| 2026-11-07T10:15 | SB-9129 | SB-11DF | 101.5 | camera, lit blobs | found | 25.3 | 30.5 | yes | 39.9 | 82 frames, 16/240 reads named; tag gap 2980 ms |
+| 2026-11-07T10:21 | SB-9129 | SB-11DF | 111.7 | camera, lit blobs | found | 36.2 | 33.5 | no | 7.2 | 130 frames, 20/408 reads named; tag gap 561 ms |
+| 2026-11-07T10:28 | SB-9129 | SB-11DF | 110.5 | camera, lit blobs | time | 49.7 | 33.2 | no | 48.2 | 173 frames, 40/576 reads named; tag gap Infinity ms |
+| 2026-11-07T10:30 | SB-9129 | SB-11DF | 106.6 | camera, lit blobs | found | 10.7 | 32 | yes | 5.7 | 43 frames, 5/141 reads named; tag gap 3354 ms |
+| 2026-11-07T10:32 | SB-9129 | SB-11DF | 104.7 | camera, lit blobs | found | 20.1 | 31.4 | yes | 6.2 | 79 frames, 11/231 reads named; tag gap 12 ms |
+| 2026-11-07T10:34 | SB-9129 | SB-11DF | 110.1 | camera, lit blobs | fence | 14.8 | 33 | no | 31.5 | 60 frames, 6/180 reads named; tag gap Infinity ms |
+| 2026-11-07T10:38 | SB-9129 | SB-11DF | 96.7 | camera, lit blobs | found | 33 | 29 | no | 6.5 | 143 frames, 34/453 reads named; tag gap 233 ms |
+| 2026-11-07T10:41 | SB-9129 | SB-11DF | 94.2 | camera, lit blobs | found | 10.1 | 28.3 | yes | 6.1 | 40 frames, 5/123 reads named; tag gap 6 ms |
+| 2026-11-07T10:43 | SB-9129 | SB-11DF | 94.5 | camera, lit blobs | found | 13.8 | 28.3 | yes | 6.9 | 45 frames, 8/144 reads named; tag gap 7 ms |
+| 2026-11-07T10:46 | SB-9129 | SB-11DF | 87.8 | camera, lit blobs | found | 36.7 | 26.3 | no | 7.2 | 91 frames, 13/327 reads named; tag gap 228 ms FALSE DISTANCE: the camera took a light at (151.7, 431.9) for the sender, which stood at (253, 339) before and after; the true start was about 101 cm, goal 30.3 s, still late |
+| 2026-11-07T10:48 | SB-9129 | SB-11DF | 99.1 | camera, lit blobs | found | 21.2 | 29.7 | yes | 6.7 | 85 frames, 17/285 reads named; tag gap 22 ms |
+| 2026-11-07T10:50 | SB-9129 | SB-11DF | 97.9 | camera, lit blobs | fence | 18.3 | 29.4 | no | 54.6 | 41 frames, 6/153 reads named; tag gap Infinity ms |
+| 2026-11-07T10:52 | SB-9129 | SB-11DF | 99.4 | camera, lit blobs | found | 19.9 | 29.8 | yes | 7.4 | 74 frames, 13/255 reads named; tag gap 7 ms |
+| 2026-11-07T10:54 | SB-9129 | SB-11DF moving | 95.2 | camera, lit blobs | found | 25.3 | 28.6 | yes | 82.2 | 87 frames, 11/321 reads named; tag gap 2456 ms FALSE FIND, VOID: the camera track shows the seeker standing 80 cm off at (334, 334) from 22 s on; the tag paired the seeker's own report (y 16) with the rolling sender's at a corner of its square (y 33) |
+
+Notes on the rows of 2026-11-07 (report-2026-11-07.md): the sender sends the ladder through utils/ladder.mjs and the observation keeps each channel's timing from 10:12 on; the stepped scan and the axis listen from 10:15; the near weave from 10:30; the miss gated by self.still from 10:41. Sender at (218, 297) in the doorway until 10:34, at (253, 339) from 10:38. The `--move` sender rolls a slow circle from 11:00, a square before.
+| 2026-11-07T11:00 | SB-9129 | SB-11DF moving | 100.6 | camera, lit blobs | time | 45.2 | 30.2 | no | 84.9 | 132 frames, 23/483 reads named; tag gap 24699 ms |

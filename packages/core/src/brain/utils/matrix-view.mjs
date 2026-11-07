@@ -26,7 +26,7 @@ export class MatrixView {
     const peak = ring.rates.indexOf(Math.max(...ring.rates));
     const angle = mode === 'target' ? ring.angle : peak * 360 / ring.rates.length;
     const k = Math.min(1, 0.25 + ring.length / 2);
-    const color = mode === 'target' ? [0, 255 * k, 0] : mode === 'probe' ? [0, 160 * k, 255 * k] : mode === 'scan' ? [0, 0, 255 * k] : [60, 0, 0];
+    const color = mode === 'target' ? [0, 255 * k, 0] : mode === 'probe' || mode === 'listen' ? [0, 160 * k, 255 * k] : mode === 'scan' ? [0, 0, 255 * k] : [60, 0, 0];
     const p = Math.max(...ring.rates) > 0.02 ? borderPixel(angle) : { x: 3, y: 3 };
     const old = this.pixel;
     this.pixel = p;

@@ -58,11 +58,22 @@ export async function light (entry, on) {
   else await matrix.clear();
 }
 
+// the partition's ends where the fixed mount saw them on 2026-11-06; since a lamp lit the floor
+// (2026-11-07) the left part's top is darker than the boards and the detector finds a board
+const KNOWN_ENDS = { left: { x: 322, y: 773.5 }, right: { x: 838, y: 764.5 } };
+function landmarks (frame) {
+  let ends = null;
+  try { ends = partitionEnds(frame); } catch { /* not found: the known ends */ }
+  const near = (p, q) => p && Math.hypot(p.x - q.x, p.y - q.y) < 15;
+  return { left: near(ends?.left, KNOWN_ENDS.left) ? ends.left : KNOWN_ENDS.left,
+    right: near(ends?.right, KNOWN_ENDS.right) ? ends.right : KNOWN_ENDS.right };
+}
+
 /** Each Bolt lit in turn against one dark frame: { map, at: { name: plan point }, dark }. Throws when one is not seen. */
 export async function locate (entries, label = 'find') {
   for (const e of entries) await light(e, false);
   const dark = await frameAfter(Date.now());
-  const ends = partitionEnds(dark);
+  const ends = landmarks(dark);
   const map  = similarity(ends.left, ends.right);
   if (Math.abs(map.deg) > 10 || map.cmPerPx < 0.2 || map.cmPerPx > 0.4) throw new Error('camera: landmarks implausible');
   const at = {};

@@ -10,7 +10,7 @@
 //
 // The trace goes to frames/<stamp>-trace.txt.
 //
-// --move: the sender rolls a slow square while the seeker seeks (the extra).
+// --move: the sender rolls a slow circle while the seeker seeks (the extra).
 
 import { appendFileSync } from 'node:fs';
 import { StabilizationIndex } from '@bolt/core';
@@ -18,6 +18,7 @@ import { NAMES, bringUp, locate, letGo, cam, wait, r1, pt, dist, headingOf, stam
 import { Brain } from './connectome/brain.mjs';
 import { MatrixView } from './utils/matrix-view.mjs';
 import { track } from './utils/track.mjs';
+import { LadderSender } from './utils/ladder.mjs';
 
 const seekerName = process.argv.slice(2).find((a) => NAMES.includes(a)) ?? NAMES[0];
 const senderName = NAMES.find((n) => n !== seekerName);
@@ -66,15 +67,17 @@ try {
     }, e === seeker ? THRESHOLDS.seeker : moving ? THRESHOLDS.rolling : THRESHOLDS.sender);
   }
 
-  // the sender: the ladder, and on --move a slow square, 2 s a side
-  const sending = sender.bolt.communication.sendLadder('long').catch(() => finish('error'));
+  // the sender: the ladder, and on --move a slow circle
+  const ladder = new LadderSender(sender.bolt, 'long', 1);
+  const sending = ladder.run().catch(() => finish('error'));
   let pattern = null;
   if (moving) {
     pattern = (async () => {
       await sender.bolt.actuators.motor.stabilize(StabilizationIndex.full);
-      for (let k = 0; !sender.bolt.motion.aborted; k++) {
-        for (let i = 0; i < 20 && !sender.bolt.motion.aborted; i++) { await sender.bolt.actuators.motor.roll(22, (k % 4) * 90); await wait(100); }
-      }
+      // a slow circle, about 17 cm in radius, a roll every 500 ms, not every 100: the infrared commands
+      // share the sender's link (2026-11-06). Not a square: at its corners the sender reported (y 33 to 36),
+      // and one paired with the seeker's own report, a false tag 80 cm apart (2026-11-07, 10:54)
+      for (let k = 0; !sender.bolt.motion.aborted; k++) { await sender.bolt.actuators.motor.roll(22, (k * 20) % 360); await wait(500); }
     })().catch(() => {});
   }
   await wait(1000);
@@ -95,7 +98,7 @@ try {
   await view.start();
   const loc0 = { x: seeker.sample.locator.positionX, y: seeker.sample.locator.positionY };
   const brain = new Brain(seeker.bolt, {
-    onLadder: (range) => { console.log(`  ladder -> ${range}`); void sender.bolt.communication.switchLadder(range); },
+    onLadder: (range) => { console.log(`  ladder -> ${range}`); ladder.switch(range); },
     onRoll: (b) => view.update(b),
     onStep: (b) => {
       t0 ??= Date.now();
@@ -120,6 +123,7 @@ try {
   // the stop, each step capped: a --move run hung here with the sender still rolling (2026-11-06)
   const capped = (p) => Promise.race([Promise.resolve(p).catch(() => {}), wait(3000)]);
   await capped(brain.stop());   // the seeker first: stopped second, it rolled on 50 cm past the tag (2026-11-06)
+  ladder.stop();
   sender.bolt.abortMotion();
   await capped(sender.bolt.actuators.motor.off());
   await capped(Promise.allSettled([sending, pattern]));
