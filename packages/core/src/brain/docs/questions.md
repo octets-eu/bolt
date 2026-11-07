@@ -19,3 +19,7 @@ In the last seek of this session (ledger, 16:33) SB-9129 drove off and the camer
 2. Is the space under the chest open to a Bolt? If so, I would add a geofence by the camera for the seeker (a frame every few seconds, stop when it nears the chest or the partition ends) before the next seek. Is that the right way, or would you rather I keep seeks to the floor south of the partition?
 
 Answer: 1. SB-9129 is back on the floor, between the two partition parts. 2. There was an obstruction on the camera's lens, now removed. Bolts cannot go under the chest.
+
+## 2026-11-07 Note from the human: the light, and two marks in the opening
+
+Answer: a note, not a question. The bright pool on the floor is daylight from the window; no lamp was added. Sessions 1 and 2 ran after dusk under the room's lamps, session 3 by day, and that is when the partition's top read darker than the boards. Two matte white paper squares, 9 by 9 cm, now lie on the floor in the opening on the partition's centre line, 120 cm apart centre to centre, at about plan (164, 295) and (283, 295). By day the ultrawide frame shows them at pixel (381, 776) and (793, 765), gray above 200, the boards between them under 120. They do not move; the mount may drift a little. Use them as the landmarks and the known pixels in rig.mjs as a hint.
