@@ -136,6 +136,45 @@ So every setting is sent again after each wake, and only a sleep and wake gives 
 
 **The sample.** The streaming mask carries orientation, accelerometer and locator; the gyro sits in the extended mask. Every sample has one layout, 13 big-endian floats, 52 bytes, in the order orientation, accelerometer, locator, gyro. The project asks for one every 50 ms, the platform's usual 20 Hz. The first packets after a mask write can be short; they are dropped.
 
+**The masks' bits.** Each mask is 32 bits; the firmware accepts the ones below and refuses any other with badParameterValue. One float per accepted bit. All on, a sample is 21 floats, 84 bytes, in the order of the base mask's bits from the highest down, then the extended mask's.
+
+| bit | base mask | purpose | extended mask | purpose |
+|---|---|---|---|---|
+| 0 | refused | | refused | |
+| 1 | clock | seconds since the reset, counting | refused | |
+| 2 | refused | | refused | |
+| 3 | locator vy | cm/s along the sheet's y | refused | |
+| 4 | locator vx | cm/s along x | refused | |
+| 5 | locator y | position, cm | refused | |
+| 6 | locator x | position, cm | refused | |
+| 7 | refused | | refused | |
+| 8 | refused | | refused | |
+| 9 | acceleration magnitude | √(x²+y²+z²) in g, 1.0 at rest | refused | |
+| 10 | refused | | refused | |
+| 11 | refused | | refused | |
+| 12 | refused | | refused | |
+| 13 | accelerometer z | g, 1.0 lying flat | refused | |
+| 14 | accelerometer y | g | refused | |
+| 15 | accelerometer x | g | refused | |
+| 16 | yaw | degrees, minus the heading | refused | |
+| 17 | roll | degrees | refused | |
+| 18 | pitch | degrees | ambient light | lux, the same number as the ambient light read |
+| 19 | refused | | refused | |
+| 20 | refused | | refused | |
+| 21 | refused | | unnamed | 0 at rest, ±0.2 under a wheel kick, noise at every sample |
+| 22 | quaternion z | the attitude as a unit quaternion; 0 to 1 over half a turn about the vertical | refused | |
+| 23 | quaternion y | | gyro z | degrees per second, about −30 turning 30° per second |
+| 24 | quaternion x | | gyro y | degrees per second |
+| 25 | quaternion w | 1.0 at the reset heading, −1 half a turn later | gyro x | degrees per second |
+| 26 | refused | | refused | |
+| 27 | refused | | refused | |
+| 28 | refused | | refused | |
+| 29 | refused | | refused | |
+| 30 | refused | | refused | |
+| 31 | refused | | refused | |
+
+The base command takes the interval in ms, a packet count (0 for endless) and the mask; the extended command the mask alone. The interval sets the rate, 30 ms at the fastest, and nothing else. No float answers a broadcasting Bolt, near or at 1 m, standing or turning: the firmware streams nothing of the infrared.
+
 | Value | Unit | Character |
 |---|---|---|
 | pitch, roll | degrees | gravity referenced, fused, no drift |
