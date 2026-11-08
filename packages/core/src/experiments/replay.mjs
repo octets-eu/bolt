@@ -167,6 +167,8 @@ function score (run, estimator) {
         const est = estimator.estimate(); const tr = truth(m, run.at, offset); const t = (nextSec - ev[0].t) / 1000;
         secs.push({ t, err: Math.abs(angDiff(est.angle, tr)), length: est.length, truth: tr, dErr: est.distance === undefined ? null : est.distance - Math.hypot(run.at.x - m.x, run.at.y - m.y) });
         if (flag('--dump') && t % 10 === 0 && estimator.debug) console.log(`    ${t} s truth ${tr.toFixed(0)} est ${est.angle.toFixed(0)} ${estimator.debug()}`);
+        // --trace: every second the truth and the estimate side by side, bearing and distance, with the Bolt's heading
+        if (flag('--trace')) console.log(`    ${String(t).padStart(4)} s  truth ${String(tr.toFixed(0)).padStart(3)}° ${String(Math.hypot(run.at.x - m.x, run.at.y - m.y).toFixed(0)).padStart(4)} cm  |  belief ${String(mod360(est.angle).toFixed(0)).padStart(3)}°${est.distance !== undefined ? ` ${String(est.distance.toFixed(0)).padStart(4)} cm` : ''}  len ${est.length.toFixed(2)}  heading ${m.heading.toFixed(0)}`);
       }
       nextSec += 1000;
     }

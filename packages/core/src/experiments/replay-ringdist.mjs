@@ -28,7 +28,7 @@ const RANGE = {
 RANGE[6] = RANGE[1];                                 // strength 4
 RANGE[5] = RANGE[0];                                 // strength 2
 RANGE[4] = [RANGE[0][1], ...RANGE[0].slice(2), 0];   // strength 1: strength 2's profile one band nearer
-const DEFAULTS = { wCorner: 3, wDist: 1, parallax: 1, temperature: 1 };
+const DEFAULTS = { wCorner: 3, wDist: 1, parallax: 1, temperature: 1, tauCmDist: 30 };   // 30 cm: recordings 72 to 75 %, the day's five runs 56 to 65 %, distance |off| 28 to 27 cm
 const mod360 = (a) => ((a % 360) + 360) % 360;
 
 /** Log of the rate over its mean per band, the first band's four seconds of exposure given little weight through EPS. */
@@ -80,6 +80,10 @@ export function ringdist (params = {}) {
             for (let i = 0; i < BANDS; i++) { const src = i - shift, k = Math.floor(src), f = src - k; const a = dist[Math.min(BANDS - 1, Math.max(0, k))], c = dist[Math.min(BANDS - 1, Math.max(0, k + 1))]; out[i] = a * (1 - f) + c * f; }
             dist.set(out);
           }
+          // distance evidence is earned at a place and stale once the Bolt has moved on, unlike a bearing the carry keeps true:
+          // the bands forget with the travel, tauCmDist; strength 16 arrives most when far, and its frames from 1.2 m away
+          // held the believed distance at 120 cm while the truth went to 40 (run 8, 2026-11-08)
+          if (Number.isFinite(p.tauCmDist)) { const decay = Math.exp(-stepCm / p.tauCmDist); for (let i = 0; i < BANDS; i++) dist[i] *= decay; }
         }
       }
       lastPos = { x: e.x, y: e.y }; lastHeading = e.heading;
