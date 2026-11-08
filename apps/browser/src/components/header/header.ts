@@ -46,8 +46,12 @@ const Header = Factory.create('Header', {
             m('button.cmd.br2.ml1', { onclick: saved(() => Bolts.reset()) },                                    'Reset'),
             m('button.cmd.br2.ml1', { title: 'Sleep all', onclick: saved(() => Promise.all(Bolts.map( (bolt: Bolt) => bolt.lifecycle.sleep() ))) }, Icon('bed')),
             m('button.cmd.br2.ml1', { title: 'Wake all',  onclick: saved(() => Promise.all(Bolts.map( (bolt: Bolt) => bolt.lifecycle.wake() ))) },  Icon('alarmClock')),
-            m('button.cmd.br2.ml1', { class: matrixBrain.on ? 'on' : '', disabled: matrixBrain.busy || Bolts.count() < 2, title: 'Matrix brain: the seeker shows the ring, the sender the ladder; motors off',
+            m('button.cmd.br2.ml1', { class: matrixBrain.on && !matrixBrain.seeking ? 'on' : '', disabled: matrixBrain.busy || Bolts.count() < 2 || matrixBrain.seeking, title: 'Matrix brain: the seeker shows the ring, the sender the ladder; motors off',
               onclick: saved(() => matrixBrain.toggle().then(() => m.redraw(), (e: unknown) => { console.warn(e); m.redraw(); })) }, 'brain'),
+            m('button.cmd.br2.ml1', { class: matrixBrain.seeking ? 'on' : '', disabled: matrixBrain.busy || Bolts.count() < 2 || (matrixBrain.on && !matrixBrain.seeking), title: 'Seek: from the starts, the seeker rolls 1.2 m south, then the brain drives it into the sender; ends on the tag, the time limit or a runaway; click again or STOP to end',
+              onclick: saved(() => matrixBrain.toggle(true).then(() => m.redraw(), (e: unknown) => { console.warn(e); m.redraw(); })) }, 'seek'),
+            m('button.cmd.br2.ml1', { disabled: !matrixBrain.markable, title: 'The last seek was a good run: mark it for the replay bench, which takes only marked runs',
+              onclick: saved(() => { matrixBrain.markGood(); m.redraw(); }) }, 'good'),
             m('button.cmd.br2.ml1', { title: 'Clears the log on screen; the session file keeps everything', onclick: () => Logger.clear() }, 'Clear log'),
           ]
 

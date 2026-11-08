@@ -17,7 +17,9 @@
 // until other runs confirm it.
 //
 // Direction is the peak bin; confidence is the peak's share of the map's
-// mass after softmax, 1/36 for flat, 1 for one bin.
+// mass after softmax, 1/36 for flat, 1 for one bin. `rates()` hands the
+// bins to a ring of 36 neurons (Network.imprint): the summing layer in
+// front of the ring, the matrix-brain mode of the browser app.
 
 const N = 36, STEP_MS = 25, EPS = 0.5;
 const SECTORS = [0, 45, 90, 135, 180, 225, 270, 315];
@@ -92,6 +94,14 @@ export function bayes (params = {}) {
       if (Number.isFinite(p.tauCm) && lastPos) decay *= Math.exp(-Math.hypot(e.x - lastPos.x, e.y - lastPos.y) / p.tauCm);
       lastPos = { x: e.x, y: e.y };
       if (decay < 1) for (let j = 0; j < N; j++) map[j] *= decay;
+    },
+    /** Turn the belief by `deg` clockwise, as another layer's parallax asks (replay-ringdist.mjs). */
+    shiftBy (deg) { shift(-deg); },
+    /** The bins as rates 0..1 for a ring of N neurons: exp of the log-evidence over the peak, the peak at 1. */
+    rates () {
+      let max = -Infinity;
+      for (let j = 0; j < N; j++) max = Math.max(max, map[j]);
+      return Float64Array.from(map, (v) => Math.exp((v - max) / p.temperature));
     },
     estimate () {
       let peak = 0, max = -Infinity;

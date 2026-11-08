@@ -32,6 +32,22 @@ export class Network {
 
   get (id) { return this.rate[this.index.get(id)]; }
 
+  /**
+   * The ring set from outside, a summing belief layer's bins as the ring's
+   * rates (0..1, as many as ring neurons), and the neurons that read the
+   * ring re-evaluated; the leaky ring then starts its next step from there.
+   */
+  imprint (rates) {
+    if (rates.length !== this.ring.length) throw new Error(`imprint: ${rates.length} rates for ${this.ring.length} ring neurons`);
+    this.ring.forEach((i, j) => { this.rate[i] = Math.min(1, Math.max(0, rates[j])); });
+    for (const [i, n] of this.neurons.entries()) {
+      if (n.tauMs !== undefined || this.sensory.has(i)) continue;
+      let input = n.bias ?? 0;
+      for (const [p, w] of this.inputs[i]) input += w * this.rate[p];
+      this.rate[i] = Math.max(0, input);
+    }
+  }
+
   ringRates () { return Float64Array.from(this.ring, (i) => this.rate[i]); }
 
   drive (channel, sources, dtMs, mem) {

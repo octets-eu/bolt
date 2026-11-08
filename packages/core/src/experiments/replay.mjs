@@ -34,9 +34,17 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { baseline } from './replay-baseline.mjs';
 import { accumulator } from './replay-accumulator.mjs';
 import { bayes } from './replay-bayes.mjs';
+import { ringdist } from './replay-ringdist.mjs';
 
 const LOCK_DEG = 30, LOCK_S = 3;
-const RUNS = /^(sweepTest|approachTest)\.(in|out)/;
+const RUNS = /^(sweepTest|approachTest)\.(in|out)|^brain (seek)(:| found| time| runaway| stopped)/;
+/**
+ * The browser's seek runs count only when the user marked them good: the
+ * `brain replay {seeker, sender, at, startCm, result, seconds}` line after
+ * the run's end, `at` the sender's place in the seeker's locator frame from
+ * the sheet starts. Unmarked seeks are dropped.
+ */
+const MARK = /^brain replay (\{.*\})$/;
 const args = process.argv.slice(2);
 const flag = (f) => args.includes(f);
 const opt = (f, d) => { const i = args.indexOf(f); return i >= 0 ? args[i + 1] : d; };
@@ -61,16 +69,27 @@ function runs (lines) {
   for (const e of lines) {
     const d = e.data;
     if (e.name === 'info' && typeof d === 'string' && RUNS.test(d)) {
-      const [, name, step] = d.match(RUNS);
-      if (step === 'in') {
+      const m = d.match(RUNS);
+      const name = m[1] ?? m[3], step = m[2] ?? (m[4] === ':' ? 'in' : 'out');
+      if (step === 'in' && name === 'seek') {
+        // brain seek: seeker SB-9129 on sender SB-11DF, ... (the matrix-brain mode of the browser app); `at` comes with the mark
+        const who = d.match(/seeker (\S+) on sender (\S+)/);
+        cur = { name, t0: e.t, seeker: who?.[1], sender: who?.[2], at: null, args: { direction: 0 }, lines: [], trials: [] };
+      } else if (step === 'in') {
         const json = d.slice(d.indexOf('{'));
         let a = {}; try { a = JSON.parse(json); } catch { /* keep going */ }
         cur = { name, t0: e.t, seeker: a.seeker, sender: a.sender, at: a.at ?? null, args: a, lines: [], trials: [] };
       } else if (cur) {
         const json = d.slice(d.indexOf('{'));
-        try { cur.result = JSON.parse(json); } catch { cur.result = null; }
+        try { cur.result = json.startsWith('{') ? JSON.parse(json) : { text: d }; } catch { cur.result = null; }
         cur.t1 = e.t; out.push(cur); cur = null;
       }
+      continue;
+    }
+    if (e.name === 'info' && typeof d === 'string' && MARK.test(d) && out.length) {
+      // the mark follows its run: the last seek gets the user's verdict and its truth
+      const last = out.at(-1);
+      if (last.name === 'seek' && !last.at) { try { const mk = JSON.parse(d.match(MARK)[1]); last.at = mk.at ?? null; last.mark = mk; } catch { /* no mark */ } }
       continue;
     }
     if (cur) cur.lines.push(e);
@@ -179,16 +198,20 @@ function check (run) {
  * (sector 0 is -22.5 to 22.5); per channel, the frames heard by the sender's
  * sector; the share of all 20 Hz samples by sector as the exposure.
  */
+/** Distance bands for the senses, cm: 0-20, 20-40, ... 180-200, 200 and more. */
+const BANDS = 11, BAND_CM = 20;
+const band = (m, at) => Math.min(BANDS - 1, Math.floor(Math.hypot(at.x - m.x, at.y - m.y) / BAND_CM));
+
 function senses (run, acc) {
   const ev = events(run);
   const offset = headingOffset();
   const sector = (a) => Math.round(mod360(a) / 45) % 8;
   let m = null;
   for (const e of ev) {
-    if (e.type === 'motion') { m = e; acc.exposure[sector(truth(m, run.at, offset))]++; continue; }
+    if (e.type === 'motion') { m = e; acc.exposure[sector(truth(m, run.at, offset))]++; acc.distExposure[band(m, run.at)]++; continue; }
     if (!m) continue;
     const sec = sector(truth(m, run.at, offset));
-    if (e.type === 'frame') { (acc.frames[e.channel] ??= new Array(8).fill(0))[sec]++; }
+    if (e.type === 'frame') { (acc.frames[e.channel] ??= new Array(8).fill(0))[sec]++; (acc.dist[e.channel] ??= new Array(BANDS).fill(0))[band(m, run.at)]++; }
     else if (e.type === 'read') {
       const names = ['FL', 'FR', 'BR', 'BL'];
       const heard = names.filter((_, i) => e.payload[i] !== 255);
@@ -199,13 +222,18 @@ function senses (run, acc) {
 }
 
 if (flag('--senses')) {
-  const acc = { exposure: new Array(8).fill(0), frames: {}, corners: { FL: new Array(8).fill(0), FR: new Array(8).fill(0), BR: new Array(8).fill(0), BL: new Array(8).fill(0), flooded: new Array(8).fill(0) } };
+  const acc = { exposure: new Array(8).fill(0), frames: {}, corners: { FL: new Array(8).fill(0), FR: new Array(8).fill(0), BR: new Array(8).fill(0), BL: new Array(8).fill(0), flooded: new Array(8).fill(0) }, distExposure: new Array(BANDS).fill(0), dist: {} };
   for (const spec of specs) for (const r of runs(load(spec)).filter((x) => x.at)) senses(r, acc);
   const row = (name, a) => `${name.padEnd(10)} ${a.map((v) => String(v).padStart(6)).join('')}  ${String(a.reduce((x, y) => x + y, 0)).padStart(7)}`;
   console.log(`sector:    ${['0', '45', '90', '135', '180', '225', '270', '315'].map((v) => v.padStart(6)).join('')}    total   (sender's true bearing off the nose, clockwise)`);
   console.log(row('exposure', acc.exposure));
   for (const c of ['FL', 'FR', 'BR', 'BL', 'flooded']) console.log(row(`read ${c}`, acc.corners[c]));
   for (const ch of Object.keys(acc.frames).sort()) console.log(row(`frame ch${ch}`, acc.frames[ch]));
+  // by distance: frames per second of exposure in each band, the level's range profile
+  const drow = (name, a) => `${name.padEnd(10)} ${a.map((v) => String(v).padStart(6)).join('')}`;
+  console.log(`\ndistance:  ${Array.from({ length: BANDS }, (_, i) => (i === BANDS - 1 ? `${i * BAND_CM}+` : `${i * BAND_CM}`).padStart(6)).join('')}   (cm to the sender; frames per second of exposure)`);
+  console.log(drow('exposure s', acc.distExposure.map((v) => Math.round(v / 20))));
+  for (const ch of Object.keys(acc.dist).sort()) console.log(drow(`frame ch${ch}`, acc.dist[ch].map((v, i) => (acc.distExposure[i] ? (v / (acc.distExposure[i] / 20)).toFixed(2) : '-'))));
   process.exit(0);
 }
 
@@ -220,7 +248,7 @@ if (flag('--list')) {
   process.exit(0);
 }
 
-const ESTIMATORS = { baseline, accumulator, bayes };
+const ESTIMATORS = { baseline, accumulator, bayes, ringdist };
 if (!specs.length) { console.error('usage: replay.mjs <zip>:<member>|<file.jsonl> ... [--check] [--estimator baseline] | --list'); process.exit(1); }
 /** `--param tauMs=60000,wCorner=10`: the estimator's parameters, numbers. */
 const params = Object.fromEntries((opt('--param', '') || '').split(',').filter(Boolean).map((kv) => { const [k, v] = kv.split('='); return [k, Number(v)]; }));
