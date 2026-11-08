@@ -6,8 +6,76 @@ import { TPoint } from '../../tracking/homography';
 import { Logger } from '../../components/logger/logger';
 import { Bolts } from '../../bolts';
 import { Bolt } from '@bolt/core';
+import { phone } from '../../phone';
 
 let clicks: TPoint[] = [];
+
+/** The phone picture's zoom about a clicked point (fractions of the frame), and its contrast and brightness. */
+const look = { zoom: 1, cx: 0.5, cy: 0.5, contrast: 1, brightness: 1 };
+
+const BORDER = 8;
+window.addEventListener('resize', () => m.redraw());
+
+/**
+ * The frame's window around (cx, cy) at `zoom` onto the canvas, filtered. The
+ * canvas keeps the frame's aspect and fills what the page leaves: the height
+ * under the bars or the width, less a border, whichever binds.
+ */
+function drawPhone (cv: HTMLCanvasElement) {
+  const img = phone.image;
+  if (!img) return;
+  const w = img.naturalWidth, h = img.naturalHeight;
+  if (cv.width !== 1200 || cv.height !== Math.round(1200 * h / w)) { cv.width = 1200; cv.height = Math.round(1200 * h / w); }
+  const top = cv.getBoundingClientRect().top;
+  const availH = window.innerHeight - top - BORDER, availW = window.innerWidth - 2 * BORDER;
+  const shownH = Math.max(100, Math.min(availH, availW * h / w));
+  cv.style.height = `${Math.round(shownH)}px`;
+  cv.style.width = `${Math.round(shownH * w / h)}px`;
+  const sw = w / look.zoom, sh = h / look.zoom;
+  const sx = Math.min(w - sw, Math.max(0, look.cx * w - sw / 2)), sy = Math.min(h - sh, Math.max(0, look.cy * h - sh / 2));
+  const ctx = cv.getContext('2d')!;
+  ctx.filter = `contrast(${look.contrast}) brightness(${look.brightness})`;
+  ctx.drawImage(img, sx, sy, sw, sh, 0, 0, cv.width, cv.height);
+}
+
+/** The phone on the partition's ceiling: the forwarder's stream as polled JPEGs, zoomed and filtered to read a matrix. */
+const PhoneView = {
+  view () {
+    const p = phone;
+    const slider = (label: string, key: 'zoom' | 'contrast' | 'brightness', min: number, max: number, step: number) => m('label.mono.f6.cfff.ml2', [
+      `${label} ${look[key].toFixed(1)} `,
+      m('input', { type: 'range', min, max, step, value: look[key], style: { width: '6rem', verticalAlign: 'middle' }, oninput: (e: Event) => { look[key] = Number((e.target as HTMLInputElement).value); } }),
+    ]);
+    // a click names the frame point the window centres on: the shown window's own position and size in the frame
+    const onclick = (e: MouseEvent) => {
+      const el = e.currentTarget as HTMLElement, r = el.getBoundingClientRect();
+      const sw = 1 / look.zoom, sx = Math.min(1 - sw, Math.max(0, look.cx - sw / 2)), sy = Math.min(1 - sw, Math.max(0, look.cy - sw / 2));
+      look.cx = sx + (e.clientX - r.left) / r.width * sw;
+      look.cy = sy + (e.clientY - r.top) / r.height * sw;
+    };
+    return m('[', [
+      m('div.camera.w-100.pa2.bg-777.flex.items-center.flex-wrap', [
+        m('span.f3.mono.cfff.ma2', 'Phone'),
+        m('button.cmd.br2.ml1', { title: 'Stream the ultrawide camera, id 2: the whole floor', onclick: () => p.on(2).catch(() => undefined) }, 'On wide'),
+        m('button.cmd.br2.ml1', { title: 'Stream the main camera, id 0: half the floor at twice the detail', onclick: () => p.on(0).catch(() => undefined) }, 'On main'),
+        m('button.cmd.br2.ml1', { onclick: () => p.off().catch(() => undefined) }, 'Off'),
+        m('button.cmd.br2.ml1', { onclick: () => p.ask('status').catch(() => undefined) }, 'Status'),
+        m('button.cmd.br2.ml1', { class: p.watching ? 'on' : '', title: 'Poll the latest frame twice a second', onclick: () => p.watching ? p.unwatch() : p.watch() }, 'Watch'),
+        m('span.mono.f6.cfff.ml2', [p.status, p.watching ? ` · ${p.frames} frames · age ${p.age} ms` : '', p.width ? ` · ${p.width}×${p.height}` : ''].join('')),
+        m('span.mono.f6.ml2', { style: { color: '#fc8' } }, p.error),
+        slider('zoom', 'zoom', 1, 16, 0.5),
+        slider('contrast', 'contrast', 0.5, 4, 0.1),
+        slider('brightness', 'brightness', 0.2, 3, 0.1),
+        m('button.cmd.br2.ml1', { title: 'Zoom 1, centre, no filter', onclick: () => Object.assign(look, { zoom: 1, cx: 0.5, cy: 0.5, contrast: 1, brightness: 1 }) }, 'Reset'),
+        m('span.mono.f6.cfff.ml2', 'click the picture to zoom there'),
+      ]),
+      p.image
+        ? m('div.w-100.bg-eee', { style: { padding: `${BORDER}px` } }, m('canvas.phone', { style: { display: 'block', cursor: 'crosshair' }, onclick,
+            oncreate: (v: m.VnodeDOM) => drawPhone(v.dom as HTMLCanvasElement), onupdate: (v: m.VnodeDOM) => drawPhone(v.dom as HTMLCanvasElement) }))
+        : null,
+    ]);
+  },
+};
 
 /** Draw calibration and tracks over the video, in video pixels scaled to the element. */
 function drawOverlay (cv: HTMLCanvasElement) {
@@ -78,10 +146,8 @@ function drawOverlay (cv: HTMLCanvasElement) {
   }
 }
 
-/** The overhead camera: stream, calibration to floor centimetres, tracking. */
+/** The camera tab: the phone first, then the retired WHEP stream with its calibration and tracking. */
 const CameraView = Factory.create('Camera', {
-
-  oninit () { if (camera.state === 'idle') camera.connect(); },
 
   view () {
     const c = camera, tr = tracker;
@@ -96,8 +162,10 @@ const CameraView = Factory.create('Camera', {
       Logger.info({ name: '*' }, `camera click px ${Math.round(px[0])},${Math.round(px[1])}${cm ? ` = ${cm[0].toFixed(1)},${cm[1].toFixed(1)} cm` : ''}`);
     };
     return m('[', [
-      m('div.camera.w-100.pa2.bg-777.flex.items-center.flex-wrap', [
-        m('span.f3.mono.cfff.ma2', 'Camera'),
+      m(PhoneView),
+      // the retired WHEP stream and its tracker, hidden; the code stays for the experiments that use the tracker
+      m('div.camera.w-100.pa2.bg-777.flex.items-center.flex-wrap', { style: { display: 'none' } }, [
+        m('span.f3.mono.cfff.ma2', { title: 'The retired WHEP stream of the old overhead camera and its tracker' }, 'WHEP'),
         m('input.mono.f6.ml2.pa1', { style: { width: '22rem' }, value: c.url, onchange: (e: Event) => c.setUrl((e.target as HTMLInputElement).value) }),
         m('button.cmd.br2.ml2', { onclick: () => c.connect() }, c.state === 'connected' ? 'Reconnect' : 'Connect'),
         m('button.cmd.br2.ml1', { disabled: c.state === 'idle', onclick: () => {
@@ -123,7 +191,7 @@ const CameraView = Factory.create('Camera', {
         m('span.mono.f6.cfff.ml2', tr.homography ? 'calibrated by the pads' : 'not calibrated: press Pads'),
         m('span.mono.f6.ml2', { style: { color: '#fc8' } }, tr.error),
       ]),
-      m('div.w-100.bg-eee.pa2', [
+      m('div.w-100.bg-eee.pa2', { style: { display: 'none' } }, [
         m('div.relative', { style: { maxWidth: '1280px' }, onclick }, [
           m('video.w-100', {
             style: { background: '#000', display: 'block' },

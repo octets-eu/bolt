@@ -8,19 +8,13 @@
 //      clamped to 0..1
 //   4. the rest, in the circuit's order, are max(0, bias + input) at once
 //
-// Nothing in here knows a Bolt; the constants are in the two data files.
+// Nothing in here knows a Bolt; the constants are in the two data files,
+// read by load.mjs in Node and by the browser app's bundler.
 
-import { readFileSync } from 'node:fs';
 import { shiftRing } from './ring/ring.mjs';
 
-const jsonc = (url) => JSON.parse(readFileSync(url, 'utf8').replace(/^\s*\/\/.*$/gm, '').replace(/\s\/\/[^"\n]*$/gm, ''));
-
-export function loadConnectome () {
-  return {
-    circuit: JSON.parse(readFileSync(new URL('./circuit.json', import.meta.url), 'utf8')),
-    map: jsonc(new URL('./sensory_map.jsonc', import.meta.url)),
-  };
-}
+/** sensory_map.jsonc's text as an object: the `//` comments dropped. */
+export const parseJsonc = (text) => JSON.parse(text.replace(/^\s*\/\/.*$/gm, '').replace(/\s\/\/[^"\n]*$/gm, ''));
 
 export class Network {
 
@@ -74,13 +68,21 @@ export class Network {
     this.ring.forEach((i, j) => { this.rate[i] = shifted[j]; });
     const last = Float64Array.from(this.rate);
     for (const [i, n] of this.neurons.entries()) {
-      if (!n.tauMs) continue;
+      if (n.tauMs === undefined) continue;
       let input = n.bias ?? 0;
       for (const [p, w] of this.inputs[i]) input += w * last[p];
-      this.rate[i] += Math.min(1, dtMs / n.tauMs) * (Math.min(1, Math.max(0, input)) - this.rate[i]);
+      if (n.tauMs === null) this.rate[i] += input * dtMs / 1000;   // no leak: an integrator, input in units per second, bounded below
+      else this.rate[i] += Math.min(1, dtMs / n.tauMs) * (Math.min(1, Math.max(0, input)) - this.rate[i]);
+    }
+    // the integrating ring holds relative evidence: nothing below zero, the peak kept at 1 by rescaling the whole ring, so the shape is all that counts
+    const integrating = this.ring.filter((i) => this.neurons[i].tauMs === null);
+    if (integrating.length) {
+      let max = 0;
+      for (const i of integrating) { this.rate[i] = Math.max(0, this.rate[i]); max = Math.max(max, this.rate[i]); }
+      if (max > 1) for (const i of integrating) this.rate[i] /= max;
     }
     for (const [i, n] of this.neurons.entries()) {
-      if (n.tauMs || this.sensory.has(i)) continue;
+      if (n.tauMs !== undefined || this.sensory.has(i)) continue;
       let input = n.bias ?? 0;
       for (const [p, w] of this.inputs[i]) input += w * this.rate[p];
       this.rate[i] = Math.max(0, input);

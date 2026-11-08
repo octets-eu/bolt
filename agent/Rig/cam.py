@@ -20,7 +20,8 @@ The stream runs only between `on` and `off`; nothing is recorded. Environment:
 CAM_SERIAL selects the adb device when more than one is attached (an address
 like <ip>:5555 or an adb mDNS name), CAM_ID the default camera id (2, the
 ultrawide; 0 is the main camera, half the floor at twice the detail),
-CAM_SIZE the longer side (1632), CAM_FPS the frames kept per second (2),
+CAM_SIZE the longer side (1632), CAM_BITRATE the H.265 rate (2M; 12M lets a
+matrix be read at 3264), CAM_ZOOM the camera's own zoom (1), CAM_FPS the frames kept per second (2),
 CAM_ROTATE the anticlockwise turn given to every frame in degrees (90, which
 lays the frame like the floor plan, x right and y down; 0, 180, 270 allowed),
 CAM_PORT the port (7020). ADB_MDNS defaults to 0 here, see below. Run on the M1 as
@@ -32,6 +33,8 @@ PORT = int(os.environ.get("CAM_PORT", "7020"))
 SERIAL = os.environ.get("CAM_SERIAL", "")
 CAM_ID = os.environ.get("CAM_ID", "2")
 SIZE = os.environ.get("CAM_SIZE", "1632")
+BITRATE = os.environ.get("CAM_BITRATE", "2M")
+ZOOM = os.environ.get("CAM_ZOOM", "1")
 FPS = os.environ.get("CAM_FPS", "2")
 ROTATE = os.environ.get("CAM_ROTATE", "90")
 ALLOWED = ("127.", "192.168.5.")
@@ -65,7 +68,7 @@ def start(cam_id=CAM_ID):
         os.unlink(LATEST)
     scrcpy = ["scrcpy"] + (["-s", SERIAL] if SERIAL else []) + [
         "--video-source=camera", f"--camera-id={cam_id}", "--camera-ar=sensor",
-        f"--max-size={SIZE}", "--video-codec=h265", "--video-bit-rate=2M",
+        f"--max-size={SIZE}", "--video-codec=h265", f"--video-bit-rate={BITRATE}", f"--camera-zoom={ZOOM}",
         "--no-playback", "--no-audio", "--record-format=mkv", f"--record={FIFO}"]
     turn = {"0": "", "90": ",transpose=2", "180": ",hflip,vflip", "270": ",transpose=1"}.get(ROTATE, "")
     ffmpeg = ["ffmpeg", "-loglevel", "error", "-i", FIFO, "-vf", f"fps={FPS}{turn}",

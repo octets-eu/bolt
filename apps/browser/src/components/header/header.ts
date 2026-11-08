@@ -7,6 +7,7 @@ import { Bolt }   from '@bolt/core';
 import { Icon }   from '../icons';
 import { session } from '../../session';
 import { Logger } from '../logger/logger';
+import { matrixBrain } from '../../matrix-brain';
 
 import iconBluetooth from './../../assets/bluetooth.icon.256.png';
 import iconGreyBluetooth from './../../assets/bluetooth.icon.grey.256.png';
@@ -45,6 +46,8 @@ const Header = Factory.create('Header', {
             m('button.cmd.br2.ml1', { onclick: saved(() => Bolts.reset()) },                                    'Reset'),
             m('button.cmd.br2.ml1', { title: 'Sleep all', onclick: saved(() => Promise.all(Bolts.map( (bolt: Bolt) => bolt.lifecycle.sleep() ))) }, Icon('bed')),
             m('button.cmd.br2.ml1', { title: 'Wake all',  onclick: saved(() => Promise.all(Bolts.map( (bolt: Bolt) => bolt.lifecycle.wake() ))) },  Icon('alarmClock')),
+            m('button.cmd.br2.ml1', { class: matrixBrain.on ? 'on' : '', disabled: matrixBrain.busy || Bolts.count() < 2, title: 'Matrix brain: the seeker shows the ring, the sender the ladder; motors off',
+              onclick: saved(() => matrixBrain.toggle().then(() => m.redraw(), (e: unknown) => { console.warn(e); m.redraw(); })) }, 'brain'),
             m('button.cmd.br2.ml1', { title: 'Clears the log on screen; the session file keeps everything', onclick: () => Logger.clear() }, 'Clear log'),
           ]
 

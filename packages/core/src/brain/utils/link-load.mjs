@@ -6,7 +6,7 @@
 //   BRIDGE_HOST=192.168.5.2 npx tsx packages/core/src/brain/utils/link-load.mjs [seeker] [seconds]
 
 import { NAMES, bringUp, letGo, wait } from './rig.mjs';
-import { loadConnectome } from '../connectome/network.mjs';
+import { loadConnectome } from '../connectome/load.mjs';
 import { Observation } from '../connectome/observation/observation.mjs';
 import { LadderSender } from './ladder.mjs';
 

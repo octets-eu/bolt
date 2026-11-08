@@ -7,9 +7,36 @@ import type { Color } from '../config';
 import { BLACK, IMAGES, RED, WHITE } from '../communication/images';
 import type { Image, ImageName } from '../communication/images';
 import { clamp } from '../helpers/utils';
+import { CommandError } from '../errors';
 
 type Mode = 'show' | 'blink' | 'flash';
 interface Layer { readonly id: number; readonly mode: Mode }
+/**
+ * The two frame indexes and animation ids `picture` keeps, clear of the
+ * stack's, which count from 0. An animation id of 63 and up is refused with
+ * badParameterValue, 32 is accepted; frame indexes 0 to 1000 are, 1001 and
+ * up refused (2026-11-08). Two of each because a frame rewritten while on
+ * display goes dark until the next play, a blink at every redraw
+ * (2026-11-08): a draw writes the other slot and plays that one.
+ */
+const PICTURE_FRAMES = [999, 1000] as const, PICTURE_IDS = [31, 32] as const;
+
+/**
+ * A frame's 4 bit planes of a palette index per pixel, 8 bytes each: byte k
+ * is column 7 - k, bit r is row r, so a frame shows like `showImage`
+ * (2026-10-01; spherov2's row order showed it turned 90 degrees clockwise).
+ */
+function planes (pixel: (row: number, col: number) => number): number[] {
+  const out: number[] = [];
+  for (let bit = 0; bit < 4; bit++) {
+    for (let k = 0; k < 8; k++) {
+      let byte = 0;
+      for (let row = 0; row < 8; row++) byte |= ((pixel(row, 7 - k) >> bit) & 1) << row;
+      out.push(byte);
+    }
+  }
+  return out;
+}
 
 /**
  * The 8 by 8 LED matrix. Writes the commanded rotation into the status.
@@ -27,6 +54,10 @@ export class Matrix {
   private stored = new Map<string, number>();
   private nextFrame = 0;
   private playing = false;
+  /** The palette stored with the picture's two animations, null when the slots are empty. */
+  private palette: string | null = null;
+  /** The picture slot on display, 0 or 1. */
+  private shown = 1;
   private turn: Promise<unknown> = Promise.resolve();
   /** animationdone notifies still due for animations a play or a stop replaced. */
   private replaced = 0;
@@ -43,6 +74,7 @@ export class Matrix {
     ctx.events.on('didsleep', () => {
       this.stack = [];
       this.stored.clear();
+      this.palette = null;
       this.playing = false;
       this.replaced = 0;
     });
@@ -187,12 +219,9 @@ export class Matrix {
   }
 
   /**
-   * The animation for `mode`, `names` and `mark`, stored on first use. A
-   * frame is 4 bit planes of a palette index per pixel, 8 bytes each: byte
-   * k is column 7 - k, bit r is row r, so a frame shows like `showImage`
-   * (2026-10-01; spherov2's row order showed it turned 90 degrees
-   * clockwise). The first store of a page session deletes what an earlier
-   * one left.
+   * The animation for `mode`, `names` and `mark`, stored on first use. The
+   * first store of a page session deletes what an earlier one left, the
+   * picture's slot too.
    */
   private async store (mode: Mode, names: readonly ImageName[], mark: ImageName | null): Promise<Layer> {
     const key = `${mode} ${names.join(' ')} ${mark ?? ''}`;
@@ -201,6 +230,7 @@ export class Matrix {
     if (!this.stored.size) {
       await this.send('matrixDeleteAnimations', DeviceId.userIO, IOCommand.deleteMatrixAnimations, [], Target.st);
       this.nextFrame = 0;
+      this.palette = null;
     }
     const images: Image[] = names.length ? names.map(n => IMAGES[n]) : [[]];
     if (images.length === 1 && mode !== 'show') images.push([]);
@@ -210,15 +240,7 @@ export class Matrix {
     for (const frame of frames) {
       const index = this.nextFrame++;
       const pixel = (row: number, col: number) => over[row]?.[col] || frame[row]?.[col] || 0;
-      const planes: number[] = [];
-      for (let bit = 0; bit < 4; bit++) {
-        for (let k = 0; k < 8; k++) {
-          let byte = 0;
-          for (let row = 0; row < 8; row++) byte |= ((pixel(row, 7 - k) >> bit) & 1) << row;
-          planes.push(byte);
-        }
-      }
-      await this.send('matrixSaveFrame', DeviceId.userIO, IOCommand.saveMatrixFrame, [index >> 8, index & 0xff, ...planes], Target.st);
+      await this.send('matrixSaveFrame', DeviceId.userIO, IOCommand.saveMatrixFrame, [index >> 8, index & 0xff, ...planes(pixel)], Target.st);
       indexes.push(index);
     }
     const palette = [BLACK, mode === 'flash' ? RED : this.ctx.config.colors.matrix, WHITE];
@@ -227,6 +249,40 @@ export class Matrix {
     await this.send('matrixSaveAnimation', DeviceId.userIO, IOCommand.saveMatrixAnimation, [id, mode === 'flash' ? 8 : 2, 0, palette.length, ...palette.flat(), ...list], Target.st);
     this.stored.set(key, id);
     return { id, mode };
+  }
+
+  /**
+   * A whole picture in one go: `pixels` 8 rows of 8 palette indexes, row 0
+   * at the back, `palette` up to 16 colours, index 0 the first. Kept in two
+   * frame slots with an animation each; a frame saved again under its index
+   * and its animation played shows the new picture (2026-11-08), so an
+   * update is two commands, about 150 ms; a new palette stores both
+   * animations first, 56 bytes each, which the link under load may not ack.
+   * Any other write stops it like an animation.
+   */
+  async picture (pixels: readonly (readonly number[])[], palette: readonly Color[], owner?: string): Promise<void> {
+    if (!this.free('matrixPicture', owner)) return;
+    if (palette.length < 1 || palette.length > 16) throw new Error(`matrix picture: ${palette.length} colours, 1 to 16 allowed`);
+    const key = palette.flat().join();
+    if (key !== this.palette) {
+      for (const [k, id] of PICTURE_IDS.entries()) {
+        const frame = PICTURE_FRAMES[k]!;
+        await this.send('matrixSaveAnimation', DeviceId.userIO, IOCommand.saveMatrixAnimation, [id, 2, 0, palette.length, ...palette.flat(), 0, 1, frame >> 8, frame & 0xff], Target.st);
+      }
+      this.palette = key;
+    }
+    const slot = 1 - this.shown, frame = PICTURE_FRAMES[slot]!, id = PICTURE_IDS[slot]!;
+    await this.send('matrixSaveFrame', DeviceId.userIO, IOCommand.saveMatrixFrame, [frame >> 8, frame & 0xff, ...planes((row, col) => pixels[row]?.[col] ?? 0)], Target.st);
+    if (this.playing) this.replaced++;
+    try { await this.send('matrixPlayAnimation', DeviceId.userIO, IOCommand.playMatrixAnimation, [id, 1], Target.st); }
+    catch (e) {
+      // the animations are gone when the stack's first store deleted all animations between the save and the play (seen at connect, 2026-11-08)
+      if (!(e instanceof CommandError) || this.palette === null) throw e;
+      this.palette = null;
+      return this.picture(pixels, palette, owner);
+    }
+    this.shown = slot;
+    this.playing = true;
   }
 
   /** Indexes of the animation frames stored on the Bolt. */

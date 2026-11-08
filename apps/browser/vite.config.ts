@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { execSync } from 'node:child_process';
 import { sessionArchive } from './vite-plugin-sessions';
+import { camForwarder } from './vite-plugin-cam';
 
 /** Short hash of HEAD, with "+dirty" when the working tree differs from it. */
 function commit (): string {
@@ -27,7 +28,8 @@ const certDir = resolve(import.meta.dirname, '../../Certificates/macos');
 
 export default defineConfig({
   // completed days of session logs land in <workspace>/sessions as one zip per month
-  plugins: [commitStamp, sessionArchive(resolve(import.meta.dirname, '../../sessions'))],
+  // the phone over the floor through the forwarder on the rig, see vite-plugin-cam.ts
+  plugins: [commitStamp, sessionArchive(resolve(import.meta.dirname, '../../sessions')), camForwarder()],
   server: {
     host: true,
     port: 8080,

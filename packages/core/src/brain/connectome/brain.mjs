@@ -7,7 +7,8 @@
 // is; it asks for a ladder through `onLadder` and the program passes it on.
 
 import { mod360, StabilizationIndex } from '@bolt/core';
-import { Network, loadConnectome } from './network.mjs';
+import { Network } from './network.mjs';
+import { loadConnectome } from './load.mjs';
 import { Observation } from './observation/observation.mjs';
 import { motorCommand, MOTOR } from './motor/motor.mjs';
 import { ringVector } from './ring/ring.mjs';

@@ -180,7 +180,7 @@ The base command takes the interval in ms, a packet count (0 for endless) and th
 | pitch, roll | degrees | gravity referenced, fused, no drift |
 | yaw | degrees | counter-clockwise seen from above; relative to the last wake or yaw reset, drifts |
 | accelerometer x, y, z | g | |
-| locator x, y | metres on the wire, cm in the code | dead reckoned from wheel travel; slips are not seen |
+| locator x, y | metres on the wire, cm in the code | dead reckoned from wheel travel; slips are not seen, and a Bolt moved by hand reports no travel, the drive blocks in the shell |
 | locator velocity x, y | m/s on the wire, cm/s in the code | derived; near zero under torque means stuck |
 | gyro x, y, z | degrees per second | |
 
@@ -212,7 +212,9 @@ A message is its channel number and nothing else: the receiver reports the chann
 
 ## 8 Matrix, LEDs, light
 
-The matrix is 8 by 8 RGB pixels, drawn by pixel, colour, fill, line or character, rotated in steps of 90°. Scroll text takes at most 25 characters at speeds 1 to 31 and ends with the scroll done notification. Frames and animations can be stored on the Bolt and played; sleep wipes them. A matrix picture written before the wake's reset is gone after it.
+The matrix is 8 by 8 RGB pixels, drawn by pixel, colour, fill, line or character, rotated in steps of 90°. Row 0 is at the back, by the white LED; row 7 at the front, by the red one. Scroll text takes at most 25 characters at speeds 1 to 31 and ends with the scroll done notification. Frames and animations can be stored on the Bolt and played; sleep wipes them. A matrix picture written before the wake's reset is gone after it.
+
+**Stored frames.** A frame is 4 bit planes of a palette index per pixel, 32 bytes; an animation names its frames, a palette of up to 16 colours and a rate. Frame indexes 0 to 1000 are accepted, 1001 and up refused; animation ids up to 32 are accepted, 63 and up refused, the ids between are not tried. A frame saved again under its index and its animation played again shows the new picture, so a whole picture costs two commands, about 150 ms. A frame rewritten while on display goes dark until the next play. The animation command with 16 colours is 56 bytes; under a loaded link its ack can stay out for seconds, while the 34-byte frame command goes through.
 
 Two single LEDs, front and back, set with one command. Pink on both is the firmware's default after sleep.
 

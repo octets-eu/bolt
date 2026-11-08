@@ -4,6 +4,9 @@
 // - The listen notify, one per frame heard, carries the channel only: which
 //   ladder and level arrived, not from where. The weakest level arriving is
 //   the carrier, heard with the sender inside its lobe ahead or behind.
+// - Each frame heard says which level got through, `frame.ch<k>`, and the
+//   beats between heard frames are slots that went silent, `slot.ch<k>`
+//   (see `slots`); the map weighs both per level.
 // - The four corner receivers show the channel while a frame is in the air.
 //   A volley of reads fired 46 to 60 ms before a frame's expected notify
 //   lands in it three times in ten; the corners that heard name the side.
@@ -39,7 +42,7 @@ export class Observation {
     this.stats = { misses: 0, frames: 0, reads: 0, landed: 0, named: 0, flooded: 0, bunched: 0 };
   }
 
-  fresh () { return { miss: 0, carrier: 0, any: 0, closeness: 0, corners: new Set(), down: 0, up: 0 }; }
+  fresh () { return { miss: 0, carrier: 0, any: 0, closeness: 0, corners: new Set(), down: 0, up: 0, frames: {}, slots: {} }; }
 
   async start () {
     this.running = true;
@@ -60,9 +63,12 @@ export class Observation {
     if (!level) return;
     const t = performance.now();
     this.stats.frames++;
+    this.slots(channel, level.range, t);
     if (this.heard.length && level.range !== this.range()) this.switchedAt = t;
     this.heard.push({ t, channel, ...level });
     this.events.any = 1;
+    if (!this.heardAt || t - this.heardAt > 100) this.events.frames[channel] = (this.events.frames[channel] ?? 0) + 1;   // one frame, not its second notify
+    this.heardAt = t;
     this.events.closeness += Math.log2(32 / level.strength);   // 16 says 1, 1 says 5: weaker frames arrive only near
     if (level.strength === this.carrier && level.range === this.range()) { this.events.carrier = 1; this.carrierAt = t; }
     else if (level.strength > this.carrier && this.carrier !== null) {   // a stronger level: was the carrier's frame of this round missed?
@@ -70,6 +76,31 @@ export class Observation {
       if (t - (this.carrierAt ?? t) > 1.2 * roundMs && t - (this.missAt ?? -Infinity) > roundMs) { this.events.miss = 1; this.missAt = t; this.stats.misses++; }
     }
     this.follow(channel, level.range, t);
+  }
+
+  /**
+   * The frames that did not arrive: the sender sends one frame per beat, the
+   * ladder's channels in order, each held `ir.repeat` beats, so the beats
+   * between the last heard frame and this one are known slots that went
+   * unheard, each on a known channel. A second notify of one frame, within
+   * 100 ms, is no new frame. Every level's silence is evidence too: without
+   * it every heard frame says "ahead", the front receivers hear better
+   * (replay bench, 2026-11-08).
+   */
+  slots (channel, range, t) {
+    const last = this.lastFrame;
+    this.lastFrame = { t, channel, range };
+    if (!last || last.range !== range || t - last.t < 100) return;
+    const order = [...this.channels].filter(([, c]) => c.range === range).map(([ch]) => ch).sort((a, b) => a - b);
+    const repeat = this.ir.repeat ?? 1, beats = Math.round((t - last.t) / this.ir.beatMs) - 1;
+    if (beats < 1 || beats > order.length * repeat * 2) return;
+    // the sending position after the last heard frame: its channel's last beat is assumed
+    let pos = order.indexOf(last.channel) * repeat + repeat - 1;
+    for (let i = 0; i < beats; i++) {
+      pos = (pos + 1) % (order.length * repeat);
+      const ch = order[Math.floor(pos / repeat)];
+      this.events.slots[ch] = (this.events.slots[ch] ?? 0) + 1;
+    }
   }
 
   /** The ladder the frames come on now: the last frame's. */
@@ -171,6 +202,7 @@ export class Observation {
       'ladder.near': this.near ? 1 : 0, 'self.forward': forward, 'self.still': still,
       'frame.closeness': e.closeness, 'ladder.settled': performance.now() - (this.switchedAt ?? -Infinity) > this.ir.settleMs ? 1 : 0 };
     for (const c of CORNER_NAMES) s[`corner.${c}`] = e.corners.has(c) ? 1 : 0;
+    for (const ch of this.channels.keys()) { s[`frame.ch${ch}`] = e.frames[ch] ?? 0; s[`slot.ch${ch}`] = e.slots[ch] ?? 0; }
     return s;
   }
 

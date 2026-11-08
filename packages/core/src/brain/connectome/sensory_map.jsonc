@@ -16,6 +16,8 @@
     // the sender's beat: one command per 200 ms on its schedule (utils/ladder.mjs), the notify 45 ms after the frame;
     // a read lands only while the frame is in the air, 7.5 ms (behavior/beat.ts)
     "beatMs": 200,
+    // beats each level is held by the sender: 2 for utils/ladder.mjs, 1 for the browser's sendLadder and the recordings of 2026-10
+    "repeat": 2,
     // over the bridge a read lands at a 40 to 55 ms lead (utils/read-timing.mjs, 2026-11-06), and
     // commands reach the Bolt on a 15 ms grid: three reads 7 ms apart, leads 60 to 46, span a grid
     // slot (behavior/beat.ts: three land in 35 to 39 % of frames, five in 43 %); five loaded the link
@@ -34,10 +36,11 @@
   "channels": [
     // a read that landed: the corners that heard the frame, unless all four
     // (the sender on top, or a level heard all round) or two opposite ones
-    { "drive": "IR_FL", "source": "corner.FL", "pipeline": [] },
-    { "drive": "IR_FR", "source": "corner.FR", "pipeline": [] },
-    { "drive": "IR_BR", "source": "corner.BR", "pipeline": [] },
-    { "drive": "IR_BL", "source": "corner.BL", "pipeline": [] },
+    // a corner read is worth about three frames (replay bench, 2026-11-08)
+    { "drive": "IR_FL", "source": "corner.FL", "pipeline": [ { "op": "gain", "k": 3 } ] },
+    { "drive": "IR_FR", "source": "corner.FR", "pipeline": [ { "op": "gain", "k": 3 } ] },
+    { "drive": "IR_BR", "source": "corner.BR", "pipeline": [ { "op": "gain", "k": 3 } ] },
+    { "drive": "IR_BL", "source": "corner.BL", "pipeline": [ { "op": "gain", "k": 3 } ] },
 
     // a frame of the carrier: the sender within the lobe, ahead or behind
     { "drive": "IR_AX", "source": "frame.carrier", "pipeline": [] },
