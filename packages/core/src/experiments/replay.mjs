@@ -37,7 +37,9 @@ import { bayes } from './replay-bayes.mjs';
 import { ringdist } from './replay-ringdist.mjs';
 
 const LOCK_DEG = 30, LOCK_S = 3;
-const RUNS = /^(sweepTest|approachTest)\.(in|out)|^brain (seek)(:| found| time| runaway| stopped)/;
+const RUNS = /^(sweepTest|approachTest)\.(in|out)|^brain (seek)(:| found| time| runaway| stopped)|^brain (path) (start|done)/;
+/** A path run (the mode by hand, the seeker driven by its navigation from the plan's starts): the sender 23 cm behind the reset, in the seeker's locator frame. */
+const PATH_AT = { x: 0, y: -23 };
 /**
  * The browser's seek runs count only when the user marked them good: the
  * `brain replay {seeker, sender, at, startCm, result, seconds}` line after
@@ -70,8 +72,10 @@ function runs (lines) {
     const d = e.data;
     if (e.name === 'info' && typeof d === 'string' && RUNS.test(d)) {
       const m = d.match(RUNS);
-      const name = m[1] ?? m[3], step = m[2] ?? (m[4] === ':' ? 'in' : 'out');
-      if (step === 'in' && name === 'seek') {
+      const name = m[1] ?? m[3] ?? m[5], step = m[2] ?? (m[4] === ':' ? 'in' : m[4] ? 'out' : m[6] === 'start' ? 'in' : 'out');
+      if (step === 'in' && name === 'path') {
+        cur = { name, t0: e.t, seeker: e.bolt, sender: null, at: PATH_AT, args: { direction: 0 }, lines: [], trials: [] };
+      } else if (step === 'in' && name === 'seek') {
         // brain seek: seeker SB-9129 on sender SB-11DF, ... (the matrix-brain mode of the browser app); `at` comes with the mark
         const who = d.match(/seeker (\S+) on sender (\S+)/);
         cur = { name, t0: e.t, seeker: who?.[1], sender: who?.[2], at: null, args: { direction: 0 }, lines: [], trials: [] };
@@ -161,7 +165,7 @@ function score (run, estimator) {
     while (e.t >= nextSec) {
       if (m) {
         const est = estimator.estimate(); const tr = truth(m, run.at, offset); const t = (nextSec - ev[0].t) / 1000;
-        secs.push({ t, err: Math.abs(angDiff(est.angle, tr)), length: est.length, truth: tr });
+        secs.push({ t, err: Math.abs(angDiff(est.angle, tr)), length: est.length, truth: tr, dErr: est.distance === undefined ? null : est.distance - Math.hypot(run.at.x - m.x, run.at.y - m.y) });
         if (flag('--dump') && t % 10 === 0 && estimator.debug) console.log(`    ${t} s truth ${tr.toFixed(0)} est ${est.angle.toFixed(0)} ${estimator.debug()}`);
       }
       nextSec += 1000;
@@ -273,5 +277,6 @@ if (all.length) {
   const buckets = [[0, 10], [10, 30], [30, 60], [60, 120], [120, 1e9]];
   console.log('  |err| by time since start: ' + buckets.map(([a, b]) => { const x = secs.filter((v) => v.t >= a && v.t < b); return x.length ? `${a}-${b === 1e9 ? '' : b} s ${mean(x, (v) => v.err).toFixed(0)}° (${(100 * x.filter((v) => v.err < LOCK_DEG).length / x.length).toFixed(0)} %)` : ''; }).filter(Boolean).join(', '));
   console.log(`${opt('--estimator', 'baseline')}${opt('--param') ? ' ' + opt('--param') : ''}: ${all.length} runs, ${secs.length} s; locked ${locks.length} of ${all.length}, median lock ${locks.length ? locks[Math.floor(locks.length / 2)] : '-'} s; `
-    + `seconds under ${LOCK_DEG}°: ${(100 * secs.filter((x) => x.err < LOCK_DEG).length / secs.length).toFixed(0)} %; mean |err| ${mean(secs, (x) => x.err).toFixed(0)}°; mean len ${mean(secs, (x) => x.length).toFixed(2)}`);
+    + `seconds under ${LOCK_DEG}°: ${(100 * secs.filter((x) => x.err < LOCK_DEG).length / secs.length).toFixed(0)} %; mean |err| ${mean(secs, (x) => x.err).toFixed(0)}°; mean len ${mean(secs, (x) => x.length).toFixed(2)}`
+    + (secs.some((x) => x.dErr !== null) ? `; distance: mean ${mean(secs.filter((x) => x.dErr !== null), (x) => x.dErr).toFixed(0)} cm off, mean |off| ${mean(secs.filter((x) => x.dErr !== null), (x) => Math.abs(x.dErr)).toFixed(0)} cm` : ''));
 }

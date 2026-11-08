@@ -2,7 +2,12 @@
 // replay-bayes.mjs, and a distance belief of 10 bands of 20 cm, fed by the
 // levels' measured range profiles (replay.mjs --senses: strength 2 of the
 // long ladder arrives under 80 cm, 4 under 140, 16 everywhere and most when
-// far; the short ladder's 1 under 40 cm, 2 and 4 under 120). Nothing is
+// far). The profiles go by physical strength, not by channel: the short
+// ladder is only ever sent when the brain believes it is near, so its
+// channels were only recorded near, and taken by channel they said 20 cm
+// for a frame heard at a metre, the believed distance running at half the
+// truth (path test, 2026-11-08). So ch6 (strength 4) takes ch1's profile,
+// ch5 (2) ch0's, ch4 (1, the short ladder's own) ch0's one band nearer. Nothing is
 // forgotten; instead the ring is carried along when the Bolt moves: a step
 // of the locator turns every bearing by the parallax the believed distance
 // gives, and shortens or lengthens the distance by the step's component
@@ -19,8 +24,10 @@ const EXPOSURE_S = [4, 125, 245, 219, 248, 164, 168, 202, 105, 78];
 const RANGE = {
   0: [0, 0.77, 0.82, 0.64, 0.20, 0.07, 0.01, 0, 0, 0], 1: [0, 0.82, 1.06, 0.97, 0.59, 0.32, 0.45, 0.19, 0.14, 0.01],
   2: [0, 0.72, 1.15, 1.16, 0.87, 0.63, 0.98, 1.17, 1.02, 0.93], 3: [0, 0.67, 1.15, 1.21, 1.00, 0.86, 1.51, 1.92, 1.76, 2.10],
-  4: [1.16, 0.87, 0.27, 0.03, 0, 0, 0, 0, 0, 0], 5: [2.33, 1.05, 0.54, 0.30, 0.32, 0.15, 0, 0, 0, 0], 6: [2.56, 1.25, 0.68, 0.50, 0.77, 0.50, 0, 0, 0, 0],
 };
+RANGE[6] = RANGE[1];                                 // strength 4
+RANGE[5] = RANGE[0];                                 // strength 2
+RANGE[4] = [RANGE[0][1], ...RANGE[0].slice(2), 0];   // strength 1: strength 2's profile one band nearer
 const DEFAULTS = { wCorner: 3, wDist: 1, parallax: 1, temperature: 1 };
 const mod360 = (a) => ((a % 360) + 360) % 360;
 
