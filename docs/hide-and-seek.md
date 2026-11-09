@@ -24,7 +24,7 @@ The seeker knows nothing of the room: no map, no walls, no camera. From how loud
 
 ## Not in the game yet
 
-The room. The seeker drives at one gentle speed whatever it believes; it could drive faster when it is sure of the direction and slow down when it is not. It can get wedged between two pieces of furniture, where the only way out is backwards. It can stall on a doorsill or a cable, where a moment of extra push gets it over. It can hit the leg of a table, which feels like a bump but is not the hider, and has to back off and go round. And it can get stuck for good, in a cushion or under a chair, with nothing left to do but blink for help; a Bolt has no voice.
+The room. The seeker drives at one gentle speed whatever it believes; it could drive faster when it is sure of the direction and slow down when it is not. It can get wedged between two pieces of furniture, where the only way out is backwards. It can stall on a doorsill or a cable, where a moment of extra push gets it over. It can hit the leg of a table, which feels like a bump but is not the hider, and has to back off and go round. And it can get stuck for good, in a cushion or under a chair, with nothing left to do but call for help: blink, and rattle its motors back and forth at full torque, which is loud on a hard floor and can even make the ball hop. A Bolt has no speaker, but it is not mute.
 
 For all of these the seeker needs a sense it does not have yet: that it is pushing but not moving, and that a bump came from something that did not bump back. The speed comes first, because it needs no new sense. The stuck sense comes next, because one sense covers the wedge, the sill and the cushion. Going round a leg comes last.
 
