@@ -14,7 +14,7 @@ A Bolt is a ball that rolls, with four infrared emitters and four infrared recei
 
 Hearing. A message is heard when the hider is roughly ahead or roughly behind, and lost when it is off to the side; how the seeker turns that into a direction and a path is in `recipes.md`.
 
-The seeker knows nothing of the room: no map, no walls, no camera, no idea how far away the hider is. Everything it does follows from what it hears right now. That is why its path looks odd to an observer, with short legs and many turns. The path is implementation and the subject of the experiments: first a game has to work at all, then the path gets clever and elegant.
+The seeker knows nothing of the room: no map, no walls, no camera. From how loud the call arrives it holds a rough idea of how far away the hider is. Everything it does follows from what it hears right now and what it has heard on the way. That is why its path looks odd to an observer, with short legs and many turns. The path is implementation and the subject of the experiments: first a game has to work at all, then the path gets clever and elegant.
 
 ## A game
 
@@ -24,4 +24,8 @@ The seeker knows nothing of the room: no map, no walls, no camera, no idea how f
 
 ## Not in the game yet
 
-The tag. Walls, furniture and the edge of the floor. A hider that moves. A second game with the roles swapped.
+The room. The seeker drives at one gentle speed whatever it believes; it could drive faster when it is sure of the direction and slow down when it is not. It can get wedged between two pieces of furniture, where the only way out is backwards. It can stall on a doorsill or a cable, where a moment of extra push gets it over. It can hit the leg of a table, which feels like a bump but is not the hider, and has to back off and go round. And it can get stuck for good, in a cushion or under a chair, with nothing left to do but blink for help; a Bolt has no voice.
+
+For all of these the seeker needs a sense it does not have yet: that it is pushing but not moving, and that a bump came from something that did not bump back. The speed comes first, because it needs no new sense. The stuck sense comes next, because one sense covers the wedge, the sill and the cushion. Going round a leg comes last.
+
+A hider that moves. A second game with the roles swapped.
