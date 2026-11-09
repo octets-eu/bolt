@@ -32,6 +32,8 @@ The bench runs on old frames and cannot see a pass that never happened or a turn
 
 Once the behaviour is stable, a rule becomes a population with weights, the rule as the specification and the bench as the check that nothing moved. The frame receivers, the ring and the distance bands went this way: the imprint rules became receivers and evidence neurons. The shifts are next: the yaw as two rotation populations gated by the turn's direction, the parallax and the slide as populations gated by the distance and bearing belief too, the forgetting as an inhibitory population driven by travel. Rotation neurons shift the ring in whole steps where the rule turns by fractions of a degree; the bench shows the cost, and a finer ring is the answer if there is one.
 
+The drawings follow the file. `vis` in `circuit.json` is written by the builder, the SVG is drawn by `agent/pull.sh` after every pull, the brain view derives every cell from the circuit at load (`docs/brain-view.plan.md`). The one time a hand touches them is here: a new kind of cell gets its place in `vis` and its grade and material in the view in the same commit as its weights.
+
 ## 7 Round again
 
 New neurons change what the senses need to measure, so the tables grow with them: the product neurons by distance band needed exposure near, and a path was driven round the sender at 30 and 55 cm to fill the bands. Step 2 follows.
