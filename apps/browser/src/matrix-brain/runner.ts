@@ -16,7 +16,7 @@ import { Network } from '../../../../packages/core/src/brain/connectome/network.
 import { Observation } from '../../../../packages/core/src/brain/connectome/observation/observation.mjs';
 import { ringVector } from '../../../../packages/core/src/brain/connectome/ring/ring.mjs';
 import { LadderSender } from '../../../../packages/core/src/brain/utils/ladder.mjs';
-import { motorCommand, MOTOR } from '../../../../packages/core/src/brain/connectome/motor/motor.mjs';
+import { motorCommand, fireRoll, MOTOR } from '../../../../packages/core/src/brain/connectome/motor/motor.mjs';
 import { connectome } from './connectome';
 import { ringPicture, peaks, PALETTE } from './render';
 
@@ -25,6 +25,8 @@ const OWNER = 'brain';
 const NOSE_LED = [3, 3, 0] as const, TAIL_LED = [0, 0, 0] as const;
 const STEP_MS = 25;        // the shortest network step, as brain.mjs
 const DRAW_MS = 300;       // two commands of about 150 ms fit the beat's idle part after a volley
+/** No pictures while the motors run: the picture's two commands per 300 ms loaded the link until a matrix command lost its ack and stalled the queue 3 s (run 10, 2026-11-09); the state line has the ring */
+const DRAW_WHILE_DRIVING = false;
 const FLASH_MS = 200;
 const STATE_MS = 1000;
 const ROLL_MS = 100;         // before the frames are timed, a roll this often (brain.mjs)
@@ -138,16 +140,16 @@ export class MatrixBrain {
     } else this.seeker.log('info', `brain on: seeker ${this.seeker.name}, sender ${this.sender.name}, ladder long`);
   }
 
-  /** The motor layer's roll, as brain.mjs: right after a volley, once the link is idle. */
+  /** The motor layer's roll, as brain.mjs: right after a volley, fired past the queue. */
   private roll (): void {
-    if (this.commanded === null || !this.running || this.result || this.seeker.queue.pending > 0) return;
+    if (this.commanded === null || !this.running || this.result) return;
     const now = Date.now();
     if (!this.t0) this.t0 = now;
     this.cmd = motorCommand(this.net, this.heading, this.commanded, Math.min(400, now - this.lastRoll));
     this.commanded = mod360(this.cmd.heading);
     this.lastRoll = now;
     this.modes[this.cmd.mode] = (this.modes[this.cmd.mode] ?? 0) + 1;
-    void this.seeker.actuators.motor.roll(this.cmd.speed, this.commanded).catch(() => {});
+    void fireRoll(this.seeker, this.cmd.speed, this.commanded);
   }
 
   /** The run's end: the motor first, then the result into the log; the toggle does the rest. */
@@ -166,7 +168,7 @@ export class MatrixBrain {
 
   /** The ring onto the matrix, when it changed and the last draw is DRAW_MS ago. */
   private async draw (): Promise<void> {
-    if (!this.running || this.drawing) return;
+    if (!this.running || this.drawing || (this.options.motors && !DRAW_WHILE_DRIVING)) return;
     const now = performance.now();
     if (now - this.drawnAt < DRAW_MS) return;
     const flash = now < this.flashUntil;

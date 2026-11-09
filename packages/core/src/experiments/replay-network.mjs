@@ -24,7 +24,7 @@ export function network (params = {}) {
   if (process.env.CIRCUIT) connectome.circuit = JSON.parse(readFileSync(process.env.CIRCUIT, 'utf8'));
   if (process.env.MAP) connectome.map = parseJsonc(readFileSync(process.env.MAP, 'utf8'));
   const net = new Network(connectome);
-  const obs = new Observation({ sensors: { listenInfrared: async () => {} } }, { ...connectome.map.ir, repeat: 1 });   // no Bolt for the listen's re-arm; the recordings' ladder held each level one beat
+  const obs = new Observation({ sensors: { listenInfrared: async () => {} }, queue: { fire: async () => ({}) } }, { ...connectome.map.ir, repeat: 1 });   // no Bolt for the listen's re-arm; the recordings' ladder held each level one beat
   let now = 0;
   performance.now = () => now;
   obs.switchedAt = 0;

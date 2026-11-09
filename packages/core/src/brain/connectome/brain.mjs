@@ -1,7 +1,8 @@
 // The seeker's brain on a Bolt: observation -> network -> motor, one step per
 // motion sample. The roll goes out right after each volley of corner reads,
 // once per beat, so the link is idle when the next read is due; before the
-// beat is learned, every `ROLL_MS`. The Bolt's own layers are
+// beat is learned, every `ROLL_MS`. The roll and the listen's re-arm are
+// fired past the queue, so a command that loses its ack stalls neither. The Bolt's own layers are
 // its hands: the infrared stream and fired reads (observation), the motion
 // stream for the yaw, the motor's roll. It knows nothing of where the sender
 // is; it asks for a ladder through `onLadder` and the program passes it on.
@@ -10,7 +11,7 @@ import { mod360, StabilizationIndex } from '@bolt/core';
 import { Network } from './network.mjs';
 import { loadConnectome } from './load.mjs';
 import { Observation } from './observation/observation.mjs';
-import { motorCommand, MOTOR } from './motor/motor.mjs';
+import { motorCommand, fireRoll, MOTOR } from './motor/motor.mjs';
 import { ringVector } from './ring/ring.mjs';
 
 const ROLL_MS = 100;
@@ -37,13 +38,13 @@ export class Brain {
     await this.obs.start();
     let last = null, lastRoll = 0, commanded = null, heading = 0;
     const roll = () => {
-      if (commanded === null || this.stopped || this.bolt.queue.pending > 0) return;
+      if (commanded === null || this.stopped) return;
       const now = Date.now();
       this.cmd = motorCommand(this.net, heading, commanded, Math.min(400, now - lastRoll));
       commanded = mod360(this.cmd.heading);
       lastRoll = now;
       this.modes[this.cmd.mode]++;
-      void motor.roll(this.cmd.speed, commanded).catch(() => {});
+      void fireRoll(this.bolt, this.cmd.speed, commanded);
       this.onRoll(this);
     };
     this.obs.afterVolley = roll;

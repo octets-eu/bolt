@@ -25,11 +25,16 @@
 //
 // `tick` turns what came since the last tick into the sources and clears the
 // events. Uses the Bolt's lower layers only: the infrared stream and the
-// queue's fire.
+// queue's fire, for the reads and for the listen's re-arm, so neither waits
+// behind a queued command.
 
 import { DeviceId, SensorCommand, Target } from '@bolt/core';
 
 const READ = { name: 'infraredReadings', device: DeviceId.sensor, id: SensorCommand.getInfraredReadings, target: Target.st, data: [] };
+// the listen's re-arm, fired past the queue like the reads: behind a command that lost its ack (a matrix picture,
+// 2026-11-09, run 10) the queued re-arm waited 3 s and the ear was off for the last 2.3 s of the approach
+const LISTEN = { name: 'listenInfrared', device: DeviceId.sensor, id: SensorCommand.listenInfraredMessages, target: Target.st, data: [255, 255, 255, 255, 255] };
+const FIRE_MS = 300;   // ack timeout of a fired command that is not a timed read
 const CORNER_NAMES = ['FL', 'FR', 'BR', 'BL'];
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -65,7 +70,7 @@ export class Observation {
   }
 
   onNotify (channel) {
-    void this.bolt.sensors.listenInfrared(true).catch(() => {});   // a listen ends with the first message
+    void this.bolt.queue.fire(LISTEN, FIRE_MS).catch(() => {});   // a listen ends with the first message; past the queue, the ear never waits behind the hand
     const level = this.channels.get(channel);
     if (!level) return;
     const t = performance.now();

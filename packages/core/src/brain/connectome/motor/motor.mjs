@@ -23,6 +23,19 @@
 //   standing `scanHoldMs` after each, as the sweep listens a round per
 //   heading; with nothing heard at all, M_ROAM, roll a wide circle instead,
 //   to come into range.
+//
+// `fireRoll` sends the roll past the queue, like the reads and the listen's
+// re-arm: a queued roll waited 3 s behind a matrix picture that lost its
+// ack and the seeker drove blind on its last command (run 10, 2026-11-09).
+
+import { DeviceId, DrivingCommand, Target, mod360 } from '@bolt/core';
+
+/** The roll as a fired command: heading in the Bolt's heading frame, speed 0..255; the status heading follows. */
+export function fireRoll (bolt, speed, heading) {
+  const h = mod360(Math.round(heading)), v = Math.min(255, Math.max(0, Math.round(speed)));
+  bolt.status.heading = h;
+  return bolt.queue.fire({ name: 'roll', device: DeviceId.driving, id: DrivingCommand.driveWithHeading, target: Target.st, data: [v, (h >> 8) & 0xff, h & 0xff, 0] }, 300).then(() => undefined, () => undefined);
+}
 
 export const MOTOR = {
   seekSpeed:   32,    // roll speed, about 17 cm/s (40 gave 22); at 21 cm/s runs passed 15 cm off, at 13 a touch went unreported

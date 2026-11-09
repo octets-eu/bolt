@@ -27,7 +27,7 @@ export function accumulator (params = {}) {
   const p = { ...DEFAULTS, ...params };
   const N = p.n;   // bins; 16 is the ring's resolution
   const connectome = loadConnectome();
-  const obs = new Observation({ sensors: { listenInfrared: async () => {} } }, connectome.map.ir);
+  const obs = new Observation({ sensors: { listenInfrared: async () => {} }, queue: { fire: async () => ({}) } }, connectome.map.ir);
   let now = 0;
   performance.now = () => now;
   obs.switchedAt = 0;
