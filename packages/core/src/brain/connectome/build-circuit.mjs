@@ -5,7 +5,8 @@
 // a neuron's direction off the nose, clockwise, deg; `evidence`, the neuron
 // sums its input per step into log-evidence and its rate is the softmax
 // over its role's group (network.mjs); `cm`, a distance neuron's band;
-// `tauCm`, its evidence forgets with the travel; `bias`; `tauMs` for leaky
+// `tauCm`, its evidence forgets with the travel in cm; `tauParallax`, it
+// forgets with the travel over the believed distance, radians; `bias`; `tauMs` for leaky
 // neurons. Every constant of the brain is here or in sensory_map.jsonc; the
 // runtime has none.
 //
@@ -35,7 +36,7 @@
 //   npx tsx packages/core/src/brain/connectome/build-circuit.mjs
 //
 // OUT=<path> writes elsewhere, for a circuit under test on the replay bench
-// (CIRCUIT=<path>); N, TAU_CM, W_DIST override.
+// (CIRCUIT=<path>); N, TAU_CM, RING_TAU_RAD, W_DIST override.
 //
 // Fields beyond the worm's, continued: `of` and `gate`, a gated neuron's
 // source and the distance neurons whose share scales it; `band`, its cm.
@@ -47,6 +48,12 @@ const map = parseJsonc(readFileSync(new URL('./sensory_map.jsonc', import.meta.u
 const N        = Number(process.env.N ?? 36);         // ring neurons, 10 deg apart; 16 bins lost nine points against 36 on the bench (2026-11-08)
 const BANDS = 10, BAND_CM = 20;                        // distance neurons
 const TAU_CM   = Number(process.env.TAU_CM ?? 30);    // the distance forgets with the travel: recordings 72 to 75 %, the day's runs 56 to 65 %, |off| 28 to 27 cm
+// the ring forgets by the potential parallax of the travel, the step over the believed distance, in radians: a bearing
+// is worth e times less once the sender could have shifted by this angle, so abruptly through a close pass and gently on
+// a far approach. Infinity: never; a ring that never forgets is pinned by its approach evidence through a pass, six
+// corner reads at 40 cm moved it 30 deg (run 12, 2026-11-09). Forgetting by centimetres (60 cm) lifted the seek runs of
+// 11-08 from 34 to 60 % but is the same near and far.
+const RING_TAU_RAD = Number(process.env.RING_TAU_RAD ?? 1);   // 1 rad, the user's pick (2026-11-09): the seek runs of 11-08 at 62 %, today's four at 38, the pass of run 11 followed; 0.5 gave 60 / 39, 0.3 53 / 44
 const W_DIST   = Number(process.env.W_DIST ?? 1);     // a frame's range profile onto the distance
 
 // --- the senses, measured: senses.json, written by experiments/replay.mjs --senses --write over the
@@ -129,7 +136,7 @@ neuron('SELF_FWD', 'self', { axis: 'fwd', unit: 'cm' });
 neuron('SELF_RIGHT', 'self', { axis: 'right', unit: 'cm' });
 
 // the belief: the ring and the distance, evidence neurons
-for (let j = 0; j < N; j++) neuron(id(j), 'ring', { angle: ringAngle(j), evidence: true });
+for (let j = 0; j < N; j++) neuron(id(j), 'ring', { angle: ringAngle(j), evidence: true, ...(Number.isFinite(RING_TAU_RAD) ? { tauParallax: RING_TAU_RAD } : {}) });
 for (let i = 0; i < BANDS; i++) neuron(did(i), 'distance', { cm: [i * BAND_CM, (i + 1) * BAND_CM], tauCm: TAU_CM, evidence: true });
 const ontoRing = (pre, profile) => profile.forEach((w, j) => edge(pre, id(j), w));
 for (const c of Object.keys(map.ir.corners)) ontoRing(`IR_${c}`, sectorProfile(sectorRate(S.corners[c].sector, totalExposure('sector'))));   // a read lands whatever the ladder

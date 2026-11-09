@@ -9,7 +9,8 @@
 //      gate neurons in their group's rates, the distance belief of the last step
 //   2. the step carries the belief along: the ring turns by the parallax of
 //      the believed distance, the distance slides by the step along the
-//      believed bearing and forgets with the travel (tauCm)
+//      believed bearing; evidence forgets with the travel, in cm (tauCm) or
+//      in radians of the step over the believed distance (tauParallax)
 //   3. the ring shifts against the turn (ring/ring.mjs)
 //   4. evidence neurons add their input to what they hold; the rate of each
 //      is exp of its evidence less the peak of its group (the neurons of its
@@ -104,9 +105,9 @@ export class Network {
    * frame: a frame is a bearing from where the Bolt stood, so the
    * point the belief names, at the believed bearing and distance, is placed
    * anew relative to the Bolt, the ring turned to it and the distance slid to
-   * it. The distance's evidence was earned at a place and is stale once the
-   * Bolt has moved on, unlike a bearing the carry keeps true: it forgets with
-   * the travel, tauCm.
+   * it. Evidence earned at a place is stale once the Bolt has moved on, so
+   * neurons with tauCm forget with the travel: the distance, and the ring if
+   * the circuit says so.
    */
   carry ({ fwd, right }) {
     const stepCm = Math.hypot(fwd, right);
@@ -122,7 +123,15 @@ export class Network {
       const out = this.distance.map((_, i) => { const src = i - shift, k = Math.floor(src), f = src - k; return at(k) * (1 - f) + at(k + 1) * f; });
       this.distance.forEach((i, k) => { this.evidence[i] = out[k]; });
     }
-    for (const i of this.distance) if (Number.isFinite(this.neurons[i].tauCm)) this.evidence[i] *= Math.exp(-stepCm / this.neurons[i].tauCm);
+    // forgetting with the travel: evidence earned at a place goes stale once the Bolt has moved on. tauCm in
+    // centimetres; tauParallax in radians of the step over the believed distance, the angle the sender could have
+    // shifted by, so a close pass forgets abruptly and a far approach gently; the distance floored at a Bolt's width
+    const potential = stepCm / Math.max(7, d);
+    for (const [i, n] of this.neurons.entries()) {
+      if (!n.evidence) continue;
+      if (Number.isFinite(n.tauCm)) this.evidence[i] *= Math.exp(-stepCm / n.tauCm);
+      if (Number.isFinite(n.tauParallax)) this.evidence[i] *= Math.exp(-potential / n.tauParallax);
+    }
   }
 
   /** Evidence neurons' rates: exp of the evidence less the group's peak. */
