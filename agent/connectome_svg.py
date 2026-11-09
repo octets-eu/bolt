@@ -17,7 +17,8 @@ receiver, nose up: blue where it excites a bearing, red where it inhibits,
 the radius the weight; its weights onto the distance bands as bars, near to
 far. The ring's weights onto the motor neurons are lines, blue excites, red
 inhibits, wider is stronger. Dashed ochre marks the shifts the network
-computes from the motion stream, not weights. Hover shows names and weights.
+computes from the motion stream, not weights; the ring's and the distance's
+forgetting constants stand beside them. Hover shows names and weights.
 """
 import json, math, sys
 from collections import Counter, defaultdict
@@ -148,8 +149,9 @@ def dashed(x0, y0, x1, y1, bend=60):
 if "turned" in by_axis:
     (x0, y0), (x1, y1) = by_axis["turned"], polar(R_RING + 26, 290); o.append(dashed(x0 + 10, y0, x1, y1))
 o.append(f'<path class="e" d="{arc(R_RING + 26, 200, 250)}" stroke="{SHIFT}" stroke-width="2" stroke-dasharray="6 5" marker-end="url(#arrow)"/>')
-for k, line in enumerate(["parallax: a locator step turns the ring", "by the believed distance"]):
-    o.append(f'<text class="lab" x="20" y="{CY + 150 + 16 * k}">{line}</text>')
+tau_par = next((n.get("tauParallax") for n in ring if n.get("tauParallax")), None)
+for k, line in enumerate(["parallax: a locator step turns the ring", "by the believed distance"] + ([f"and the ring forgets by it: e times less", f"per {tau_par:g} rad the sender could have shifted"] if tau_par else [])):
+    o.append(f'<text class="{"lab" if k < 2 else "small"}" x="20" y="{CY + 150 + 16 * k}">{line}</text>')
 for axis in ("fwd", "right"):
     if axis in by_axis:
         (x0, y0), (x1, y1) = by_axis[axis], polar(R_RING + 26, 250); o.append(dashed(x0 + 10, y0, x1 - 6, y1 - 2))
@@ -190,8 +192,8 @@ def label(i):
     return f'<text class="lab" x="{x:.1f}" y="{y + 30:.1f}" text-anchor="middle">{i}</text>'
 o.append('<g>' + "".join(node(i) for i in N) + '</g>')
 o.append('<g>' + "".join(label(i) for i in N) + '</g>')
-o.append(f'<text class="small" x="{ROW_X0 - 60}" y="{ROW_Y["frame"] - 40}">a frame heard, by channel: onto the distance by its strength\'s range profile (bars, near to far), and onto the ring by the bearing profile of the believed distance band</text>')
-o.append(f'<text class="small" x="{ROW_X0 - 60}" y="{ROW_Y["frame"] - 24}">(a product neuron per band, the receiver times the band\'s share of the distance belief; an empty place: too few frames recorded in that band to say anything):</text>')
+o.append(f'<text class="small" x="{ROW_X0 - 60}" y="{ROW_Y["frame"] - 56}">a frame heard, by channel: onto the distance by its strength\'s range profile (bars, near to far), and onto the ring by the bearing profile of the believed distance band</text>')
+o.append(f'<text class="small" x="{ROW_X0 - 60}" y="{ROW_Y["frame"] - 40}">(a product neuron per band, the receiver times the band\'s share of the distance belief; an empty place: too few frames recorded in that band to say anything):</text>')
 for b in bands:
     y = ROW_Y[("gated", b)]
     o.append(f'<text class="lab" x="{ROW_X0 - 60}" y="{y + 4}" text-anchor="end">{"under " + str(b[1]) if b[0] == 0 else (str(b[0]) + " to " + str(b[1]) if b[1] is not None else "over " + str(b[0]))}</text><text class="small" x="{ROW_X0 - 60}" y="{y + 18}" text-anchor="end">cm</text>')
