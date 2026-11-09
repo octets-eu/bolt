@@ -23,6 +23,7 @@ const Links = Factory.create('Links', {
       m(m.route.Link, { style, class: 'mono ph2', href: '/'       }, 'Bolts'),
       m(m.route.Link, { style, class: 'mono ph2', href: '/status' }, 'Status'),
       m(m.route.Link, { style, class: 'mono ph2', href: '/camera' }, 'Camera'),
+      m(m.route.Link, { style, class: 'mono ph2', href: '/brain' }, 'Brain'),
     ]);
 
   },

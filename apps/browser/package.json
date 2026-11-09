@@ -14,11 +14,13 @@
     "@bolt/protocol": "*",
     "@bolt/web-ble": "*",
     "@techstark/opencv-js": "^4.12.0-release.1",
-    "mithril": "^2.3.8"
+    "mithril": "^2.3.8",
+    "three": "^0.187.0"
   },
   "devDependencies": {
     "@types/mithril": "^2.2.7",
     "@types/node": "^22.0.0",
+    "@types/three": "^0.187.0",
     "@types/web-bluetooth": "^0.0.21",
     "sass": "^1.104.1",
     "typescript": "^5.9.0",

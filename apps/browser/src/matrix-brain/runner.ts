@@ -40,8 +40,13 @@ const THRESHOLDS = { seeker: { xThreshold: 15, yThreshold: 15, xSpeed: 0, ySpeed
 export interface SeekOptions { motors: boolean; startCm: number; at?: { x: number, y: number } | undefined }
 /** What a run leaves for the `good` mark: the replay's truth and the outcome. */
 export interface RunSummary { seeker: string; sender: string; at: { x: number, y: number } | null; startCm: number; result: string; seconds: number }
+/** What a listener gets after each network step: the network, the sources it stepped on, the step in ms. */
+export interface BrainStep { net: Network; sources: Record<string, number>; dtMs: number }
 
 export class MatrixBrain {
+
+  /** Called after every network step, the brain view's live source; a listener that throws is logged and dropped, so a view never stops a run. */
+  static readonly steps = new Set<(step: BrainStep) => void>();
 
   readonly seeker: Bolt;
   readonly sender: Bolt;
@@ -126,6 +131,9 @@ export class MatrixBrain {
         this.seeker.log('info', `brain read landed: corners ${corners.join(' ') || 'none named'}`);
       }
       this.net.step(sources, dt);
+      for (const f of MatrixBrain.steps) {
+        try { f({ net: this.net, sources, dtMs: dt }); } catch (e) { MatrixBrain.steps.delete(f); this.seeker.log('warn', `brain step listener dropped: ${String(e)}`); }
+      }
       const want: string = (this.net.get('REQ_SHORT') ?? 0) > 0.5 ? 'short' : 'long';
       if (want !== this.range) { this.range = want; this.ladder.switch(want); this.seeker.log('info', `brain ladder ${want}`); }
       if (this.options.motors && !this.obs.timed && Date.now() - this.lastRoll >= ROLL_MS) this.roll();

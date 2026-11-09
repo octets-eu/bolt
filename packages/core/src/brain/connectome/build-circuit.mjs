@@ -40,9 +40,14 @@
 //
 // Fields beyond the worm's, continued: `of` and `gate`, a gated neuron's
 // source and the distance neurons whose share scales it; `band`, its cm.
+//
+// `vis`, beside neurons and edges: the anatomy for the brain view, the
+// neuropils' and organs' places and the cell bodies' (vis.mjs); the network
+// does not read it.
 
 import { readFileSync, writeFileSync } from 'node:fs';
 import { parseJsonc } from './network.mjs';
+import { bodyLayout } from './vis.mjs';
 
 const map = parseJsonc(readFileSync(new URL('./sensory_map.jsonc', import.meta.url), 'utf8'));
 const N        = Number(process.env.N ?? 36);         // ring neurons, 10 deg apart; 16 bins lost nine points against 36 on the bench (2026-11-08)
@@ -187,6 +192,7 @@ const circuit = {
     + 'Evidence neurons sum their input per step and their rate is the softmax over their group; the ring is shifted against the Bolt\'s turn (yaw) and by the parallax '
     + 'of the believed distance as the locator moves and forgets by the potential parallax of the step (tauParallax), the distance slid along the bearing and forgetting with the travel (tauCm); every other neuron is max(0, bias + sum of weight * rate).',
   neurons, edges,
+  vis: bodyLayout(neurons, map),
 };
 writeFileSync(process.env.OUT ?? new URL('./circuit.json', import.meta.url), JSON.stringify(circuit));
 console.log(`${neurons.length} neurons, ${edges.length} edges`);
