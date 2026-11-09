@@ -12,7 +12,9 @@
 // The belief is the ring plus distance (found from 122 cm in 23.5 s,
 // 2026-11-08): N ring neurons hold the log-evidence of the sender's bearing
 // off the nose, BANDS distance neurons of BAND_CM its range. Every frame
-// heard adds its channel's sector profile to the ring and its strength's
+// heard adds its channel's sector profile for the believed distance band to
+// the ring, through a product neuron per band (role gated: the receiver's
+// rate times the band's share of the distance belief), and its strength's
 // range profile to the distance; every slot of the sender's schedule that
 // went silent adds the profile of not hearing that channel; a corner read
 // adds its corner's profile. A profile is the log of a rate over its mean,
@@ -36,6 +38,9 @@
 //
 // OUT=<path> writes elsewhere, for a circuit under test on the replay bench
 // (CIRCUIT=<path>); N, TAU_CM, W_DIST override.
+//
+// Fields beyond the worm's, continued: `of` and `gate`, a gated neuron's
+// source and the distance neurons whose share scales it; `band`, its cm.
 
 import { readFileSync, writeFileSync } from 'node:fs';
 import { parseJsonc } from './network.mjs';
@@ -55,6 +60,27 @@ const FRAMES = {   // frames heard per channel
 };
 const CORNERS = { FL: [33, 10, 9, 19, 6, 5, 26, 57], FR: [55, 46, 40, 10, 1, 8, 10, 26], BR: [5, 5, 37, 85, 54, 2, 0, 6], BL: [4, 10, 22, 37, 55, 32, 26, 4] };   // landed reads naming the corner
 const EPS_SECTOR = 0.5;   // counts added before the rate, so an empty sector is rare, not impossible
+// the frames by sector within bands of distance (replay.mjs --senses --bands 40,80,120): a frame's bearing meaning
+// depends on the range. Beyond 120 cm the strong channels are heard 2.5 times more often ahead than behind, between
+// 40 and 80 cm they are flat, under 40 cm inverted, while the short ladder keeps an ahead lobe near; one profile over all
+// distances said "ahead" for every strong frame and held the belief 40 to 50 deg ahead of the truth at 30 cm (run 9, 2026-11-09)
+const BAND_EDGES_CM = [40, 80, 120];   // four bands: under 40, 40 to 80, 80 to 120, 120 and beyond
+const EXPOSURE_BAND_SECTOR_S = [
+  [  9,  15,  16,  26,  12,  19,  12,  16],
+  [ 57,  50,  82,  81,  62,  45,  42,  37],
+  [ 30,  49,  58,  61,  80,  42,  50,  34],
+  [ 55,  80, 110, 110, 187,  58,  65,  42],
+];   // seconds of exposure per band and sector
+const FRAMES_BY_BAND = {
+  0: [[  7,  18,  17,  17,  13,  13,   8,   2], [ 48,  48,  23,  51,  69,  45,  19,  37], [  7,  22,   0,  11,   5,  13,   0,   2], [  0,   0,   0,   0,   0,   1,   0,   0]],
+  1: [[  7,  20,  13,  18,  15,  15,   7,   6], [ 62,  49,  76,  72,  64,  55,  45,  45], [ 35,  38,  10,  43,  15,  20,  11,  24], [ 24,  35,   5,  20,  21,  18,   3,   3]],
+  2: [[  3,  16,  13,  18,  14,   8,   9,   6], [ 54,  53, 113,  87,  67,  54,  59,  43], [ 43,  44,  43,  59,  16,  34,  40,  33], [ 77,  95,  43, 128, 139,  53,  21,  62]],
+  3: [[  2,  19,  12,  15,  13,  12,   5,   3], [ 53,  69, 105,  85,  71,  44,  71,  42], [ 38,  55,  66,  60,  25,  40,  64,  34], [140, 151, 180, 211, 192, 108,  95, 119]],
+  4: [[ 19,  15,   0,  13,   7,  15,  16,  29], [ 23,  12,   0,   0,   2,  13,   1,  22], [  0,   0,   0,   0,   0,   0,   0,   0], [  0,   0,   0,   0,   0,   0,   0,   0]],
+  5: [[ 23,  17,   7,  14,   7,  15,  23,  36], [ 45,  28,   2,  11,  15,  25,  17,  54], [ 17,  16,   0,  12,  25,  13,   0,  22], [  0,   0,   0,   0,   0,   0,   0,   0]],
+  6: [[ 24,  28,  11,  15,   8,  23,  25,  34], [ 58,  45,  13,  17,  17,  31,  25,  69], [ 25,  33,   8,  47,  64,  47,  10,  39], [  0,   0,   0,   0,   0,   0,   0,   0]],
+};   // frames heard per channel, band and sector
+const MIN_FRAMES = 20;   // a channel with fewer frames in a band says nothing about the bearing there: no edges
 // per band of distance, near to far: seconds of exposure and frames per second per physical strength of the long ladder
 const EXPOSURE_BAND_S = [4, 125, 245, 219, 248, 164, 168, 202, 105, 78];
 const RANGE = {
@@ -106,8 +132,18 @@ for (let j = 0; j < N; j++) neuron(id(j), 'ring', { angle: ringAngle(j), evidenc
 for (let i = 0; i < BANDS; i++) neuron(did(i), 'distance', { cm: [i * BAND_CM, (i + 1) * BAND_CM], tauCm: TAU_CM, evidence: true });
 const ontoRing = (pre, profile) => profile.forEach((w, j) => edge(pre, id(j), w));
 for (const c of Object.keys(CORNERS)) ontoRing(`IR_${c}`, sectorProfile(sectorRate(CORNERS[c])));
-for (const { ch, strength } of channels) {
-  ontoRing(`IR_CH${ch}`, sectorProfile(sectorRate(FRAMES[ch])));
+// a frame heard, gated by the believed distance: IR_CH<k>_B<j> is the receiver's rate times the share of the
+// distance neurons in band j, with the band's own sector profile onto the ring (network.mjs, `of` and `gate`)
+const bandLo = [0, ...BAND_EDGES_CM], bandHi = [...BAND_EDGES_CM, Infinity];
+const inBand = (j) => neurons.filter((n) => n.role === 'distance' && n.cm[0] >= bandLo[j] && n.cm[0] < bandHi[j]).map((n) => n.id);
+for (const { ch, ladder, strength } of channels) {
+  for (let j = 0; j < bandLo.length; j++) {
+    const counts = FRAMES_BY_BAND[ch][j];
+    if (counts.reduce((a, b) => a + b, 0) < MIN_FRAMES) continue;
+    const nid = `IR_CH${ch}_B${j}`;
+    neuron(nid, 'gated', { of: `IR_CH${ch}`, gate: inBand(j), band: [bandLo[j], bandHi[j] === Infinity ? null : bandHi[j]], channel: ch, ladder, strength });
+    ontoRing(nid, sectorProfile(counts.map((c, i) => (c + EPS_SECTOR) / EXPOSURE_BAND_SECTOR_S[j][i])));
+  }
   ontoRing(`IR_SLOT${ch}`, sectorProfile(heardPerSlot(FRAMES[ch]).map((q) => 1 - q)));
   rangeProfile(RANGE[strength]).forEach((w, i) => edge(`IR_CH${ch}`, did(i), W_DIST * w));
 }

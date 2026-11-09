@@ -4,7 +4,9 @@
 //   1. sensory neurons take their drives, the map's pipelines over the sources,
 //      added where two channels drive one neuron; among them the Bolt's own
 //      motion, role `self`: its turn (axis turned, deg) and its step over the
-//      floor (axes fwd and right, cm), from the observation layer
+//      floor (axes fwd and right, cm), from the observation layer; then the
+//      gated neurons (`of`, `gate`): a receiver's rate times the share of the
+//      gate neurons in their group's rates, the distance belief of the last step
 //   2. the step carries the belief along: the ring turns by the parallax of
 //      the believed distance, the distance slides by the step along the
 //      believed bearing and forgets with the travel (tauCm)
@@ -39,6 +41,7 @@ export class Network {
     this.sensory = new Set(map.channels.map((c) => this.index.get(c.drive)));
     this.ring = this.neurons.flatMap((n, i) => (n.role === 'ring' ? [i] : []));
     this.distance = this.neurons.flatMap((n, i) => (n.role === 'distance' ? [i] : []));
+    this.gated = this.neurons.flatMap((n, i) => (n.of ? [[i, this.index.get(n.of), n.gate.map((g) => this.index.get(g)), this.neurons.flatMap((m, k) => (m.role === this.neurons[this.index.get(n.gate[0])].role && m.evidence ? [k] : []))]] : []));
     this.self = Object.fromEntries(this.neurons.flatMap((n, i) => (n.role === 'self' ? [[n.axis, i]] : [])));   // the Bolt's own motion: turned, fwd, right
     this.groups = new Map();   // role -> the indexes of its evidence neurons
     for (const [i, n] of this.neurons.entries()) if (n.evidence) this.groups.set(n.role, [...(this.groups.get(n.role) ?? []), i]);
@@ -135,6 +138,12 @@ export class Network {
   step (sources, dtMs) {
     for (const i of this.sensory) this.rate[i] = 0;
     for (const [c, channel] of this.map.channels.entries()) this.rate[this.index.get(channel.drive)] += this.drive(channel, sources, dtMs, this.state[c]);
+    for (const [i, of, gate, group] of this.gated) {
+      let share = 0, total = 0;
+      for (const g of gate) share += this.rate[g];
+      for (const g of group) total += this.rate[g];
+      this.rate[i] = total > 0 ? this.rate[of] * share / total : 0;
+    }
     const own = (axis) => (this.self[axis] === undefined ? 0 : this.rate[this.self[axis]]);
     this.carry({ fwd: own('fwd'), right: own('right') });
     this.turn(own('turned'));
@@ -153,7 +162,7 @@ export class Network {
       this.rate[i] += Math.min(1, dtMs / n.tauMs) * (Math.min(1, Math.max(0, input)) - this.rate[i]);
     }
     for (const [i, n] of this.neurons.entries()) {
-      if (n.tauMs !== undefined || n.evidence || this.sensory.has(i)) continue;
+      if (n.tauMs !== undefined || n.evidence || n.of || this.sensory.has(i)) continue;
       let input = n.bias ?? 0;
       for (const [p, w] of this.inputs[i]) input += w * this.rate[p];
       this.rate[i] = Math.max(0, input);

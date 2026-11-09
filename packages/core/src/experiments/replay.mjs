@@ -11,6 +11,7 @@
 //
 //   npx tsx packages/core/src/experiments/replay.mjs <zip>:<member>|<file.jsonl> ... [--check] [--estimator network|accumulator]
 //   npx tsx packages/core/src/experiments/replay.mjs --list            runs in every zip of sessions/
+//   npx tsx packages/core/src/experiments/replay.mjs <runs> --senses [--bands 50,120]   the senses against the truth
 //
 // --check prints, per trial the test logged, the locator and heading the
 // stream had at that moment beside the test's own numbers; the positions
@@ -49,7 +50,7 @@ const args = process.argv.slice(2);
 const flag = (f) => args.includes(f);
 const opt = (f, d) => { const i = args.indexOf(f); return i >= 0 ? args[i + 1] : d; };
 
-const specs = args.filter((a, i) => !a.startsWith('--') && !['--estimator', '--offset', '--param'].includes(args[i - 1] ?? ''));
+const specs = args.filter((a, i) => !a.startsWith('--') && !['--estimator', '--offset', '--param', '--bands'].includes(args[i - 1] ?? ''));
 const mod360 = (a) => ((a % 360) + 360) % 360;
 const angDiff = (a, b) => { const d = mod360(a - b); return d > 180 ? d - 360 : d; };
 
@@ -212,21 +213,25 @@ function senses (run, acc) {
   const sector = (a) => Math.round(mod360(a) / 45) % 8;
   let m = null;
   for (const e of ev) {
-    if (e.type === 'motion') { m = e; acc.exposure[sector(truth(m, run.at, offset))]++; acc.distExposure[band(m, run.at)]++; continue; }
+    if (e.type === 'motion') { m = e; const sec = sector(truth(m, run.at, offset)), b = band(m, run.at); acc.exposure[sec]++; acc.distExposure[b]++; acc.bandExposure[b][sec]++; continue; }
     if (!m) continue;
-    const sec = sector(truth(m, run.at, offset));
-    if (e.type === 'frame') { (acc.frames[e.channel] ??= new Array(8).fill(0))[sec]++; (acc.dist[e.channel] ??= new Array(BANDS).fill(0))[band(m, run.at)]++; }
-    else if (e.type === 'read') {
+    const sec = sector(truth(m, run.at, offset)), b = band(m, run.at);
+    if (e.type === 'frame') {
+      (acc.frames[e.channel] ??= new Array(8).fill(0))[sec]++; (acc.dist[e.channel] ??= new Array(BANDS).fill(0))[b]++;
+      ((acc.bandFrames[e.channel] ??= Array.from({ length: BANDS }, () => new Array(8).fill(0)))[b])[sec]++;
+    } else if (e.type === 'read') {
       const names = ['FL', 'FR', 'BR', 'BL'];
       const heard = names.filter((_, i) => e.payload[i] !== 255);
       if (heard.length === 4) acc.corners.flooded[sec]++;
-      else for (const c of heard) acc.corners[c][sec]++;
+      else for (const c of heard) { acc.corners[c][sec]++; acc.bandCorners[c][b][sec]++; }
     }
   }
 }
 
 if (flag('--senses')) {
-  const acc = { exposure: new Array(8).fill(0), frames: {}, corners: { FL: new Array(8).fill(0), FR: new Array(8).fill(0), BR: new Array(8).fill(0), BL: new Array(8).fill(0), flooded: new Array(8).fill(0) }, distExposure: new Array(BANDS).fill(0), dist: {} };
+  const grid = () => Array.from({ length: BANDS }, () => new Array(8).fill(0));
+  const acc = { exposure: new Array(8).fill(0), frames: {}, corners: { FL: new Array(8).fill(0), FR: new Array(8).fill(0), BR: new Array(8).fill(0), BL: new Array(8).fill(0), flooded: new Array(8).fill(0) }, distExposure: new Array(BANDS).fill(0), dist: {},
+    bandExposure: grid(), bandFrames: {}, bandCorners: { FL: grid(), FR: grid(), BR: grid(), BL: grid() } };
   for (const spec of specs) for (const r of runs(load(spec)).filter((x) => x.at)) senses(r, acc);
   const row = (name, a) => `${name.padEnd(10)} ${a.map((v) => String(v).padStart(6)).join('')}  ${String(a.reduce((x, y) => x + y, 0)).padStart(7)}`;
   console.log(`sector:    ${['0', '45', '90', '135', '180', '225', '270', '315'].map((v) => v.padStart(6)).join('')}    total   (sender's true bearing off the nose, clockwise)`);
@@ -238,6 +243,19 @@ if (flag('--senses')) {
   console.log(`\ndistance:  ${Array.from({ length: BANDS }, (_, i) => (i === BANDS - 1 ? `${i * BAND_CM}+` : `${i * BAND_CM}`).padStart(6)).join('')}   (cm to the sender; frames per second of exposure)`);
   console.log(drow('exposure s', acc.distExposure.map((v) => Math.round(v / 20))));
   for (const ch of Object.keys(acc.dist).sort()) console.log(drow(`frame ch${ch}`, acc.dist[ch].map((v, i) => (acc.distExposure[i] ? (v / (acc.distExposure[i] / 20)).toFixed(2) : '-'))));
+  // by sector within bands of distance, `--bands 50,120`: the sector profile of each channel and corner, near and far apart;
+  // counts and seconds of exposure, so the builder can take them as they are
+  if (opt('--bands')) {
+    const edges = opt('--bands').split(',').map(Number), lo = [0, ...edges], hi = [...edges, Infinity];
+    const sum = (rows) => rows.reduce((a, r) => a.map((v, i) => v + r[i]), new Array(8).fill(0));
+    const within = (g, k) => sum(g.filter((_, b) => b * BAND_CM >= lo[k] && b * BAND_CM < hi[k]));
+    for (let k = 0; k < lo.length; k++) {
+      console.log(`\nband ${lo[k]}-${hi[k] === Infinity ? '' : hi[k]} cm:  ${['0', '45', '90', '135', '180', '225', '270', '315'].map((v) => v.padStart(6)).join('')}    total`);
+      console.log(row('exposure s', within(acc.bandExposure, k).map((v) => Math.round(v / 20))));
+      for (const c of ['FL', 'FR', 'BR', 'BL']) console.log(row(`read ${c}`, within(acc.bandCorners[c], k)));
+      for (const ch of Object.keys(acc.bandFrames).sort()) console.log(row(`frame ch${ch}`, within(acc.bandFrames[ch], k)));
+    }
+  }
   process.exit(0);
 }
 
