@@ -107,7 +107,8 @@ function runs (lines) {
 function sends (run) {
   const out = [];
   for (const e of run.lines) {
-    if (e.bolt !== run.sender || e.name !== 'action' || e.data?.name !== 'infrared') continue;
+    // a path run names no sender: whoever is not the seeker sends
+    if ((run.sender ? e.bolt !== run.sender : e.bolt === run.seeker) || e.name !== 'action' || e.data?.name !== 'infrared') continue;
     const p = e.data.payload ?? e.data.data;
     if (p?.length) out.push({ t: e.t, type: 'send', channel: p[0] });
   }

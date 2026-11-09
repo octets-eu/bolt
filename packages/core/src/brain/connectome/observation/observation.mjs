@@ -32,9 +32,13 @@ import { DeviceId, SensorCommand, Target } from '@bolt/core';
 
 const READ = { name: 'infraredReadings', device: DeviceId.sensor, id: SensorCommand.getInfraredReadings, target: Target.st, data: [] };
 // the listen's re-arm, fired past the queue like the reads: behind a command that lost its ack (a matrix picture,
-// 2026-11-09, run 10) the queued re-arm waited 3 s and the ear was off for the last 2.3 s of the approach
+// 2026-11-09, run 10) the queued re-arm waited 3 s and the ear was off for the last 2.3 s of the approach.
+// A fired write can fail on a busy link, and one that does leaves the ear off for good (the near path of
+// 2026-11-09, pass 1: 11 frames in 3 s, then none in 200 s): `tick` re-arms through the queue, the watchdog,
+// after SILENT_MS without a notify
 const LISTEN = { name: 'listenInfrared', device: DeviceId.sensor, id: SensorCommand.listenInfraredMessages, target: Target.st, data: [255, 255, 255, 255, 255] };
 const FIRE_MS = 300;   // ack timeout of a fired command that is not a timed read
+const SILENT_MS = 1500;   // the watchdog: nothing heard for this long, re-arm the listen through the queue
 const CORNER_NAMES = ['FL', 'FR', 'BR', 'BL'];
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -60,6 +64,7 @@ export class Observation {
     this.running = true;
     this.switchedAt = performance.now();   // the closeness has no mean yet: as after a switch of ladder
     this.release = await this.bolt.sensors.infrared.subscribe(({ payload }) => this.onNotify(payload[0] ?? 255));
+    this.armedAt = performance.now();
     await this.bolt.sensors.listenInfrared(true);
     void this.volleys();
   }
@@ -70,7 +75,8 @@ export class Observation {
   }
 
   onNotify (channel) {
-    void this.bolt.queue.fire(LISTEN, FIRE_MS).catch(() => {});   // a listen ends with the first message; past the queue, the ear never waits behind the hand
+    this.armedAt = performance.now();
+    void this.bolt.queue.fire(LISTEN, FIRE_MS).catch(() => { this.armedAt = 0; });   // a listen ends with the first message; past the queue, the ear never waits behind the hand; failed, the watchdog re-arms
     const level = this.channels.get(channel);
     if (!level) return;
     const t = performance.now();
@@ -216,6 +222,11 @@ export class Observation {
   tick (motion, forward = 0) {
     const now = performance.now();
     this.update(now);
+    if (this.running && now - (this.heardAt ?? this.armedAt ?? now) > SILENT_MS && now - (this.armedAt ?? 0) > SILENT_MS) {   // the watchdog
+      this.armedAt = now;
+      this.stats.rearmed = (this.stats.rearmed ?? 0) + 1;
+      void this.bolt.sensors.listenInfrared(true).catch(() => {});
+    }
     const e = this.events;
     this.events = this.fresh();
     const last = this.motion ?? motion;
