@@ -15,7 +15,7 @@ import { Plotter } from '../components/plotter/plotter';
 import { MatrixBrain } from './runner';
 import type { RunSummary } from './runner';
 
-export const ROLES = { seeker: 'SB-11DF', sender: 'SB-9129' };   // swapped 2026-11-08 evening: blue seeks, green sends
+export const ROLES = { seeker: 'SB-9129', sender: 'SB-11DF' };   // green seeks, blue sends (2026-11-09)
 const PRE_ROLL_CM = 120;
 
 let brain: MatrixBrain | null = null;

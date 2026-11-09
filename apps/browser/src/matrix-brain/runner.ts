@@ -17,21 +17,10 @@ import { Observation } from '../../../../packages/core/src/brain/connectome/obse
 import { ringVector } from '../../../../packages/core/src/brain/connectome/ring/ring.mjs';
 import { LadderSender } from '../../../../packages/core/src/brain/utils/ladder.mjs';
 import { motorCommand, MOTOR } from '../../../../packages/core/src/brain/connectome/motor/motor.mjs';
-import { ringdist } from '../../../../packages/core/src/experiments/replay-ringdist.mjs';
 import { connectome } from './connectome';
 import { ringPicture, peaks, PALETTE } from './render';
 
 const OWNER = 'brain';
-/**
- * The summing layer in front of the ring: every frame and every silent slot
- * by its level's measured profile, the corner reads, never forgetting, and a
- * distance belief from the levels' range profiles that carries the ring
- * along when the Bolt moves, by parallax (experiments/replay-ringdist.mjs:
- * 69 % on the recordings against the ring's 41, 42 % on the marked run of
- * 2026-11-08 against 3). Imprinted on the ring each step; the motor layer
- * and the matrix read the ring as before. Off, the ring is the agent's alone.
- */
-const SUMMING = true;
 /** The seeker's LEDs while the mode runs: the nose a dim yellow the camera tells from the blue-green ring, the tail off. */
 const NOSE_LED = [3, 3, 0] as const, TAIL_LED = [0, 0, 0] as const;
 const STEP_MS = 25;        // the shortest network step, as brain.mjs
@@ -55,7 +44,6 @@ export class MatrixBrain {
   readonly seeker: Bolt;
   readonly sender: Bolt;
   private net = new Network(connectome);
-  private sum = SUMMING ? ringdist({ wCorner: 3 }) : null;
   private obs: Observation & { afterVolley?: () => void; onRead: (payload: number[]) => void };
   private ladder: LadderSender;
   private range = 'long';
@@ -115,16 +103,7 @@ export class MatrixBrain {
     }
     await this.obs.start();
     this.obs.afterVolley = () => { if (this.options.motors) this.roll(); void this.draw(); };
-    if (this.sum) {
-      // the summing layer's events: the notifies, the landed reads through the observation layer, the motion below
-      const sum = this.sum;
-      this.releases.push(await this.seeker.sensors.infrared.subscribe(({ payload }) => sum.step({ t: performance.now(), type: 'frame', channel: payload[0] ?? 255 })));
-      const onRead = this.obs.onRead.bind(this.obs);
-      this.obs.onRead = (payload) => { onRead(payload); sum.step({ t: performance.now(), type: 'read', payload }); };
-    }
-
-    const turns: { t: number, turned: number }[] = [];
-    let last: number | null = null, lastHeading = 0;
+    let last: number | null = null;
     this.release = await this.seeker.sensors.motion.subscribe((s) => {
       const heading = mod360(-s.angles.yaw);
       this.heading = heading;
@@ -132,26 +111,19 @@ export class MatrixBrain {
         if (!this.start0) this.start0 = { x: s.locator.positionX, y: s.locator.positionY };
         else if (Math.hypot(s.locator.positionX - this.start0.x, s.locator.positionY - this.start0.y) > RUNAWAY_CM) this.end('runaway');
       }
-      if (last === null) { last = s.t; lastHeading = heading; this.commanded = heading; return; }
+      const motion = { heading, x: s.locator.positionX, y: s.locator.positionY };
+      if (last === null) { last = s.t; this.obs.tick(motion); this.commanded = heading; return; }
       if (s.t - last < STEP_MS) { this.obs.stats.bunched++; return; }
       const dt = Math.min(250, s.t - last);
-      const turned = ((heading - lastHeading + 540) % 360) - 180;
-      last = s.t; lastHeading = heading;
-      turns.push({ t: s.t, turned });
-      while (s.t - turns[0]!.t > 1000) turns.shift();
-      const still = turns.reduce((a, x) => a + Math.abs(x.turned), 0) < 20 ? 1 : 0;
-      const sources: Record<string, number> = this.obs.tick(this.options.motors ? this.cmd.speed / MOTOR.seekSpeed : 0, still);   // the motor's efference copy; by hand, 0
+      last = s.t;
+      const sources: Record<string, number> = this.obs.tick(motion, this.options.motors ? this.cmd.speed / MOTOR.seekSpeed : 0);   // the motor's efference copy; by hand, 0
       const corners = ['FL', 'FR', 'BR', 'BL'].filter((c) => sources[`corner.${c}`]);
       if (sources['frame.carrier'] || sources['frame.miss'] || corners.length) this.flashUntil = performance.now() + FLASH_MS;
       if (this.obs.stats.landed > this.landed) {
         this.landed = this.obs.stats.landed;
         this.seeker.log('info', `brain read landed: corners ${corners.join(' ') || 'none named'}`);
       }
-      this.net.step(sources, dt, turned);
-      if (this.sum) {
-        this.sum.step({ t: performance.now(), type: 'motion', heading, x: s.locator.positionX, y: s.locator.positionY, speed: 0 });
-        this.net.imprint(this.sum.rates());
-      }
+      this.net.step(sources, dt);
       const want: string = (this.net.get('REQ_SHORT') ?? 0) > 0.5 ? 'short' : 'long';
       if (want !== this.range) { this.range = want; this.ladder.switch(want); this.seeker.log('info', `brain ladder ${want}`); }
       if (this.options.motors && !this.obs.timed && Date.now() - this.lastRoll >= ROLL_MS) this.roll();
@@ -159,12 +131,11 @@ export class MatrixBrain {
     // before the frames are timed, and for the flash's end
     this.drawTimer = setInterval(() => { if (!this.obs.timed || (this.flashUntil && performance.now() > this.flashUntil)) void this.draw(); }, 100);
     this.stateTimer = setInterval(() => this.state(), STATE_MS);
-    const layer = this.sum ? 'summing layer on the ring' : 'the ring alone';
     if (this.options.motors) {
       const limitS = Math.max(20, 1.5 * SECONDS_PER_M * this.options.startCm / 100);
       setTimeout(() => this.end('time'), limitS * 1000);
-      this.seeker.log('info', `brain seek: seeker ${this.seeker.name} on sender ${this.sender.name}, ${layer}, ${this.options.startCm} cm given, limit ${limitS.toFixed(0)} s, speed ${MOTOR.seekSpeed}`);
-    } else this.seeker.log('info', `brain on: seeker ${this.seeker.name}, sender ${this.sender.name}, ${layer}, ladder long`);
+      this.seeker.log('info', `brain seek: seeker ${this.seeker.name} on sender ${this.sender.name}, ${this.options.startCm} cm given, limit ${limitS.toFixed(0)} s, speed ${MOTOR.seekSpeed}`);
+    } else this.seeker.log('info', `brain on: seeker ${this.seeker.name}, sender ${this.sender.name}, ladder long`);
   }
 
   /** The motor layer's roll, as brain.mjs: right after a volley, once the link is idle. */
@@ -215,7 +186,7 @@ export class MatrixBrain {
     const { angle, length, rates } = this.ring();
     const s = this.obs.stats;
     const p = peaks(rates).map((a) => Math.round(a)).join('/');
-    this.seeker.log('info', `brain ring ${Math.round((angle + 360) % 360)}° len ${length.toFixed(2)} yaw ${Math.round(this.heading)}${this.sum ? ` dist ${Math.round(this.sum.estimate().distance)}` : ''}${this.options.motors ? ` ${this.cmd.mode} speed ${Math.round(this.cmd.speed)}` : ''} peaks ${p || '-'} carrier ${this.obs.carrier ?? '-'} near ${this.obs.near ? 1 : 0} frames ${s.frames} reads ${s.reads} landed ${s.landed} named ${s.named} flooded ${s.flooded} misses ${s.misses}`);
+    this.seeker.log('info', `brain ring ${Math.round((angle + 360) % 360)}° len ${length.toFixed(2)} yaw ${Math.round(this.heading)}${` dist ${Math.round(this.net.estimate().distance ?? 0)}`}${this.options.motors ? ` ${this.cmd.mode} speed ${Math.round(this.cmd.speed)}` : ''} peaks ${p || '-'} carrier ${this.obs.carrier ?? '-'} near ${this.obs.near ? 1 : 0} frames ${s.frames} reads ${s.reads} landed ${s.landed} named ${s.named} flooded ${s.flooded} misses ${s.misses}`);
   }
 
   async stop (): Promise<void> {

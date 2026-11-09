@@ -9,7 +9,7 @@
 // estimator that takes the same events can be run over the run, as often
 // as wanted, without a Bolt. The locator's slip is the truth's error bar.
 //
-//   npx tsx packages/core/src/experiments/replay.mjs <zip>:<member>|<file.jsonl> ... [--check] [--estimator baseline]
+//   npx tsx packages/core/src/experiments/replay.mjs <zip>:<member>|<file.jsonl> ... [--check] [--estimator network|accumulator]
 //   npx tsx packages/core/src/experiments/replay.mjs --list            runs in every zip of sessions/
 //
 // --check prints, per trial the test logged, the locator and heading the
@@ -31,10 +31,8 @@
 
 import { execFileSync } from 'node:child_process';
 import { readFileSync, readdirSync } from 'node:fs';
-import { baseline } from './replay-baseline.mjs';
+import { network } from './replay-network.mjs';
 import { accumulator } from './replay-accumulator.mjs';
-import { bayes } from './replay-bayes.mjs';
-import { ringdist } from './replay-ringdist.mjs';
 
 const LOCK_DEG = 30, LOCK_S = 3;
 const RUNS = /^(sweepTest|approachTest)\.(in|out)|^brain (seek)(:| found| time| runaway| stopped)|^brain (path) (start|done)/;
@@ -254,12 +252,12 @@ if (flag('--list')) {
   process.exit(0);
 }
 
-const ESTIMATORS = { baseline, accumulator, bayes, ringdist };
-if (!specs.length) { console.error('usage: replay.mjs <zip>:<member>|<file.jsonl> ... [--check] [--estimator baseline] | --list'); process.exit(1); }
+const ESTIMATORS = { network, accumulator };
+if (!specs.length) { console.error('usage: replay.mjs <zip>:<member>|<file.jsonl> ... [--check] [--estimator network] | --list'); process.exit(1); }
 /** `--param tauMs=60000,wCorner=10`: the estimator's parameters, numbers. */
 const params = Object.fromEntries((opt('--param', '') || '').split(',').filter(Boolean).map((kv) => { const [k, v] = kv.split('='); return [k, Number(v)]; }));
-const make = () => ESTIMATORS[opt('--estimator', 'baseline')](params);
-if (!ESTIMATORS[opt('--estimator', 'baseline')]) { console.error(`no estimator ${opt('--estimator')}; have ${Object.keys(ESTIMATORS).join(', ')}`); process.exit(1); }
+const make = () => ESTIMATORS[opt('--estimator', 'network')](params);
+if (!ESTIMATORS[opt('--estimator', 'network')]) { console.error(`no estimator ${opt('--estimator')}; have ${Object.keys(ESTIMATORS).join(', ')}`); process.exit(1); }
 const all = [];
 for (const spec of specs) {
   const rs = runs(load(spec)).filter((r) => r.at);
@@ -278,7 +276,7 @@ if (all.length) {
   // the error by time since the run's start: does it keep falling as frames accumulate
   const buckets = [[0, 10], [10, 30], [30, 60], [60, 120], [120, 1e9]];
   console.log('  |err| by time since start: ' + buckets.map(([a, b]) => { const x = secs.filter((v) => v.t >= a && v.t < b); return x.length ? `${a}-${b === 1e9 ? '' : b} s ${mean(x, (v) => v.err).toFixed(0)}° (${(100 * x.filter((v) => v.err < LOCK_DEG).length / x.length).toFixed(0)} %)` : ''; }).filter(Boolean).join(', '));
-  console.log(`${opt('--estimator', 'baseline')}${opt('--param') ? ' ' + opt('--param') : ''}: ${all.length} runs, ${secs.length} s; locked ${locks.length} of ${all.length}, median lock ${locks.length ? locks[Math.floor(locks.length / 2)] : '-'} s; `
+  console.log(`${opt('--estimator', 'network')}${opt('--param') ? ' ' + opt('--param') : ''}: ${all.length} runs, ${secs.length} s; locked ${locks.length} of ${all.length}, median lock ${locks.length ? locks[Math.floor(locks.length / 2)] : '-'} s; `
     + `seconds under ${LOCK_DEG}°: ${(100 * secs.filter((x) => x.err < LOCK_DEG).length / secs.length).toFixed(0)} %; mean |err| ${mean(secs, (x) => x.err).toFixed(0)}°; mean len ${mean(secs, (x) => x.length).toFixed(2)}`
     + (secs.some((x) => x.dErr !== null) ? `; distance: mean ${mean(secs.filter((x) => x.dErr !== null), (x) => x.dErr).toFixed(0)} cm off, mean |off| ${mean(secs.filter((x) => x.dErr !== null), (x) => Math.abs(x.dErr)).toFixed(0)} cm` : ''));
 }

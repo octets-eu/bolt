@@ -1,10 +1,11 @@
 // sensory_map.jsonc — the seeker's senses into the circuit's sensory neurons,
 // in the worm's format (examples/worm): every channel a named source through
 // a pipeline of typed ops into a drive, a neuron of circuit.json. The sources
-// are what observation/observation.mjs makes of the infrared, per tick of the
-// motion stream (50 ms): an event is 1 on the tick it happened, else 0.
+// are what observation/observation.mjs makes of the infrared and of the
+// motion stream, per tick of the stream (50 ms): an event counts on the tick
+// it happened, else 0; the Bolt's own turn and step are the tick's.
 // Ops: gain k; rate tauMs, events per second, smoothed; clamp lo hi; mul by
-// another source. The `ir` block is what the observation layer knows of the
+// another source; sub k; adapt tauMs, the value less its own mean. The `ir` block is what the observation layer knows of the
 // ladder and the receivers (docs/bolt-reference.md section 7, communication.ts).
 {
   "ir": {
@@ -35,39 +36,44 @@
 
   "channels": [
     // a read that landed: the corners that heard the frame, unless all four
-    // (the sender on top, or a level heard all round) or two opposite ones
+    // (the sender on top, or a level heard all round) or two opposite ones;
+    // onto the ring by the corner's measured profile (build-circuit.mjs);
     // a corner read is worth about three frames (replay bench, 2026-11-08)
     { "drive": "IR_FL", "source": "corner.FL", "pipeline": [ { "op": "gain", "k": 3 } ] },
     { "drive": "IR_FR", "source": "corner.FR", "pipeline": [ { "op": "gain", "k": 3 } ] },
     { "drive": "IR_BR", "source": "corner.BR", "pipeline": [ { "op": "gain", "k": 3 } ] },
     { "drive": "IR_BL", "source": "corner.BL", "pipeline": [ { "op": "gain", "k": 3 } ] },
 
-    // a frame of the carrier: the sender within the lobe, ahead or behind
-    { "drive": "IR_AX", "source": "frame.carrier", "pipeline": [] },
-    // a whole round of the ladder heard without its carrier: the sender is outside the lobe;
-    // without it, the nose confirmed itself anywhere in a wide lobe and runs passed 20 cm off (2026-11-06)
-    // Standing only (self.still: under 20 deg turned in the last second): turning, the lobe leaves the
-    // sender within the round, and the miss erased a bump of four corner reads the seeker was turning to (2026-11-07)
-    { "drive": "IR_MISS", "source": "frame.miss", "pipeline": [ { "op": "mul", "by": "self.still" } ] },
+    // every frame heard, by channel: onto the ring by the channel's sector profile and onto
+    // the distance by its strength's range profile; a second notify of one frame, within 100 ms, is not counted
+    { "drive": "IR_CH0", "source": "frame.ch0", "pipeline": [] },
+    { "drive": "IR_CH1", "source": "frame.ch1", "pipeline": [] },
+    { "drive": "IR_CH2", "source": "frame.ch2", "pipeline": [] },
+    { "drive": "IR_CH3", "source": "frame.ch3", "pipeline": [] },
+    { "drive": "IR_CH4", "source": "frame.ch4", "pipeline": [] },
+    { "drive": "IR_CH5", "source": "frame.ch5", "pipeline": [] },
+    { "drive": "IR_CH6", "source": "frame.ch6", "pipeline": [] },
 
-    // no carrier step: a weaker level arriving is as often the nose turning into the
-    // lobe as the sender coming closer; it tipped the ring to the nose wrongly (2026-11-06, run 17:06)
-
-    // the gradient, the worm's way: closeness, log2(32 / strength) summed per
-    // second over the frames heard, against its own mean over 4 s; rising while
-    // driving ahead says ahead, falling says behind. Its noise is about 2 per s,
-    // so only what stands out of it counts. It weighs carrier frames only, toward
-    // the nose or the tail: fed on its own it pinned the ring to the nose wherever
-    // that pointed, and runs aimed 20 cm off and passed (2026-11-06).
-    { "drive": "IR_APPROACH", "source": "frame.closeness", "pipeline": [ { "op": "rate", "tauMs": 1500 }, { "op": "adapt", "tauMs": 4000 },
-        { "op": "mul", "by": "self.forward" }, { "op": "mul", "by": "ladder.settled" }, { "op": "sub", "k": 1.5 }, { "op": "gain", "k": 0.15 }, { "op": "clamp", "lo": 0, "hi": 1 }, { "op": "mul", "by": "frame.carrier" } ] },
-    { "drive": "IR_RECEDE", "source": "frame.closeness", "pipeline": [ { "op": "rate", "tauMs": 1500 }, { "op": "adapt", "tauMs": 4000 }, { "op": "gain", "k": -1 },
-        { "op": "mul", "by": "self.forward" }, { "op": "mul", "by": "ladder.settled" }, { "op": "sub", "k": 1.5 }, { "op": "gain", "k": 0.15 }, { "op": "clamp", "lo": 0, "hi": 1 }, { "op": "mul", "by": "frame.carrier" } ] },
+    // every slot of the sender's schedule that went silent, by the channel it was sent on
+    // (observation.mjs slots): onto the ring by the profile of not hearing that channel
+    { "drive": "IR_SLOT0", "source": "slot.ch0", "pipeline": [] },
+    { "drive": "IR_SLOT1", "source": "slot.ch1", "pipeline": [] },
+    { "drive": "IR_SLOT2", "source": "slot.ch2", "pipeline": [] },
+    { "drive": "IR_SLOT3", "source": "slot.ch3", "pipeline": [] },
+    { "drive": "IR_SLOT4", "source": "slot.ch4", "pipeline": [] },
+    { "drive": "IR_SLOT5", "source": "slot.ch5", "pipeline": [] },
+    { "drive": "IR_SLOT6", "source": "slot.ch6", "pipeline": [] },
 
     // anything of the ladder: the sender is in range at all; frames per second
     { "drive": "IR_ANY", "source": "frame.any", "pipeline": [ { "op": "rate", "tauMs": 3000 } ] },
 
     // the ladder's state, held by the observation layer with its hysteresis
-    { "drive": "IR_NEAR", "source": "ladder.near", "pipeline": [] }
+    { "drive": "IR_NEAR", "source": "ladder.near", "pipeline": [] },
+
+    // the Bolt's own motion since the last tick, from the yaw and the locator: the turn in degrees clockwise,
+    // the step in cm in its own frame; the network's shift rules read these neurons (network.mjs)
+    { "drive": "SELF_TURN", "source": "self.turned", "pipeline": [] },
+    { "drive": "SELF_FWD", "source": "self.fwd", "pipeline": [] },
+    { "drive": "SELF_RIGHT", "source": "self.right", "pipeline": [] }
   ]
 }

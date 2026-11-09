@@ -35,8 +35,7 @@ export class Brain {
     const { motor } = this.bolt.actuators;
     await motor.stabilize(StabilizationIndex.full);
     await this.obs.start();
-    const turns = [];   // the last second's turns, for the efference copy self.still
-    let last = null, lastHeading = null, lastRoll = 0, commanded = null, heading = 0;
+    let last = null, lastRoll = 0, commanded = null, heading = 0;
     const roll = () => {
       if (commanded === null || this.stopped || this.bolt.queue.pending > 0) return;
       const now = Date.now();
@@ -50,19 +49,14 @@ export class Brain {
     this.obs.afterVolley = roll;
     this.release = await this.bolt.sensors.motion.subscribe((s) => {
       heading = mod360(-s.angles.yaw);
-      if (last === null) { last = s.t; lastHeading = heading; commanded = heading; return; }
+      const motion = { heading, x: s.locator.positionX, y: s.locator.positionY };
+      if (last === null) { last = s.t; this.obs.tick(motion); commanded = heading; return; }
       // the samples' times are their arrivals, which the link now and then bunches (13 in 50 s,
       // 2026-11-07): a step of 1 ms would take a corner read in at 1/250 of its weight; events and the turn wait
       if (s.t - last < STEP_MS) { this.obs.stats.bunched++; return; }
       const dt = Math.min(250, s.t - last);
-      const turned = ((heading - lastHeading + 540) % 360) - 180;
-      last = s.t; lastHeading = heading;
-
-      turns.push({ t: s.t, turned });
-      while (s.t - turns[0].t > 1000) turns.shift();
-      const still = turns.reduce((a, x) => a + Math.abs(x.turned), 0) < 20 ? 1 : 0;
-      const sources = this.obs.tick(this.cmd.speed / MOTOR.seekSpeed, still);
-      this.net.step(sources, dt, turned);
+      last = s.t;
+      this.net.step(this.obs.tick(motion, this.cmd.speed / MOTOR.seekSpeed), dt);
       const want = this.net.get('REQ_SHORT') > 0.5 ? 'short' : 'long';
       if (want !== this.ladder) { this.ladder = want; this.onLadder(want); }
 
@@ -71,8 +65,8 @@ export class Brain {
     });
   }
 
-  /** What the ring holds now: direction off the nose, length, and the rates. */
-  ring () { const r = this.net.ringRates(); return { ...ringVector(r), rates: r }; }
+  /** What the ring holds now: direction off the nose, length, the rates, and the believed distance. */
+  ring () { const r = this.net.ringRates(); return { ...ringVector(r), rates: r, distance: this.net.estimate().distance }; }
 
   /** The motor first: unsubscribing first, the last roll drove on 40 cm past the tag (2026-11-07). */
   async stop () {

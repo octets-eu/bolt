@@ -17,6 +17,11 @@
 //   landed in 3 to 8 % of the frames. So each channel keeps its own expected
 //   notify, recurring once a round; the sender holds the round's schedule
 //   (utils/ladder.mjs).
+// - The motion stream, handed to `tick` as the sample the brain steps on:
+//   the Bolt's own turn since the last tick, `self.turned`, and its step
+//   over the floor in its own frame, `self.fwd` and `self.right`, from the
+//   yaw and the locator; `self.still`, under 20 deg turned in the last
+//   second; `self.forward`, the motor's efference copy the caller gives.
 //
 // `tick` turns what came since the last tick into the sources and clears the
 // events. Uses the Bolt's lower layers only: the infrared stream and the
@@ -39,6 +44,8 @@ export class Observation {
     this.expect = new Map();     // channel -> { t, heard }: its next notify expected at t + k rounds, last heard
     this.carrier = null;         // strength of the carrier
     this.near = false;
+    this.motion = null;          // the last tick's motion sample
+    this.turns = [];             // the last second's turns, for self.still
     this.stats = { misses: 0, frames: 0, reads: 0, landed: 0, named: 0, flooded: 0, bunched: 0 };
   }
 
@@ -193,14 +200,30 @@ export class Observation {
     if (!this.near) this.nearSince = undefined;
   }
 
-  /** The sources of this tick; `forward` (0..1) and `still` (0 or 1) are the motor's efference copies. */
-  tick (forward, still) {
-    this.update(performance.now());
+  /**
+   * The sources of this tick. `motion` is the sample the brain steps on,
+   * `{ heading, x, y }`: the heading clockwise from the locator's +y, the
+   * reset's nose, the locator in cm; the turn and the step are taken from the
+   * last tick's sample, the step in the Bolt's frame of that sample, forward
+   * along its heading and right across it. `forward` (0..1) is the motor's
+   * efference copy.
+   */
+  tick (motion, forward = 0) {
+    const now = performance.now();
+    this.update(now);
     const e = this.events;
     this.events = this.fresh();
+    const last = this.motion ?? motion;
+    const turned = ((motion.heading - last.heading + 540) % 360) - 180;
+    const h = last.heading * Math.PI / 180, dx = motion.x - last.x, dy = motion.y - last.y;
+    this.motion = motion;
+    this.turns.push({ t: now, turned });
+    while (now - this.turns[0].t > 1000) this.turns.shift();
+    const still = this.turns.reduce((a, x) => a + Math.abs(x.turned), 0) < 20 ? 1 : 0;
     const s = { 'frame.carrier': e.carrier, 'frame.miss': e.miss, 'frame.any': e.any, 'carrier.down': e.down, 'carrier.up': e.up,
       'ladder.near': this.near ? 1 : 0, 'self.forward': forward, 'self.still': still,
-      'frame.closeness': e.closeness, 'ladder.settled': performance.now() - (this.switchedAt ?? -Infinity) > this.ir.settleMs ? 1 : 0 };
+      'self.turned': turned, 'self.fwd': dx * Math.sin(h) + dy * Math.cos(h), 'self.right': dx * Math.cos(h) - dy * Math.sin(h),
+      'frame.closeness': e.closeness, 'ladder.settled': now - (this.switchedAt ?? -Infinity) > this.ir.settleMs ? 1 : 0 };
     for (const c of CORNER_NAMES) s[`corner.${c}`] = e.corners.has(c) ? 1 : 0;
     for (const ch of this.channels.keys()) { s[`frame.ch${ch}`] = e.frames[ch] ?? 0; s[`slot.ch${ch}`] = e.slots[ch] ?? 0; }
     return s;

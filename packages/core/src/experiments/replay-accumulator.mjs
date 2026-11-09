@@ -32,8 +32,7 @@ export function accumulator (params = {}) {
   performance.now = () => now;
   obs.switchedAt = 0;
   let map = new Float64Array(N);
-  let last = null, lastHeading = 0;
-  const turns = [];
+  let last = null, lastHeading = 0;   // the turn is taken here too, for the shift
   const angleOf = (j) => j * 360 / N;
   const add = (centre, w, width) => { for (let j = 0; j < N; j++) map[j] = Math.max(0, map[j] + w * lobe(angleOf(j), centre, width)); };
   const shift = (d) => {   // the world turns by -d around a Bolt that turned by d
@@ -51,15 +50,12 @@ export function accumulator (params = {}) {
       const dt = Math.min(250, e.t - last);
       const turned = ((e.heading - lastHeading + 540) % 360) - 180;
       last = e.t; lastHeading = e.heading;
-      turns.push({ t: e.t, turned });
-      while (e.t - turns[0].t > 1000) turns.shift();
-      const still = turns.reduce((a, x) => a + Math.abs(x.turned), 0) < 20 ? 1 : 0;
-      const s = obs.tick(0, still);
+      const s = obs.tick(e);
       shift(turned);
       const decay = Math.exp(-dt / p.tauMs);
       for (let j = 0; j < N; j++) map[j] *= decay;
       if (s['frame.carrier']) { add(0, p.wAx, p.lobeAx); add(180, p.wAx, p.lobeAx); }
-      if (s['frame.miss'] && still) { add(0, -p.wMiss, p.lobeAx); add(180, -p.wMiss, p.lobeAx); }
+      if (s['frame.miss'] && s['self.still']) { add(0, -p.wMiss, p.lobeAx); add(180, -p.wMiss, p.lobeAx); }
       for (const [c, a] of Object.entries(CORNERS)) if (s[`corner.${c}`]) add(a, p.wCorner, p.lobeCorner);
     },
     estimate () {
