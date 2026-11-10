@@ -20,3 +20,7 @@ diary/
 # the bench's runs, cut from apps/browser/sessions/ and frames/ by bench/extract.mjs
 bench/*/
 bench/index.tsv
+
+# retired work and documentation material, kept locally, not in the repo
+/archive/
+/documentation/

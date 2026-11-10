@@ -1,18 +1,25 @@
 // The bench over its runs: experiments/replay.mjs scores the brain over
 // bench/<n>/session.jsonl (bench/extract.mjs), one line per run with its
-// number, then the total. Arguments go to replay.mjs, and so does the
-// environment: CIRCUIT=<path> scores a circuit under test.
+// number, then the total. Only runs with a truth are scored: a seek with its
+// mark, which carries the sender's place, and a path. Numbers and ranges
+// pick runs (`1-10 14`); every other argument goes to replay.mjs, and so does
+// the environment: CIRCUIT=<path> scores a circuit under test.
 //
-//   node bench/run.mjs [--trace] [--estimator network]
+//   node bench/run.mjs [n | n-m ...] [--trace] [--estimator network]
 
 import { execFileSync } from 'node:child_process';
-import { readdirSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 
 process.chdir(new URL('..', import.meta.url).pathname);
-const ns = readdirSync('bench').filter((d) => /^\d+$/.test(d)).map(Number).sort((a, b) => a - b);
-const out = execFileSync('npx', ['tsx', 'packages/core/src/experiments/replay.mjs', ...ns.map((n) => `bench/${n}/session.jsonl`), ...process.argv.slice(2)], { encoding: 'utf8', maxBuffer: 1 << 26 });
-let k = -1;   // each file holds one run, so the runs come in the files' order
+const [head, ...rows] = readFileSync('bench/index.tsv', 'utf8').split('\n').filter(Boolean).map((l) => l.split('\t'));
+const col = (r, name) => r[head.indexOf(name)];
+const picks = process.argv.slice(2).filter((a) => /^\d+(-\d+)?$/.test(a)).map((a) => a.split('-').map(Number));
+const args = process.argv.slice(2).filter((a) => !/^\d+(-\d+)?$/.test(a));
+const ns = rows.filter((r) => col(r, 'mark') === 'yes' || col(r, 'kind') === 'path').map((r) => Number(col(r, 'n')))
+  .filter((n) => !picks.length || picks.some(([a, b = a]) => n >= a && n <= b));
+const out = execFileSync('npx', ['tsx', 'packages/core/src/experiments/replay.mjs', ...ns.map((n) => `bench/${n}/session.jsonl`), ...args], { encoding: 'utf8', maxBuffer: 1 << 26 });
+let k = -1;   // each file holds one run with a truth, so the runs come in the files' order
 for (const line of out.split('\n')) {
-  if (/^  (seek|path|sweepTest|approachTest) /.test(line)) k++;
-  if (line) console.log(/^  \S/.test(line) && !line.startsWith('  |') ? `${String(ns[k]).padStart(3)} ${line.trimStart()}` : line);
+  if (/^  (seek|path) /.test(line)) k++;
+  if (line) console.log(/^  (seek|path) /.test(line) ? `${String(ns[k]).padStart(3)} ${line.trimStart()}` : line);
 }
