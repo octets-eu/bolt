@@ -42,6 +42,6 @@ You are an assistant, which helps on the journey. Your contributions are
 - raw rows only when a summary cannot answer the question
 
 #### Docs folder
-- `docs/hide-and-seek.md` is the goal: what happens in a game, for a reader of 16 and up. `docs/bolt-reference.md` is how a Bolt works, independent of floor and room. `docs/recipes.md` is temporary know-how; an entry is deleted when it becomes a function with a header. `docs/process.md` is how the brain is built, the loop from rule to run to tables to weights to neurons. `docs/brain-view.plan.md` is the plan for the brain tab, the connectome as a body. `docs/terms.png` is the vocabulary. `docs/archive/` is retired and never edited. `docs/private/` is ignored by git and holds hosts, paths and certificates.
+- `docs/hide-and-seek.md` is the goal: what happens in a game, for a reader of 16 and up. `docs/bolt-reference.md` is how a Bolt works, independent of floor and room. `docs/recipes.md` is temporary know-how; an entry is deleted when it becomes a function with a header. `docs/brain-view.plan.md` is the plan for the brain tab, the connectome as a body. `docs/terms.png` is the vocabulary. `docs/archive/` is retired and never edited. `docs/private/` is ignored by git and holds hosts, paths and certificates.
 - Docs are present tense, the state of now: no dates in the body, no log, no diary. Measurements go to the commit message.
 - A doc that explains code is a sign the code needs a better header.

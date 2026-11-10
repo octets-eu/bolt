@@ -5,8 +5,7 @@
 // off with no belief, green at a low vector, red at FULL. Those are the three
 // states the phone over the floor tells apart, white-cyan, pink and dark; it
 // exposes for the boards, green fills the matrix at 40 and blooms white from
-// 80, red does so at a quarter of that (docs/matrix-brain.plan.md, the
-// calibration of 2026-11-08). The palette is one fixed set, black, 7 green
+// 80, red does so at a quarter of that (the calibration of 2026-11-08). The palette is one fixed set, black, 7 green
 // levels, 8 red levels, stored once before the volleys load the link: the
 // 56-byte palette write timed out behind them, every time (2026-11-08). So a
 // draw is the frame and a play, and confidence picks the green or the red

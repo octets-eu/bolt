@@ -9,16 +9,12 @@
 // estimator that takes the same events can be run over the run, as often
 // as wanted, without a Bolt. The locator's slip is the truth's error bar.
 //
-//   npx tsx packages/core/src/experiments/replay.mjs <zip>:<member>|<file.jsonl> ... [--check] [--estimator network|accumulator]
+//   npx tsx packages/core/src/experiments/replay.mjs <zip>:<member>|<file.jsonl> ... [--check]
 //   npx tsx packages/core/src/experiments/replay.mjs --list            runs in every zip of sessions/
-//   npx tsx packages/core/src/experiments/replay.mjs <runs> --senses [--bands 50,120] [--write]   the senses against the truth, exposure per ladder sent
 //
 // --check prints, per trial the test logged, the locator and heading the
 // stream had at that moment beside the test's own numbers; the positions
 // agree, the tests' headings sit 90° off the stream's (see headingOffset).
-// --senses tabulates the corner reads and the frames per channel against
-// the sender's true sector, the check of the frame and of what the senses
-// carry, no estimator involved.
 //
 // Events to an estimator, in time order: { t, type: 'motion', heading, x, y, speed }
 // (t in ms, heading clockwise from the locator's +y, the brain's convention),
@@ -31,14 +27,10 @@
 // of seconds under LOCK_DEG, the mean absolute error, the mean length.
 
 import { execFileSync } from 'node:child_process';
-import { readFileSync, readdirSync, writeFileSync } from 'node:fs';
-import { loadConnectome } from '../brain/connectome/load.mjs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { network } from './replay-network.mjs';
-import { accumulator } from './replay-accumulator.mjs';
 
 const LOCK_DEG = 30, LOCK_S = 3;
-/** channel -> ladder, from the sensory map's `ir.channels` */
-const LADDER_OF = Object.fromEntries(Object.entries(loadConnectome().map.ir.channels).map(([ch, [ladder]]) => [ch, ladder]));
 const RUNS = /^(sweepTest|approachTest)\.(in|out)|^brain (seek)(:| found| time| runaway| stopped)|^brain (path) (start|done)/;
 /** A path run (the mode by hand, the seeker driven by its navigation from the plan's starts): the sender 23 cm behind the reset, in the seeker's locator frame. */
 const PATH_AT = { x: 0, y: -23 };
@@ -53,7 +45,7 @@ const args = process.argv.slice(2);
 const flag = (f) => args.includes(f);
 const opt = (f, d) => { const i = args.indexOf(f); return i >= 0 ? args[i + 1] : d; };
 
-const specs = args.filter((a, i) => !a.startsWith('--') && !['--estimator', '--offset', '--param', '--bands'].includes(args[i - 1] ?? ''));
+const specs = args.filter((a, i) => !a.startsWith('--') && !['--estimator', '--offset', '--param'].includes(args[i - 1] ?? ''));
 const mod360 = (a) => ((a % 360) + 360) % 360;
 const angDiff = (a, b) => { const d = mod360(a - b); return d > 180 ? d - 360 : d; };
 
@@ -103,18 +95,6 @@ function runs (lines) {
   return out;
 }
 
-/** The sender's sends of a run, `{ t, type: 'send', channel }`: which ladder was on when (the senses only). */
-function sends (run) {
-  const out = [];
-  for (const e of run.lines) {
-    // a path run names no sender: whoever is not the seeker sends
-    if ((run.sender ? e.bolt !== run.sender : e.bolt === run.seeker) || e.name !== 'action' || e.data?.name !== 'infrared') continue;
-    const p = e.data.payload ?? e.data.data;
-    if (p?.length) out.push({ t: e.t, type: 'send', channel: p[0] });
-  }
-  return out;
-}
-
 /** The seeker's events of a run, in order. */
 function events (run) {
   const out = [];
@@ -157,8 +137,8 @@ function trials (run) {
  * at 315, FR at 0 to 45, BR at 135, BL at 180 to 225, and the weak rungs
  * are heard ahead and behind and fall silent abeam, as pass-by measured;
  * with the +-90 the tests' own trial `heading` lines imply, every sense is
- * off by a quarter turn (2026-11-08, `--senses --offset`). `--offset N`
- * forces another value, to test a frame against the senses.
+ * off by a quarter turn (2026-11-08). `--offset N`
+ * forces another value.
  */
 function headingOffset () {
   return opt('--offset') !== undefined ? Number(opt('--offset')) : 0;
@@ -212,94 +192,6 @@ function check (run) {
   }
 }
 
-/**
- * The senses against the truth, no estimator: per corner named by a landed
- * read, where the sender really was, in 8 sectors of 45° about the nose
- * (sector 0 is -22.5 to 22.5); per channel, the frames heard by the sender's
- * sector; the share of all 20 Hz samples by sector as the exposure.
- */
-/** Distance bands for the senses, cm: 0-20, 20-40, ... 180-200, 200 and more. */
-const BANDS = 11, BAND_CM = 20;
-const band = (m, at) => Math.min(BANDS - 1, Math.floor(Math.hypot(at.x - m.x, at.y - m.y) / BAND_CM));
-
-/**
- * The exposure is counted per ladder the sender was sending, from its logged
- * sends: a channel of the short ladder can only be heard while that ladder is
- * on, and the brain asks for it when it believes it is near, so against the
- * whole exposure the short channels looked five times more frequent ahead
- * than behind under 40 cm (the approaches), an artefact that pinned the
- * belief ahead through a pass (run 11, 2026-11-09).
- */
-function senses (run, acc) {
-  const ev = [...events(run), ...sends(run)].sort((a, b) => a.t - b.t);
-  const offset = headingOffset();
-  const sector = (a) => Math.round(mod360(a) / 45) % 8;
-  const ladderOf = (ch) => LADDER_OF[ch];
-  let m = null, range = null, lastFrame = -Infinity;
-  for (const e of ev) {
-    if (e.type === 'send') { range = ladderOf(e.channel) ?? range; continue; }
-    if (e.type === 'motion') {
-      m = e;
-      if (!range) continue;   // before the first send nothing can be heard: no exposure
-      const sec = sector(truth(m, run.at, offset)), b = band(m, run.at), x = acc.exposure[range];
-      x.sector[sec]++; x.band[b]++; x.bandSector[b][sec]++;
-      continue;
-    }
-    if (!m) continue;
-    const sec = sector(truth(m, run.at, offset)), b = band(m, run.at);
-    if (e.type === 'frame') {
-      if (e.t - lastFrame <= 100) continue;   // a second notify of one frame, within 100 ms, as the observation layer counts
-      lastFrame = e.t;
-      const f = (acc.frames[e.channel] ??= { sector: new Array(8).fill(0), band: new Array(BANDS).fill(0), bandSector: Array.from({ length: BANDS }, () => new Array(8).fill(0)) });
-      f.sector[sec]++; f.band[b]++; f.bandSector[b][sec]++;
-    } else if (e.type === 'read') {
-      const names = ['FL', 'FR', 'BR', 'BL'];
-      const heard = names.filter((_, i) => e.payload[i] !== 255);
-      if (heard.length === 4) acc.flooded[sec]++;
-      else for (const c of heard) { acc.corners[c].sector[sec]++; acc.corners[c].bandSector[b][sec]++; }
-    }
-  }
-}
-
-if (flag('--senses')) {
-  const grid = () => Array.from({ length: BANDS }, () => new Array(8).fill(0));
-  const exposure = () => ({ sector: new Array(8).fill(0), band: new Array(BANDS).fill(0), bandSector: grid() });
-  const acc = { exposure: { long: exposure(), short: exposure() }, frames: {}, corners: Object.fromEntries(['FL', 'FR', 'BR', 'BL'].map((c) => [c, { sector: new Array(8).fill(0), bandSector: grid() }])), flooded: new Array(8).fill(0), runs: 0 };
-  for (const spec of specs) for (const r of runs(load(spec)).filter((x) => x.at)) { senses(r, acc); acc.runs++; }
-  const secs = (a) => a.map((v) => Math.round(v / 20));   // samples at 20 Hz to seconds
-  const row = (name, a) => `${name.padEnd(12)} ${a.map((v) => String(v).padStart(6)).join('')}  ${String(a.reduce((x, y) => x + y, 0)).padStart(7)}`;
-  const total = (k) => acc.exposure.long[k].map((v, i) => v + acc.exposure.short[k][i]);
-  console.log(`sector:      ${['0', '45', '90', '135', '180', '225', '270', '315'].map((v) => v.padStart(6)).join('')}    total   (sender's true bearing off the nose, clockwise; exposure in s per ladder sent)`);
-  for (const l of ['long', 'short']) console.log(row(`exposure ${l}`, secs(acc.exposure[l].sector)));
-  for (const c of ['FL', 'FR', 'BR', 'BL']) console.log(row(`read ${c}`, acc.corners[c].sector));
-  console.log(row('read flooded', acc.flooded));
-  for (const ch of Object.keys(acc.frames).sort()) console.log(row(`frame ch${ch}`, acc.frames[ch].sector));
-  // by distance: frames per second of the channel's ladder's exposure in each band, the channel's range profile
-  const drow = (name, a) => `${name.padEnd(12)} ${a.map((v) => String(v).padStart(6)).join('')}`;
-  console.log(`\ndistance:    ${Array.from({ length: BANDS }, (_, i) => (i === BANDS - 1 ? `${i * BAND_CM}+` : `${i * BAND_CM}`).padStart(6)).join('')}   (cm to the sender; frames per second of the ladder's exposure)`);
-  for (const l of ['long', 'short']) console.log(drow(`exposure ${l}`, secs(acc.exposure[l].band)));
-  for (const ch of Object.keys(acc.frames).sort()) { const x = acc.exposure[LADDER_OF[ch]].band; console.log(drow(`frame ch${ch}`, acc.frames[ch].band.map((v, i) => (x[i] ? (v / (x[i] / 20)).toFixed(2) : '-')))); }
-  // by sector within bands of distance, `--bands 50,120`: the sector profile of each channel and corner, near and far apart
-  if (opt('--bands')) {
-    const edges = opt('--bands').split(',').map(Number), lo = [0, ...edges], hi = [...edges, Infinity];
-    const sum = (rows) => rows.reduce((a, r) => a.map((v, i) => v + r[i]), new Array(8).fill(0));
-    const within = (g, k) => sum(g.filter((_, b) => b * BAND_CM >= lo[k] && b * BAND_CM < hi[k]));
-    for (let k = 0; k < lo.length; k++) {
-      console.log(`\nband ${lo[k]}-${hi[k] === Infinity ? '' : hi[k]} cm:  ${['0', '45', '90', '135', '180', '225', '270', '315'].map((v) => v.padStart(6)).join('')}    total`);
-      for (const l of ['long', 'short']) console.log(row(`exposure ${l}`, secs(within(acc.exposure[l].bandSector, k))));
-      for (const c of ['FL', 'FR', 'BR', 'BL']) console.log(row(`read ${c}`, within(acc.corners[c].bandSector, k)));
-      for (const ch of Object.keys(acc.frames).sort()) console.log(row(`frame ch${ch}`, within(acc.frames[ch].bandSector, k)));
-    }
-  }
-  // --write: the counts as the connectome's senses.json, what build-circuit.mjs turns into weights
-  if (flag('--write')) {
-    const out = { about: `Measured over ${acc.runs} runs with the sender's place known (replay.mjs --senses --write): exposure in samples at 20 Hz per ladder sent, by sector of the sender's true bearing (8 x 45 deg, 0 ahead, clockwise) and by band of distance (${BANDS} x ${BAND_CM} cm, the last open); frames heard per channel (a second notify within 100 ms not counted) and landed reads per corner, the same way.`, sectors: 8, bands: BANDS, bandCm: BAND_CM, hz: 20, exposure: acc.exposure, frames: acc.frames, corners: acc.corners, flooded: acc.flooded };
-    writeFileSync(new URL('../brain/connectome/senses.json', import.meta.url), JSON.stringify(out));
-    console.log('\nwritten: brain/connectome/senses.json');
-  }
-  process.exit(0);
-}
-
 if (flag('--list')) {
   for (const zip of readdirSync('sessions').filter((f) => f.endsWith('.zip'))) {
     const members = execFileSync('unzip', ['-Z1', `sessions/${zip}`], { encoding: 'utf8' }).split('\n').filter((m) => m.endsWith('.jsonl'));
@@ -311,7 +203,7 @@ if (flag('--list')) {
   process.exit(0);
 }
 
-const ESTIMATORS = { network, accumulator };
+const ESTIMATORS = { network };
 if (!specs.length) { console.error('usage: replay.mjs <zip>:<member>|<file.jsonl> ... [--check] [--estimator network] | --list'); process.exit(1); }
 /** `--param tauMs=60000,wCorner=10`: the estimator's parameters, numbers. */
 const params = Object.fromEntries((opt('--param', '') || '').split(',').filter(Boolean).map((kv) => { const [k, v] = kv.split('='); return [k, Number(v)]; }));
