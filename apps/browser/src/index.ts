@@ -26,7 +26,7 @@ window.Debug = Debug;
 // the brain tab's scene, light and resting network
 window.BrainView = brainView;
 
-// completed days of session files move from the private store into sessions/*.zip
+// completed days of session files move from the private store into apps/browser/sessions/*.zip
 void archiveSessions();
 
 m.route(document.body, '/', {

@@ -16,3 +16,7 @@ frames/
 
 # Claude Code conversation transcripts, copied from ~/.claude/projects
 diary/
+
+# the bench's runs, cut from apps/browser/sessions/ and frames/ by bench/extract.mjs
+bench/*/
+bench/index.tsv

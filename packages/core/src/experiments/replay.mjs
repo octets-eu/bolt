@@ -10,7 +10,7 @@
 // as wanted, without a Bolt. The locator's slip is the truth's error bar.
 //
 //   npx tsx packages/core/src/experiments/replay.mjs <zip>:<member>|<file.jsonl> ... [--check]
-//   npx tsx packages/core/src/experiments/replay.mjs --list            runs in every zip of sessions/
+//   npx tsx packages/core/src/experiments/replay.mjs --list            runs in every zip of apps/browser/sessions/
 //
 // --check prints, per trial the test logged, the locator and heading the
 // stream had at that moment beside the test's own numbers; the positions
@@ -193,11 +193,11 @@ function check (run) {
 }
 
 if (flag('--list')) {
-  for (const zip of readdirSync('sessions').filter((f) => f.endsWith('.zip'))) {
-    const members = execFileSync('unzip', ['-Z1', `sessions/${zip}`], { encoding: 'utf8' }).split('\n').filter((m) => m.endsWith('.jsonl'));
+  for (const zip of readdirSync('apps/browser/sessions').filter((f) => f.endsWith('.zip'))) {
+    const members = execFileSync('unzip', ['-Z1', `apps/browser/sessions/${zip}`], { encoding: 'utf8' }).split('\n').filter((m) => m.endsWith('.jsonl'));
     for (const member of members) {
-      const rs = runs(load(`sessions/${zip}:${member}`));
-      for (const r of rs) if (r.at) console.log(`sessions/${zip}:${member}  ${r.name}  ${r.seeker} <- ${r.sender} at (${r.at.x.toFixed(0)}, ${r.at.y.toFixed(0)})  ${((r.t1 - r.t0) / 1000).toFixed(0)} s`);
+      const rs = runs(load(`apps/browser/sessions/${zip}:${member}`));
+      for (const r of rs) if (r.at) console.log(`apps/browser/sessions/${zip}:${member}  ${r.name}  ${r.seeker} <- ${r.sender} at (${r.at.x.toFixed(0)}, ${r.at.y.toFixed(0)})  ${((r.t1 - r.t0) / 1000).toFixed(0)} s`);
     }
   }
   process.exit(0);
