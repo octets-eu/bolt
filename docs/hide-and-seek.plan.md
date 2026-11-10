@@ -30,9 +30,15 @@
 ## Backlog
 
 - 01, build proper brain from :
-  - Observation layer (code)
-  - circuit.json to connectome 
-  - Motor (code)
+    - Observation layer (code)
+    - circuit.json to connectome 
+    - Motor (code)
+
+- 02, revisit docs/brain-view.plan.md
+    - generate vis from circuit.json
+
+- 03, continue work on apps/play/rooms.md
+    - turn into full arch/req docs, demo iPadOs
 
 **more tasks and goals will be defined**
 

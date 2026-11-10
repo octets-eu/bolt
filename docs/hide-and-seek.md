@@ -12,7 +12,7 @@ A Bolt is a ball that rolls, with four infrared emitters and four infrared recei
 
 ## What the seeker has
 
-Hearing. A message is heard when the hider is roughly ahead or roughly behind, and lost when it is off to the side; how the seeker turns that into a direction and a path is in `recipes.md`.
+Hearing. The hider's message carries one number, its channel. It tells the seeker which ladder and which strength arrived, never where from. The seeker hears it while the hider is roughly ahead or roughly behind, inside a lobe about nose and tail, and loses it when the hider is off to the side; from the message alone, ahead or behind is a coin flip. The four receivers sit at the corners, 45° off the nose in front and 135° behind, each with a lobe of its own. Read while a frame is in the air, the corners that heard it name the hider's side. With the hider square to the side, at 90°, it sits 45° off both corners on that side, so front and back corner hear it alike, and ahead or behind is a coin flip again. Why the call is a ladder of strengths is in the ladder's comment, `packages/core/src/communication/communication.ts`.
 
 The seeker knows nothing of the room: no map, no walls, no camera. From how loud the call arrives it holds a rough idea of how far away the hider is. Everything it does follows from what it hears right now and what it has heard on the way. That is why its path looks odd to an observer, with short legs and many turns. The path is implementation and the subject of the experiments: first a game has to work at all, then the path gets clever and elegant.
 

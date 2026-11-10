@@ -134,6 +134,7 @@ export class MatrixBrain {
       for (const f of MatrixBrain.steps) {
         try { f({ net: this.net, sources, dtMs: dt }); } catch (e) { MatrixBrain.steps.delete(f); this.seeker.log('warn', `brain step listener dropped: ${String(e)}`); }
       }
+      // the referee's part: the sender follows the seeker's request for the short ladder (communication.ts, LADDERS)
       const want: string = (this.net.get('REQ_SHORT') ?? 0) > 0.5 ? 'short' : 'long';
       if (want !== this.range) { this.range = want; this.ladder.switch(want); this.seeker.log('info', `brain ladder ${want}`); }
       if (this.options.motors && !this.obs.timed && Date.now() - this.lastRoll >= ROLL_MS) this.roll();

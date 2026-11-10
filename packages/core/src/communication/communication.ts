@@ -28,6 +28,12 @@ export interface Ladder {
  * the long one's weakest level is heard all round. Each sends on channels
  * of its own, so the seeker tells them apart by the frames. The strengths
  * are chosen; the emitters go to 255.
+ *
+ * A seek sends one ladder at a time and switches while it runs: the long
+ * one until the seeker is near, the short one from then on, the long one
+ * again when the short one falls silent. The seeker asks (the observation
+ * layer's `near`, brain/connectome/sensory_map.jsonc), the referee switches
+ * the sender, which hears nothing.
  */
 export const LADDERS: { readonly [range in LadderRange]: Ladder } = {
   long:  { range: 'long',  channels: [0, 1, 2, 3], strengths: [2, 4, 8, 16], roundMs: 4 * 200 + 50 },

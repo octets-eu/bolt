@@ -7,8 +7,6 @@ You run inside the sandbox container on the rig. This folder is the part of the 
 The task is `Challenge.md`; read it first, it points at the rest. Before touching a Bolt:
 
 - `docs/bolt-reference.md` is how a Bolt works, independent of floor and room.
-- `docs/recipes.md` is the seek as it stands, pointing at the code.
-- `recipes.md` says hider where the challenge says sender.
 - `docs/archive`, cited in some code headers, is not here; the headers carry the numbers.
 
 The library is `packages/core/src`. `behavior/` holds behaviors with a result and a reason, `experiments/` holds functions under test.
