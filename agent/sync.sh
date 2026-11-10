@@ -6,7 +6,7 @@
 # start script, README, and container/ with the brief, the challenge, the session). Copies and overwrites, never
 # deletes, so the key, claude-home and sessions on the M1 are never touched; a
 # stale file there is removed by hand. The target and the key come from
-# docs/private/rig.env (RIG_TARGET, RSYNC_RSH), which is not in the repo.
+# agent/rig.env (RIG_TARGET, RSYNC_RSH), which is not in the repo.
 #
 #   agent/sync.sh              push; prints every file that changed
 #   agent/sync.sh --dry-run    show what would go, send nothing
@@ -16,7 +16,7 @@ set -euo pipefail
 
 here="$(cd "$(dirname "$0")" && pwd)"
 repo="$(cd "$here/.." && pwd)"
-env="$repo/docs/private/rig.env"
+env="$here/rig.env"
 [ -f "$env" ] || { echo "sync: $env missing (RIG_TARGET, RSYNC_RSH)" >&2; exit 1; }
 # shellcheck source=/dev/null
 . "$env"
@@ -28,7 +28,7 @@ rsync -a --itemize-changes "$@" --filter="merge $here/sync.rules" "$repo/" "${de
 # the workspace gets a copy under docs/, the one place its documents point at
 rsync -a --itemize-changes "$@" "$repo/apps/browser/public/floor-plan.svg" "${dest}container/docs/"
 # the two photos from the mount, private since they show the room, go to the workspace root
-rsync -a --itemize-changes "$@" "$repo/docs/private/floor-ultra-wide.jpg" "$repo/docs/private/floor-main.jpg" "${dest}container/"
+rsync -a --itemize-changes "$@" "$repo/documentation/moto-cam-reference/floor-ultra-wide.jpg" "$repo/documentation/moto-cam-reference/floor-main.jpg" "${dest}container/"
 # the start script on the M1 reads NTFY_TOPIC from its own copy of rig.env
 rsync -a --itemize-changes "$@" "$env" "${dest}rig.env"
 rsync -a --itemize-changes "$@" --exclude __pycache__/ --exclude .DS_Store "$here/Rig/" "$dest"

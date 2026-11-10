@@ -1,6 +1,6 @@
 # Checklist before the first agent session
 
-What has to be in place and tested, in the order it is needed. `[x]` is proven, `[ ]` is open. Hosts, keys and paths that are private stay in `docs/private/m1-rig.md`.
+What has to be in place and tested, in the order it is needed. `[x]` is proven, `[ ]` is open. Hosts, keys and paths that are private stay in `documentation/rig/m1-rig.md`.
 
 The session, as decided: a session is a budget, nothing else. The agent picks seeker and sender, drives the Bolts to start spots of its own choosing inside the play area and resets them between runs; the camera and the beacon are its instruments for that, neither takes part in the seek, the measure is Bolt to Bolt. When it has a question it writes it to a file, sleeps the Bolts and ends; the start script rings the phone and the M5; the answer goes into the file and the next session starts from it.
 

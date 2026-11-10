@@ -24,7 +24,7 @@ set -euo pipefail
 
 here="$(cd "$(dirname "$0")" && pwd)"
 repo="$(cd "$here/.." && pwd)"
-env="$repo/docs/private/rig.env"
+env="$here/rig.env"
 [ -f "$env" ] || { echo "pull: $env missing (RIG_TARGET, RSYNC_RSH)" >&2; exit 1; }
 # shellcheck source=/dev/null
 . "$env"

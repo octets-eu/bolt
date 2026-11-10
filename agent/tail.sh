@@ -4,7 +4,7 @@
 # mode session writes its stream to ~/Rig/sessions/<stamp>/stream.jsonl and
 # nothing to the tmux screen, so this is the view of a running session;
 # watch.sh attaches to the screen. Ctrl-c ends the view, not the session.
-# Host and key come from docs/private/rig.env (RIG_TARGET, RSYNC_RSH), the
+# Host and key come from agent/rig.env (RIG_TARGET, RSYNC_RSH), the
 # same as sync.sh.
 #
 #   agent/tail.sh             the newest session
@@ -12,7 +12,7 @@
 set -euo pipefail
 
 here="$(cd "$(dirname "$0")" && pwd)"
-env="$here/../docs/private/rig.env"
+env="$here/rig.env"
 [ -f "$env" ] || { echo "tail: $env missing (RIG_TARGET, RSYNC_RSH)" >&2; exit 1; }
 # shellcheck source=/dev/null
 . "$env"

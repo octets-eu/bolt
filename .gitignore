@@ -24,3 +24,6 @@ bench/index.tsv
 # retired work and documentation material, kept locally, not in the repo
 /archive/
 /documentation/
+
+# the rig's hosts and keys, read by the agent scripts
+agent/rig.env
