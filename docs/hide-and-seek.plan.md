@@ -27,6 +27,12 @@
     - can handle stuck behind chest or similar
 
 
+## Backlog
+
+- 01, build proper brain from :
+  - Observation layer (code)
+  - circuit.json to connectome 
+  - Motor (code)
 
 **more tasks and goals will be defined**
 
