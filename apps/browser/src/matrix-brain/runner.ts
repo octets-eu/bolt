@@ -5,8 +5,7 @@
 // `motors` the agent's motor layer drives the seeker as brain.mjs does, a
 // roll after each volley, both Bolts armed for collisions, and the run ends
 // on the tag (both reports within TAG_MS, brain/seek.mjs), the time limit
-// of 1.5 times 30 s per metre of the given start distance, or a runaway by
-// the locator. Logging into the session: a state line per second, the
+// of the start distance (TIME_LIMITS), or a runaway by the locator. Logging into the session: a state line per second, the
 // landed reads, the ladder's switches, the rolls' modes, the collisions and
 // the result. The receiver already logs every notify and every read's reply.
 
@@ -31,8 +30,9 @@ const FLASH_MS = 200;
 const STATE_MS = 1000;
 const ROLL_MS = 100;         // before the frames are timed, a roll this often (brain.mjs)
 const TAG_MS = 300;          // both collision reports within this: found
-const SECONDS_PER_M = 30;    // the goal; the run gets 1.5 times it
-const RUNAWAY_CM = 250;      // the locator this far from the start ends the run
+/** The seek's time limit by start distance, cm and s, the user's; a start takes the nearest listed distance's. */
+const TIME_LIMITS: [number, number][] = [[120, 60], [240, 100], [320, 130]];
+const RUNAWAY_CM = 100;      // the locator further than the start distance plus this from the start ends the run
 /** Collision thresholds of brain/seek.mjs: the seeker fires on contact, the standing sender on contact only. */
 const THRESHOLDS = { seeker: { xThreshold: 15, yThreshold: 15, xSpeed: 0, ySpeed: 0 }, sender: { xThreshold: 10, yThreshold: 10, xSpeed: 0, ySpeed: 0 } };
 
@@ -116,7 +116,7 @@ export class MatrixBrain {
       this.heading = heading;
       if (this.options.motors) {
         if (!this.start0) this.start0 = { x: s.locator.positionX, y: s.locator.positionY };
-        else if (Math.hypot(s.locator.positionX - this.start0.x, s.locator.positionY - this.start0.y) > RUNAWAY_CM) this.end('runaway');
+        else if (Math.hypot(s.locator.positionX - this.start0.x, s.locator.positionY - this.start0.y) > this.options.startCm + RUNAWAY_CM) this.end('runaway');
       }
       const motion = { heading, x: s.locator.positionX, y: s.locator.positionY };
       if (last === null) { last = s.t; this.obs.tick(motion); this.commanded = heading; return; }
@@ -143,7 +143,8 @@ export class MatrixBrain {
     this.drawTimer = setInterval(() => { if (!this.obs.timed || (this.flashUntil && performance.now() > this.flashUntil)) void this.draw(); }, 100);
     this.stateTimer = setInterval(() => this.state(), STATE_MS);
     if (this.options.motors) {
-      const limitS = Math.max(20, 1.5 * SECONDS_PER_M * this.options.startCm / 100);
+      const startCm = this.options.startCm;
+      const [, limitS] = TIME_LIMITS.reduce((a, b) => (Math.abs(b[0] - startCm) < Math.abs(a[0] - startCm) ? b : a));
       setTimeout(() => this.end('time'), limitS * 1000);
       this.seeker.log('info', `brain seek: seeker ${this.seeker.name} on sender ${this.sender.name}, ${this.options.startCm} cm given, limit ${limitS.toFixed(0)} s, speed ${MOTOR.seekSpeed}`);
     } else this.seeker.log('info', `brain on: seeker ${this.seeker.name}, sender ${this.sender.name}, ladder long`);

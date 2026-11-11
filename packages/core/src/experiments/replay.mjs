@@ -32,7 +32,12 @@ import { network } from './replay-network.mjs';
 
 const LOCK_DEG = 30, LOCK_S = 3;
 const RUNS = /^(sweepTest|approachTest)\.(in|out)|^brain (seek)(:| found| time| runaway| stopped)|^brain (path) (start|done)/;
-/** A path run (the mode by hand, the seeker driven by its navigation from the plan's starts): the sender 23 cm behind the reset, in the seeker's locator frame. */
+/**
+ * A path run (the mode by hand, the seeker driven by its navigation or turned
+ * on a reference point): the sender's place in the seeker's locator frame is
+ * the start line's `{"at": {x, y}}`; without it, as in the runs before the
+ * reference points, 23 cm behind the reset.
+ */
 const PATH_AT = { x: 0, y: -23 };
 /**
  * The browser's seek runs count only when the user marked them good: the
@@ -68,7 +73,9 @@ function runs (lines) {
       const m = d.match(RUNS);
       const name = m[1] ?? m[3] ?? m[5], step = m[2] ?? (m[4] === ':' ? 'in' : m[4] ? 'out' : m[6] === 'start' ? 'in' : 'out');
       if (step === 'in' && name === 'path') {
-        cur = { name, t0: e.t, seeker: e.bolt, sender: null, at: PATH_AT, args: { direction: 0 }, lines: [], trials: [] };
+        let at = PATH_AT;
+        if (d.includes('{')) { try { at = JSON.parse(d.slice(d.indexOf('{'))).at ?? PATH_AT; } catch { /* the default */ } }
+        cur = { name, t0: e.t, seeker: e.bolt, sender: null, at, args: { direction: 0 }, lines: [], trials: [] };
       } else if (step === 'in' && name === 'seek') {
         // brain seek: seeker SB-9129 on sender SB-11DF, ... (the matrix-brain mode of the browser app); `at` comes with the mark
         const who = d.match(/seeker (\S+) on sender (\S+)/);

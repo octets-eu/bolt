@@ -1,12 +1,11 @@
 // The mode's switches for the header: one MatrixBrain at a time, SB-9129 the
 // seeker and SB-11DF the sender until the header offers the choice; `brain`
 // by hand, `seek` with the motors, which ends itself on the tag, the time
-// limit or a runaway. A seek begins with both Bolts reset on the plan's
-// starts, back to back; the seeker first rolls `PRE_ROLL_CM` south on the
-// sheet by its navigation, so the seek starts about 1.2 m from the sender
-// (23 cm was the hard end, 2026-11-08), and the locator frame stays the
-// reset's, so the sender's place is known for the replay. A fullstop or a
-// disconnect turns either off.
+// limit or a runaway. A seek begins with both Bolts reset on reference
+// points (the plotter's buttons) and starts where the seeker stands: the
+// start distance is the points', and the sender's place in the seeker's
+// locator frame is known for the replay. A fullstop or a disconnect turns
+// either off.
 
 import type { Bolt } from '@bolt/core';
 import { NotConnectedError } from '@bolt/core';
@@ -16,7 +15,6 @@ import { MatrixBrain } from './runner';
 import type { RunSummary } from './runner';
 
 export const ROLES = { seeker: 'SB-9129', sender: 'SB-11DF' };   // green seeks, blue sends (2026-11-09)
-const PRE_ROLL_CM = 120;
 
 let brain: MatrixBrain | null = null;
 let busy = false;
@@ -40,7 +38,7 @@ export const matrixBrain = {
     lastRun = null;
   },
 
-  /** `motors`: a seek run, after the pre-roll south from the start; otherwise the mode by hand. A running mode is turned off either way. */
+  /** `motors`: a seek run from the points both Bolts were reset on; otherwise the mode by hand. A running mode is turned off either way. */
   async toggle (motors = false): Promise<void> {
     if (busy) return;
     busy = true;
@@ -52,11 +50,8 @@ export const matrixBrain = {
       if (motors) {
         const from = Plotter.startOf(seeker.name), senderAt = Plotter.startOf(sender.name);
         if (!from || !senderAt) throw new Error('no start on the sheet');
-        at = Plotter.toLocator(seeker.name, senderAt.x, senderAt.y)!;   // the sender in the seeker's locator frame, from the sheet
-        const target = Plotter.toLocator(seeker.name, from.x, from.y + PRE_ROLL_CM)!;
-        seeker.log('info', `brain pre-roll ${PRE_ROLL_CM} cm south on the sheet, to locator (${target.x.toFixed(0)}, ${target.y.toFixed(0)})`);
-        await seeker.navigation.rollToPoint(target);
-        startCm = Math.round(Math.hypot(from.x - senderAt.x, from.y + PRE_ROLL_CM - senderAt.y));
+        at = Plotter.toLocator(seeker.name, senderAt.x, senderAt.y)!;   // the sender in the seeker's locator frame, from the points
+        startCm = Math.round(Math.hypot(from.x - senderAt.x, from.y - senderAt.y));
         lastRun = null;
       }
       const b = new MatrixBrain(seeker, sender, { motors, startCm, at });
