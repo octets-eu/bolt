@@ -1,0 +1,80 @@
+// sensory_map.jsonc — the seeker's senses into the circuit's sensory neurons,
+// in the worm's format (examples/worm): every channel a named source through
+// a pipeline of typed ops into a drive, a neuron of circuit.json. The sources
+// are what observation/observation.mjs makes of the infrared and of the
+// motion stream, per tick of the stream (50 ms): an event counts on the tick
+// it happened, else 0; the Bolt's own turn and step are the tick's.
+// Ops: gain k; rate tauMs, events per second, smoothed; clamp lo hi; mul by
+// another source; sub k; adapt tauMs, the value less its own mean. The `ir` block is what the observation layer knows of the
+// ladder and the receivers (docs/bolt-reference.md section 7, communication.ts).
+{
+  "ir": {
+    // channel -> ladder and strength; a frame names its ladder and level
+    "channels": { "0": ["long", 2], "1": ["long", 4], "2": ["long", 8], "3": ["long", 16],
+                  "4": ["short", 1], "5": ["short", 2], "6": ["short", 4] },
+    // receivers at the corners, front left, front right, back right, back left, deg off the nose
+    "corners": { "FL": -45, "FR": 45, "BR": 135, "BL": -135 },
+    // the sender's beat: one command per 200 ms on its schedule (utils/ladder.mjs), the notify 45 ms after the frame;
+    // a read lands only while the frame is in the air, 7.5 ms (behavior/beat.ts)
+    "beatMs": 200,
+    // beats each level is held by the sender: 1 for brain/seek.mjs and the browser's runs; utils/ladder.mjs can hold 2
+    "repeat": 1,
+    // over the bridge a read lands at a 40 to 55 ms lead (utils/read-timing.mjs, 2026-11-06), and
+    // commands reach the Bolt on a 15 ms grid: three reads 7 ms apart, leads 60 to 46, span a grid
+    // slot (behavior/beat.ts: three land in 35 to 39 % of frames, five in 43 %); five loaded the link
+    // so that the seeker's collision report came 400 ms after the sender's (2026-11-06)
+    "volley": { "leadMs": 60, "reads": 3, "stepMs": 7 },
+    // the carrier: the weakest level heard at least `minFrames` times in `windowMs`;
+    // the level that is just arriving has an edge, nose or tail (communication.ts, LADDERS)
+    "carrier": { "windowMs": 3000, "minFrames": 2 },
+    // near: the long ladder's weakest level heard in `minFrames` of the last
+    // `windowMs` asks for the short ladder; nothing of the short one in `lostMs` asks back;
+    // the referee switches the sender between the two (communication.ts, LADDERS)
+    "near": { "windowMs": 3500, "minFrames": 3, "lostMs": 3000 },
+    // after the frames change ladder, the closeness is not compared for this long
+    "settleMs": 3000
+  },
+
+  "channels": [
+    // a read that landed: the corners that heard the frame, unless all four
+    // (the sender on top, or a level heard all round) or two opposite ones;
+    // onto the ring by the corner's measured profile (build-circuit.mjs);
+    // a corner read is worth about three frames (replay bench, 2026-11-08)
+    { "drive": "IR_FL", "source": "corner.FL", "pipeline": [ { "op": "gain", "k": 3 } ] },
+    { "drive": "IR_FR", "source": "corner.FR", "pipeline": [ { "op": "gain", "k": 3 } ] },
+    { "drive": "IR_BR", "source": "corner.BR", "pipeline": [ { "op": "gain", "k": 3 } ] },
+    { "drive": "IR_BL", "source": "corner.BL", "pipeline": [ { "op": "gain", "k": 3 } ] },
+
+    // every frame heard, by channel: onto the ring by the channel's sector profile and onto
+    // the distance by its strength's range profile; a second notify of one frame, within 100 ms, is not counted
+    { "drive": "IR_CH0", "source": "frame.ch0", "pipeline": [] },
+    { "drive": "IR_CH1", "source": "frame.ch1", "pipeline": [] },
+    { "drive": "IR_CH2", "source": "frame.ch2", "pipeline": [] },
+    { "drive": "IR_CH3", "source": "frame.ch3", "pipeline": [] },
+    { "drive": "IR_CH4", "source": "frame.ch4", "pipeline": [] },
+    { "drive": "IR_CH5", "source": "frame.ch5", "pipeline": [] },
+    { "drive": "IR_CH6", "source": "frame.ch6", "pipeline": [] },
+
+    // every slot of the sender's schedule that went silent, by the channel it was sent on
+    // (observation.mjs slots): onto the ring by the profile of not hearing that channel
+    { "drive": "IR_SLOT0", "source": "slot.ch0", "pipeline": [] },
+    { "drive": "IR_SLOT1", "source": "slot.ch1", "pipeline": [] },
+    { "drive": "IR_SLOT2", "source": "slot.ch2", "pipeline": [] },
+    { "drive": "IR_SLOT3", "source": "slot.ch3", "pipeline": [] },
+    { "drive": "IR_SLOT4", "source": "slot.ch4", "pipeline": [] },
+    { "drive": "IR_SLOT5", "source": "slot.ch5", "pipeline": [] },
+    { "drive": "IR_SLOT6", "source": "slot.ch6", "pipeline": [] },
+
+    // anything of the ladder: the sender is in range at all; frames per second
+    { "drive": "IR_ANY", "source": "frame.any", "pipeline": [ { "op": "rate", "tauMs": 3000 } ] },
+
+    // the ladder's state, held by the observation layer with its hysteresis
+    { "drive": "IR_NEAR", "source": "ladder.near", "pipeline": [] },
+
+    // the Bolt's own motion since the last tick, from the yaw and the locator: the turn in degrees clockwise,
+    // the step in cm in its own frame; the network's shift rules read these neurons (network.mjs)
+    { "drive": "SELF_TURN", "source": "self.turned", "pipeline": [] },
+    { "drive": "SELF_FWD", "source": "self.fwd", "pipeline": [] },
+    { "drive": "SELF_RIGHT", "source": "self.right", "pipeline": [] }
+  ]
+}

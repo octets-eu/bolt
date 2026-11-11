@@ -1,0 +1,17 @@
+{
+  "name": "@bolt/brain",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "The seeker's brain: the connectome in circuit.json, the observation layer that feeds it, the motor it drives.",
+  "main": "./src/index.mjs",
+  "exports": {
+    ".": "./src/index.mjs",
+    "./circuit.json": "./src/circuit.json",
+    "./sensory_map.jsonc": "./src/sensory_map.jsonc",
+    "./load": { "node": "./src/load.mjs" }
+  },
+  "dependencies": {
+    "@bolt/core": "*"
+  }
+}
