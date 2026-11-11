@@ -22,3 +22,4 @@ n	session	start	kind	seeker	mark	s	end	source
 21	2026-11-11T15-18-20-548Z	8344978.8	seek	SB-9129	yes	56.8	brain seek found after 56.7 s: frames 140, reads 570, landed	frames/l0-session.jsonl
 22	2026-11-11T17-39-44-412Z	102864.1	path	SB-9129	no	32.2	brain path done: L0 run 5, Sender/blue on d1, Seeker/green o	frames/l0-session2.jsonl
 23	2026-11-11T17-39-44-412Z	211857.9	seek	SB-9129	yes	106.1	brain seek found after 106.0 s: frames 261, reads 978, lande	frames/l0-session2.jsonl
+24	2026-11-11T19-09-49-486Z	263884	seek	SB-9129	yes	60.1	brain seek time after 60.0 s: frames 182, reads 534, landed 	frames/a4-session.jsonl
