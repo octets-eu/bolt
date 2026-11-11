@@ -182,3 +182,4 @@ Each step replaces one operator by cells and edges and is shown in full before i
 
 - The agent's `brain.mjs`, `seek.mjs`, `utils/link-load.mjs` and `pull.sh` onto the package or left, and `packages/brain` in `agent/sync.rules`: at E1.
 - The weights before D or after: at C3 every mechanism is data and the bench runs, so the weights can be drawn then and D follow on the better brain; D does not need them. Decided at C3.
+- The distance past 2 m: the builder's 10 bands of 20 cm end at 2 m, so the belief ends at 190 cm (L0, runs 20 to 23), while the goal runs to 3.5 m. Bands to 3.5 m come with the weights drawn by hand: at C3.
