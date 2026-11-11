@@ -1,12 +1,12 @@
 // The mode's switches for the header: one MatrixBrain at a time, SB-9129 the
-// seeker and SB-11DF the sender until the header offers the choice; `brain`
+// seeker and SB-11DF the sender unless a run says otherwise; `brain`
 // by hand, `seek` with the motors, which ends itself on the tag, the time
 // limit or a runaway. A seek begins with both Bolts reset on reference
 // points (the plotter's buttons) and starts where the seeker stands: the
 // start distance is the points', and the sender's place in the seeker's
 // locator frame is known for the replay. A fullstop or a disconnect turns
 // either off. `Seek` is the same for the console and the browser tools, with
-// the seek's exits given for one run instead of the defaults.
+// the seek's exits and roles given for one run instead of the defaults.
 
 import type { Bolt } from '@bolt/core';
 import { NotConnectedError } from '@bolt/core';
@@ -17,12 +17,12 @@ import { session } from '../session';
 import { MatrixBrain } from './runner';
 import type { RunSummary, SeekOptions } from './runner';
 
-export const ROLES = { seeker: 'SB-9129', sender: 'SB-11DF' };   // green seeks, blue sends (2026-11-09)
+export const ROLES = { seeker: 'SB-9129', sender: 'SB-11DF' };   // green seeks, blue sends (2026-11-09); `Seek.start({ seeker, sender })` swaps them for a run
 
 /** The seek's exits, the user's: the time limit by start distance, cm and s, a start taking the nearest listed distance's; the runaway fence beyond the start distance. */
 export const SEEK_DEFAULTS = { timeLimits: [[120, 60], [240, 100], [320, 130]] as [number, number][], fenceCm: 100 };
-/** The exits given for one run. */
-export type SeekOverrides = Partial<Pick<SeekOptions, 'limitS' | 'fenceCm'>>;
+/** What one run may set instead of the defaults: its exits and its roles, the Bolts' names. */
+export type SeekOverrides = Partial<Pick<SeekOptions, 'limitS' | 'fenceCm'>> & { seeker?: string; sender?: string };
 
 let brain: MatrixBrain | null = null;
 let busy = false;
@@ -46,14 +46,15 @@ export const matrixBrain = {
     lastRun = null;
   },
 
-  /** `motors`: a seek run from the points both Bolts were reset on, its exits the defaults unless `overrides` gives them; otherwise the mode by hand. A running mode is turned off either way. */
+  /** `motors`: a seek run from the points both Bolts were reset on, its exits and roles the defaults unless `overrides` gives them; otherwise the mode by hand. A running mode is turned off either way. */
   async toggle (motors = false, overrides: SeekOverrides = {}): Promise<void> {
     if (busy) return;
     busy = true;
     try {
       if (brain) { const b = brain; brain = null; await b.stop(); return; }
-      const seeker = Bolts.get(ROLES.seeker) as Bolt | undefined, sender = Bolts.get(ROLES.sender) as Bolt | undefined;
-      if (!seeker || !sender) throw new NotConnectedError(seeker ? ROLES.sender : ROLES.seeker);
+      const names = { seeker: overrides.seeker ?? ROLES.seeker, sender: overrides.sender ?? ROLES.sender };
+      const seeker = Bolts.get(names.seeker) as Bolt | undefined, sender = Bolts.get(names.sender) as Bolt | undefined;
+      if (!seeker || !sender) throw new NotConnectedError(seeker ? names.sender : names.seeker);
       let startCm = 23, at: { x: number, y: number } | undefined;
       if (motors) {
         const from = Plotter.startOf(seeker.name), senderAt = Plotter.startOf(sender.name);
@@ -77,7 +78,7 @@ export const matrixBrain = {
   },
 };
 
-/** For the console and the browser tools: `Seek.start({ limitS: 120 })` seeks with the exits given, `stop()` ends it, `last()` is the last run's brain lines in order, seconds first, without the step and roll lines unless asked. */
+/** For the console and the browser tools: `Seek.start({ limitS: 120, seeker: 'SB-11DF', sender: 'SB-9129' })` seeks with the exits and roles given, `stop()` ends it, `last()` is the last run's brain lines in order, seconds first, without the step and roll lines unless asked. */
 export const Seek = {
   defaults: SEEK_DEFAULTS,
   start: (overrides: SeekOverrides = {}): Promise<void> => matrixBrain.toggle(true, overrides),
