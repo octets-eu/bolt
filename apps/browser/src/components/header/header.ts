@@ -43,7 +43,7 @@ const Header = Factory.create('Header', {
             m('button.cmd.br2.ml1', { onclick: Bolts.pairBolt.bind(Bolts) },                                    'Pair'),
             m('button.cmd.br2.ml1', { onclick: saved(() => Bolts.disconnect()) },                               'DisConnect'),
             m('button.cmd.br2.ml1', { onclick: reload },                                                        'Reload'),
-            m('button.cmd.br2.ml1', { onclick: saved(() => Bolts.reset()) },                                    'Reset'),
+            m('button.cmd.br2.ml1', { style: { display: 'none' }, onclick: saved(() => Bolts.reset()) },                                    'Reset'),
             m('button.cmd.br2.ml1', { title: 'Sleep all', onclick: saved(() => Promise.all(Bolts.map( (bolt: Bolt) => bolt.lifecycle.sleep() ))) }, Icon('bed')),
             m('button.cmd.br2.ml1', { title: 'Wake all',  onclick: saved(() => Promise.all(Bolts.map( (bolt: Bolt) => bolt.lifecycle.wake() ))) },  Icon('alarmClock')),
             m('button.cmd.br2.ml1', { class: matrixBrain.on && !matrixBrain.seeking ? 'on' : '', disabled: matrixBrain.busy || Bolts.count() < 2 || matrixBrain.seeking, title: 'Matrix brain: the seeker shows the ring, the sender the ladder; motors off',

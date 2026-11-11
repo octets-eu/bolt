@@ -10,7 +10,7 @@ let series = [] as any;
 let marker = [] as any;
 let bolts  = {} as any;
 // the direction each sweep found, from where its Bolt stood, as a sheet heading; drawn as a ray
-let rays   = [] as { x: number, y: number, heading: number, color: string }[];
+let rays   = [] as { x: number, y: number, heading: number, color: string, bolt: string }[];
 let rolling = false;
 
 // the canvas in CSS pixels, from its host's size; drawn in device pixels
@@ -166,12 +166,15 @@ const Plotter = Factory.create('Plotter', {
   /** The reference points by name, for the Bolts' reset buttons. */
   points,
 
-  /** The Bolt is placed on `point`, facing its heading: a hard reset zeroes its frame there, and the plot counts from that point on. */
-  resetOn (bolt: Bolt, point: string): Promise<void> {
+  /** The Bolt is placed on `point`, facing its heading: a hard reset zeroes its frame there, and the plot counts from that point on; its track and rays, counted from where it stood before, go. */
+  async resetOn (bolt: Bolt, point: string): Promise<void> {
     placed[bolt.name] = point;
     try { localStorage.setItem(PLACED_KEY, JSON.stringify(placed)); } catch { /* private window */ }
     session.note(bolt.name, 'info', `starts ${JSON.stringify(starts())}`);
-    return bolt.lifecycle.reset(true, point);
+    await bolt.lifecycle.reset(true, point);
+    series = series.filter((p: any) => p.bolt !== bolt.name);
+    rays = rays.filter((r) => r.bolt !== bolt.name);
+    Plotter.render();
   },
 
   /** A sheet point in the locator frame of the Bolt `name`, or null without a start for it. */
@@ -207,7 +210,7 @@ const Plotter = Factory.create('Plotter', {
         const at = bolts[bolt.name]?.locator;
         if (heading === null || !at) return;
         // a locator heading is -yaw; on the sheet the start's heading comes on top
-        rays.push({ x: at.positionX, y: at.positionY, heading: start.heading + heading, color });
+        rays.push({ x: at.positionX, y: at.positionY, heading: start.heading + heading, color, bolt: bolt.name });
         Plotter.render();
         return;
       }
@@ -216,7 +219,7 @@ const Plotter = Factory.create('Plotter', {
       const yaw: number | undefined = (entry.data as any)?.sensordata?.angles?.yaw;
       if (!locator) return;
       const p     = turn(start.heading, locator.positionX, locator.positionY);
-      const location = { positionX: start.x + p.x, positionY: start.y + p.y };
+      const location = { positionX: start.x + p.x, positionY: start.y + p.y, bolt: bolt.name };
       // the sheet's heading, clockwise from its top: the start's plus the measured one, which is -yaw
       Plotter.placeBolt(bolt.name, location, color, yaw === undefined ? null : start.heading - yaw);
       Plotter.render(location, color);
