@@ -6,7 +6,7 @@
 // the environment: CIRCUIT=<path> scores a circuit under test, OLD=1 the old
 // modules in packages/core/src/brain (docs/core-brain.plan.md).
 //
-//   node bench/run.mjs [n | n-m ...] [--trace] [--estimator network]
+//   node bench/run.mjs [n | n-m ...] [--trace] [--steps <file>] [--estimator network]
 
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';

@@ -13,6 +13,7 @@
 // `t angle length distance` at six decimals, t the event's time in ms and
 // distance `-` without a distance population, printed as eight hex digits.
 // Two brains that step alike give the same digest; nothing less passes.
+// `step` answers true when the network stepped, for replay.mjs's --steps.
 
 import { readFileSync } from 'node:fs';
 
@@ -60,6 +61,7 @@ export function network (params = {}) {
       net.step(obs.tick(e, params.forward === 0 ? 0 : Math.min(1, e.speed / SEEK_SPEED)), dt);
       const est = net.estimate();
       digest.add(`${e.t.toFixed(6)} ${est.angle.toFixed(6)} ${est.length.toFixed(6)} ${est.distance === undefined ? '-' : est.distance.toFixed(6)}\n`);
+      return true;
     },
     /** The ring and the distance, for `--dump`. */
     debug () { return `ring ${Array.from(net.ringRates(), (v) => v.toFixed(1)).join(' ')} | d ${net.believedDistance().toFixed(0)} cm`; },
