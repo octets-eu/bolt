@@ -6,7 +6,7 @@
 // turn, read off the yaw: the fly's compass shift, done exactly instead of by
 // rotation neurons.
 //
-// What it does, by the weights (build-circuit.mjs): one corner read is held about
+// What it does, by the weights (build/build-circuit.ts): one corner read is held about
 // 5 s, a full bump fades over 10 s; a bump at nose and tail together, the axis a carrier
 // frame names, has no vector and fades with its input unless a corner read or the gradient tips it
 // to one side, after which the one-bump mode holds it. No input, no bump:

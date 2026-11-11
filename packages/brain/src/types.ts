@@ -3,7 +3,7 @@
 // worm's format [pre, post, weight, type], and `vis`, the view's anatomy.
 // sensory_map.jsonc: the observation layer's constants, `ir`, and the
 // channels that turn its sources into the sensory neurons' drives. This is
-// scheme 1, what build-circuit.mjs writes; docs/core-brain.plan.md's phases
+// scheme 1, what build/build-circuit.ts writes; docs/core-brain.plan.md's phases
 // B and C change it.
 
 import type { LadderRange } from '@bolt/core';
@@ -14,25 +14,26 @@ export type V3 = [number, number, number];
 export interface NeuronDef {
   id: string; type: string; role: string; side: string; pos: V3;
   angle?: number; channel?: number; ladder?: string; strength?: number;
-  of?: string; gate?: string[]; band?: (number | null)[]; cm?: [number, number]; tauCm?: number; tauParallax?: number;
+  of?: string; gate?: string[]; band?: [number, number | null]; cm?: [number, number]; tauCm?: number; tauParallax?: number;
   bias?: number; tauMs?: number; evidence?: boolean; axis?: string; unit?: string;
 }
 
 /** The brain view's anatomy, what the wiring cannot say: the neuropils' places and shapes and the somata, in the Bolt's body frame, cm, nose along +y. */
 export interface Vis {
+  frame: string;   // the body frame, in words
   ball: { r: number };
   neuropils: {
-    ring: { at: V3; r: number; tube: number };
-    column: { at: V3; r: number; layers: Record<string, number> };
-    glomeruli: { r: number; at: Record<string, V3> };
-    earNuclei: { r: number; at: Record<string, V3> };
-    motor: { at: V3; r: number; flat: number };
+    ring: { shape: string; at: V3; r: number; tube: number };
+    column: { shape: string; at: V3; r: number; layers: Record<string, number> };
+    glomeruli: { shape: string; r: number; at: Record<string, V3> };
+    earNuclei: { shape: string; r: number; at: Record<string, V3> };
+    motor: { shape: string; at: V3; r: number; flat: number };
   };
   organs: {
-    ears: { r: number; depth: number; at: Record<string, V3> };
-    hearing: { at: V3; r: number };
-    muscle: { at: V3; size: V3 };
-    wheels: { r: number; width: number; at: V3[] };
+    ears: { shape: string; r: number; depth: number; at: Record<string, V3> };
+    hearing: { shape: string; at: V3; r: number };
+    muscle: { shape: string; at: V3; size: V3 };
+    wheels: { shape: string; r: number; width: number; at: V3[] };
   };
   soma: Record<string, V3>;
 }
