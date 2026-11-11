@@ -29,9 +29,14 @@
 // ack and the seeker drove blind on its last command (run 10, 2026-11-09).
 
 import { DeviceId, DrivingCommand, Target, mod360 } from '@bolt/core';
+import type { Bolt } from '@bolt/core';
+import type { Network } from './network';
+
+/** A roll: the mode it serves, the ring's direction off the nose it followed (none for the scan and the roam), the heading and speed to send. */
+export interface Roll { mode: 'target' | 'listen' | 'probe' | 'scan' | 'roam'; dir: number | null; heading: number; speed: number }
 
 /** The roll as a fired command: heading in the Bolt's heading frame, speed 0..255; the status heading follows. */
-export function fireRoll (bolt, speed, heading) {
+export function fireRoll (bolt: Pick<Bolt, 'status' | 'queue'>, speed: number, heading: number): Promise<void> {
   const h = mod360(Math.round(heading)), v = Math.min(255, Math.max(0, Math.round(speed)));
   bolt.status.heading = h;
   return bolt.queue.fire({ name: 'roll', device: DeviceId.driving, id: DrivingCommand.driveWithHeading, target: Target.st, data: [v, (h >> 8) & 0xff, h & 0xff, 0] }, 300).then(() => undefined, () => undefined);
@@ -51,11 +56,11 @@ export const MOTOR = {
   nearDriveDeg: 30,
 };
 
-const state = { axisSince: null, scanAt: 0 };
-const cast = (deg) => deg * Math.sin(2 * Math.PI * Date.now() / MOTOR.castMs);
+const state: { axisSince: number | null; scanAt: number } = { axisSince: null, scanAt: 0 };
+const cast = (deg: number): number => deg * Math.sin(2 * Math.PI * Date.now() / MOTOR.castMs);
 
 /** `heading`: where the nose points; `commanded`: the last roll's heading, which listening and the scan's stand hold; `dtMs` since that roll. */
-export function motorCommand (net, heading, commanded, dtMs) {
+export function motorCommand (net: Pick<Network, 'get'>, heading: number, commanded: number, dtMs: number): Roll {
   const F = net.get('M_FWD'), B = net.get('M_BACK'), R = net.get('M_RIGHT'), L = net.get('M_LEFT');
   const search = net.get('M_SEARCH'), roam = net.get('M_ROAM');
   if (search <= 0.5) {

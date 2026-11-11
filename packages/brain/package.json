@@ -4,14 +4,22 @@
   "version": "0.1.0",
   "type": "module",
   "description": "The seeker's brain: the connectome in circuit.json, the observation layer that feeds it, the motor it drives.",
-  "main": "./src/index.mjs",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
   "exports": {
-    ".": "./src/index.mjs",
+    ".": "./src/index.ts",
     "./circuit.json": "./src/circuit.json",
     "./sensory_map.jsonc": "./src/sensory_map.jsonc",
-    "./load": { "node": "./src/load.mjs" }
+    "./load": { "node": "./src/load.ts" }
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@bolt/core": "*"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.9.0"
   }
 }

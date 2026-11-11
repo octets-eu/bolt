@@ -10,18 +10,25 @@
 // A code held for two beats keeps the clock.
 
 import { LADDERS } from '@bolt/core';
+import type { Bolt, LadderRange } from '@bolt/core';
 
-const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+const wait = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
 
 export class LadderSender {
 
-  constructor (bolt, range = 'long', repeat = 2) { this.bolt = bolt; this.range = range; this.repeat = repeat; this.frames = 0; }
+  readonly bolt: Pick<Bolt, 'communication' | 'actuators'>;
+  range: LadderRange;
+  readonly repeat: number;
+  frames = 0;
+  running = false;
+
+  constructor (bolt: Pick<Bolt, 'communication' | 'actuators'>, range: LadderRange = 'long', repeat = 2) { this.bolt = bolt; this.range = range; this.repeat = repeat; }
 
   /** From the next round on. */
-  switch (range) { this.range = range; void this.bolt.communication.switchLadder(range).catch(() => {}); }
+  switch (range: LadderRange): void { this.range = range; void this.bolt.communication.switchLadder(range).catch(() => {}); }
 
   /** Sends until `stop`; resolves then. */
-  async run () {
+  async run (): Promise<void> {
     this.running = true;
     await this.bolt.communication.switchLadder(this.range);   // shows the ladder on the matrix
     let at = performance.now();
@@ -29,7 +36,7 @@ export class LadderSender {
       const { channels, strengths } = LADDERS[this.range];
       for (let k = 0; k < channels.length * this.repeat && this.running; k++) {
         const level = Math.floor(k / this.repeat);
-        await this.bolt.actuators.infrared.send(channels[level], strengths[level]).catch(() => {});
+        await this.bolt.actuators.infrared.send(channels[level]!, strengths[level]!).catch(() => {});
         this.frames++;
         at += 200;
         await wait(Math.max(0, at - performance.now()));
@@ -38,6 +45,6 @@ export class LadderSender {
     }
   }
 
-  stop () { this.running = false; }
+  stop (): void { this.running = false; }
 
 }
