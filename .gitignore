@@ -17,9 +17,8 @@ frames/
 # Claude Code conversation transcripts, copied from ~/.claude/projects
 diary/
 
-# the bench's runs, cut from apps/browser/sessions/ and frames/ by bench/extract.mjs
+# the bench's runs, cut from apps/browser/sessions/ and frames/ by bench/extract.mjs; their list, bench/index.tsv, is tracked
 bench/*/
-bench/index.tsv
 
 # retired work and documentation material, kept locally, not in the repo
 /archive/

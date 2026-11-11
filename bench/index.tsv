@@ -1,0 +1,24 @@
+n	session	start	kind	seeker	mark	s	end	source
+1	2026-11-08T17-28-48-047Z	44880.8	seek	SB-9129	yes	31.7	brain seek runaway after 31.6 s: frames 65, reads 342, lande	apps/browser/sessions/sessions-2026-11.zip:2026-11/08/session-2026-11-08T17-28-48-047Z.jsonl
+2	2026-11-08T17-55-34-422Z	709568.1	seek	SB-9129	yes	54.9	brain seek time after 54.9 s: frames 108, reads 528, landed 	apps/browser/sessions/sessions-2026-11.zip:2026-11/08/session-2026-11-08T17-55-34-422Z.jsonl
+3	2026-11-08T18-14-26-526Z	97834.2	seek	SB-9129	yes	23.6	brain seek found after 23.5 s: frames 70, reads 237, landed 	apps/browser/sessions/sessions-2026-11.zip:2026-11/08/session-2026-11-08T18-14-26-526Z.jsonl
+4	2026-11-08T18-19-41-106Z	80486.7	seek	SB-11DF	yes	24.0	brain seek runaway after 23.9 s: frames 59, reads 237, lande	apps/browser/sessions/sessions-2026-11.zip:2026-11/08/session-2026-11-08T18-19-41-106Z.jsonl
+5	2026-11-09T10-30-07-800Z	244574.1	seek	SB-9129	yes	54.9	brain seek time after 54.8 s: frames 127, reads 477, landed 	frames/session-run9.jsonl
+6	2026-11-09T10-51-23-494Z	460862	seek	SB-9129	yes	24.3	brain seek found after 24.3 s: frames 56, reads 213, landed 	apps/browser/sessions/sessions-2026-11.zip:2026-11/09/session-2026-11-09T10-51-23-494Z.jsonl
+7	2026-11-09T11-19-10-933Z	136005.5	seek	SB-9129	yes	33.1	brain seek runaway after 33.1 s: frames 88, reads 276, lande	frames/session-run11.jsonl
+8	2026-11-09T11-56-24-749Z	197991.4	seek	SB-9129	yes	48.1	brain seek runaway after 48.0 s: frames 103, reads 348, land	apps/browser/sessions/sessions-2026-11.zip:2026-11/09/session-2026-11-09T11-56-24-749Z.jsonl
+9	2026-11-09T12-22-29-493Z	30718	seek	SB-9129	yes	39.8	brain seek found after 39.8 s: frames 127, reads 402, landed	apps/browser/sessions/sessions-2026-11.zip:2026-11/09/session-2026-11-09T12-22-29-493Z.jsonl
+10	2026-11-10T18-00-46-479Z	367355	seek	SB-9129	yes	52.5	brain seek found after 52.5 s: frames 165, reads 609, landed	frames/session-run14.jsonl
+11	2026-11-08T17-05-17-155Z	91711.8	seek	SB-9129	no	37.8	brain seek stopped after 37.7 s: frames 110, reads 405, land	apps/browser/sessions/sessions-2026-11.zip:2026-11/08/session-2026-11-08T17-05-17-155Z.jsonl
+12	2026-11-08T17-05-17-155Z	471718.8	seek	SB-9129	no	30.8	brain seek stopped after 30.7 s: frames 84, reads 378, lande	apps/browser/sessions/sessions-2026-11.zip:2026-11/08/session-2026-11-08T17-05-17-155Z.jsonl
+13	2026-11-08T17-17-53-196Z	46871.5	seek	SB-9129	no	45.0	brain seek time after 44.9 s: frames 97, reads 411, landed 1	apps/browser/sessions/sessions-2026-11.zip:2026-11/08/session-2026-11-08T17-17-53-196Z.jsonl
+14	2026-11-08T17-55-34-422Z	31066.2	path	SB-9129	no	116.0	brain path done	apps/browser/sessions/sessions-2026-11.zip:2026-11/08/session-2026-11-08T17-55-34-422Z.jsonl
+15	2026-11-09T11-29-44-202Z	744124.7	path	SB-9129	no	176.5	brain path done: pass 1, the mode by hand	apps/browser/sessions/sessions-2026-11.zip:2026-11/09/session-2026-11-09T11-29-44-202Z.jsonl
+16	2026-11-09T11-29-44-202Z	950291.9	path	SB-9129	no	178.0	brain path done: pass 2, the long ladder sent by hand, no br	apps/browser/sessions/sessions-2026-11.zip:2026-11/09/session-2026-11-09T11-29-44-202Z.jsonl
+17	2026-11-09T11-29-44-202Z	1182090.6	path	SB-9129	no	106.9	brain path done: pass 3, the short ladder sent by hand, no b	frames/session-path-near.jsonl
+18	2026-11-11T15-18-20-548Z	7976790	path	SB-9129	no	32.1	brain path done: L0 run 1, Sender/blue on rg, Seeker/green o	frames/l0-session.jsonl
+19	2026-11-11T15-18-20-548Z	8092395.7	seek	SB-9129	yes	18.9	brain seek found after 18.8 s: frames 61, reads 213, landed 	frames/l0-session.jsonl
+20	2026-11-11T15-18-20-548Z	8233380.1	path	SB-9129	no	32.2	brain path done: L0 run 3, Sender/blue on d1, Seeker/green o	frames/l0-session.jsonl
+21	2026-11-11T15-18-20-548Z	8344978.8	seek	SB-9129	yes	56.8	brain seek found after 56.7 s: frames 140, reads 570, landed	frames/l0-session.jsonl
+22	2026-11-11T17-39-44-412Z	102864.1	path	SB-9129	no	32.2	brain path done: L0 run 5, Sender/blue on d1, Seeker/green o	frames/l0-session2.jsonl
+23	2026-11-11T17-39-44-412Z	211857.9	seek	SB-9129	yes	106.1	brain seek found after 106.0 s: frames 261, reads 978, lande	frames/l0-session2.jsonl
