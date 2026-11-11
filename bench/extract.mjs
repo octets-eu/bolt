@@ -10,7 +10,8 @@
 // The sources are the month zips the app archives into
 // apps/browser/sessions/; session files given as arguments are read after
 // them, for a run not archived yet or a file that carries what the zip does
-// not. Of a new run found twice, a copy with a mark is taken.
+// not. Of a new run found twice, a copy with a mark is taken. A path
+// followed by `brain path void` stays out.
 //
 //   node bench/extract.mjs [session.jsonl ...]
 
@@ -19,6 +20,7 @@ import { existsSync, readFileSync, readdirSync, mkdirSync, writeFileSync } from 
 
 const START = /^brain (seek:|path start)/, END = /^brain (seek (found|time|runaway|stopped)|path done)/;
 const MARK = /^brain replay (\{.*\})$/;
+const VOID = /^brain path void/;   // the user's verdict on the path just ended: not for the bench
 const ZIPS = 'apps/browser/sessions';
 process.chdir(new URL('..', import.meta.url).pathname);
 
@@ -37,6 +39,7 @@ function runsOf (text) {
     if (d === null) return;
     if (START.test(d)) { open = { kind: d.startsWith('brain seek') ? 'seek' : 'path', from: k, t0: e.t, seeker: d.match(/seeker (\S+)/)?.[1] ?? e.bolt }; last = null; return; }
     if (END.test(d) && open) { last = { ...open, to: k, t1: e.t, end: d, id: lines[head]?.id, lines: [raw[head], ...raw.slice(open.from, k + 1)] }; out.push(last); open = null; return; }
+    if (VOID.test(d) && last?.kind === 'path') { out.pop(); last = null; return; }
     const mark = d.match(MARK);
     if (mark && last?.kind === 'seek' && !last.mark) { last.mark = JSON.parse(mark[1]); last.lines.push(raw[k]); }   // the mark follows its run
   });

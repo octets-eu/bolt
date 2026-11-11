@@ -128,9 +128,9 @@ function fireRoll (bolt: Bolt, speed: number, heading: number): Promise<void>;
 
 ### L0, far data for the bench
 
-Every marked seek of the bench starts at 122 cm (runs 1 to 10), the unmarked at 100 cm, and the paths lie within 55 cm of the sender (15 to 17) or on the sheet (14): the goal's range, 0.5 to 3.5 m, and the far evidence, the long ladder's silences, are unscored. The three starts of this plan are 1.2, 2 and 3 m from the sender, on the sheet's line; L1 and S2 use them.
+The starts are the plotter's reference points (`plotter.ts`, `floor-plan.svg`): a Bolt reset on a point knows its place, the truth carries no drive out. The three distances of this plan: Sender/blue on rg and Seeker/green on u1, 1.2 m; Sender/blue on d1 and Seeker/green on u1, 2.4 m; Sender/blue on d1 and Seeker/green on u2, 3.2 m. L1 and S2 use them.
 
-- **L0** three paths by hand, waypoints at 1.2, 2 and 3 m from the sender, standing at each facing four headings as passes 1 to 3 did, and three seeks from the three starts, marked; extracted into the bench. The runner's runaway fence, 250 cm from the seek's start (`runner.ts:35`), ends a 3 m seek before the sender: it becomes the start distance plus a metre. The truth is the mark's `at` from the sheet starts with the locator's slip over the drive out as its error bar. Before A1 when the Bolts are up, with L1 at the latest, so S and D are judged on the far belief too.
+- **L0** at each distance a path, Seeker/green standing on its point facing four headings 8 s each, the truth on its start line, and a seek, marked; extracted into the bench as runs 18 to 23. A seek starts where Seeker/green stands, its time limit `TIME_LIMITS` in `runner.ts`, the runaway fence the start distance plus a metre.
 
 ### A, the package (behaviour identical)
 
