@@ -8,18 +8,19 @@
 2. **circuit.json is the connectome.** Neurons, edges, populations, the ports to the observation layer and the motor, and the constants of all three layers are data. The network code knows a short list of cell models, synapse kinds and population operators, and no neuron names. The operators are a step on the way: at the end every mechanism is cells and edges.
 3. **Observation and motor are code behind interfaces.** The observation layer turns the Bolt's streams into input ports, the motor turns output ports into a roll; nothing crosses by a neuron's name.
 
-The weights of the senses onto the belief, the profiles the builder draws from `senses.json`, are out of scope: they stay as the builder makes them and are drawn anew after this plan. The edges the steps add (C3's add and gate edges at 1, D2's and D5's) are structural: their weights follow from the mechanism and are not drawn.
+The weights of the senses onto the belief, the profiles the builder draws from `senses.json`, stay as the builder makes them through phases A to C and are drawn by hand in phase W, short first, then far with the bands to 3.5 m. The edges the steps add (C3's and D1 to D5's) are structural: their weights follow from the mechanism and are not drawn.
 
 ## Rules for every step
 
 - One step, one commit; its check and the bench's numbers go in the commit message.
-- Every step runs the bench before and after, `node bench/run.mjs`, all scored runs, the same set before and after. Runs added by L0 to L3 and S2 join the set from the next step on; phase D's reference is re-run on the grown set.
+- Every step runs the bench before and after, `node bench/run.mjs`, all scored runs, the same set before and after. Runs added by L0 to L3 and S2 join the set from the next step on; the reference of phase D is re-run on the set as it grows.
 - Phases A to C change no behaviour. The replay prints per run two digests, 32-bit FNV-1a over one line per event: the estimate digest over every network step, `t angle length distance` at six decimals; the motor digest, from B1 on, over every motor call, `t mode heading speed` at six decimals. Equal digests pass, nothing less does. A rebuilt `circuit.json` is byte-identical to the committed one.
+- Phase W changes behaviour by the weights and the bands alone; the bench judges, each step's check names its runs and its reference.
 - Phase S changes behaviour in one variant, `"beat"`, judged by S2's A/B; the bench's numbers for it are reported, not bounded.
-- Phase D changes behaviour, in small deviations, each step against C3's numbers as S2 leaves them, on the same runs, not against the step before: the share of seconds under 30° within ±3 points, the mean error within ±5°, no run over 40 s with its share of seconds under 30° more than 10 points down (on a 24 s run 10 points are two seconds). A step outside the bounds is not committed: it is debugged, or its cell form changed, until it is inside. Weights are adjusted after the plan.
+- Phase D changes behaviour, in small deviations, each step against W2's numbers, the brain entering D, on the same runs, not against the step before: the share of seconds under 30° within ±3 points, the mean error within ±5°, no run over 40 s with its share of seconds under 30° more than 10 points down (on a 24 s run 10 points are two seconds). A step outside the bounds is not committed: it is debugged, or its cell form changed, until it is inside.
 - The old code in `packages/core/src/brain/` and `packages/core/src/experiments/replay.mjs`, `replay-network.mjs` stays untouched until E1. The package starts as a copy; `OLD=1` makes the package's replay import the old modules, `Date.now` patched onto the replay's clock for the old motor as `performance.now` is for the old observation; the old motor's timers are module state (`motor.mjs:54`), so the reference imports it afresh for every run, a query on the import's URL.
 - The brain tab is backlog 02's (`docs/hide-and-seek.plan.md`): it compiles against the package, nothing more is checked. It grows its anatomy on its first visit (`view.ts:34`), so a cell it cannot place breaks the tab and nothing else; D's new cells get their place there.
-- Live runs with the Bolts, L1 to L3 and the A/B runs of S2, go where the bench is blind: the bundle on the rig, the link, the clock, the motor and the closed loop. Each run is marked and extracted into the bench. L1 is the live baseline; phase D's reference on the bench is C3 as S2 leaves it.
+- Live runs with the Bolts, L1 to L3 and the A/B runs of S2, go where the bench is blind: the bundle on the rig, the link, the clock, the motor and the closed loop. Each run is marked and extracted into the bench. L1 is the live baseline; phase D's reference on the bench is W2.
 
 ## Interfaces
 
@@ -115,8 +116,8 @@ function fireRoll (bolt: Bolt, speed: number, heading: number): Promise<void>;
 ```
 
 - The network reads `model`, `population`, `port` and the model's parameters, never `role`, `type`, `side` or `pos`; those are for the views. This holds from C2 on; C1 still finds the self cells by `role` and `axis`.
-- Cell models: `input`, the port's value times `gain`, with `rateTauMs` its events per second smoothed; `relu`, max(0, bias + input); `evidence`, its input added to its potential, the log-evidence, its rate from its population's normalisation; `product`, its add input times the share of its gate inputs in their population (phases C and D only). The leaky cell (`tauMs`) and the old map's ops `mul`, `sub`, `clamp` and `adapt` get no model: nothing in the circuit uses them.
-- An edge `[pre, post, weight]` adds weight times the pre's rate; a fourth field names another kind. `gate` multiplies: the cell's rate is its add input times the sum of its gate inputs, weight times rate; for a `product` cell that sum is divided by the total of the gates' population, the share, which `peak` normalisation keeps above 0. Until C1 the file keeps the worm's fourth field, the type 0; C1 drops it with the kinds, `types.ts`'s edge tuple following.
+- Cell models: `input`, the port's value times `gain`, with `rateTauMs` its events per second smoothed; `relu`, max(0, bias + input); `evidence`, its input added to its potential, the log-evidence, its rate from its population's normalisation; `product`, its add input times the share of its gate inputs in their population (from C3 until D1). The leaky cell (`tauMs`) and the old map's ops `mul`, `sub`, `clamp` and `adapt` get no model: nothing in the circuit uses them.
+- An edge `[pre, post, weight]` adds weight times the pre's rate; a fourth field names another kind. `gate` multiplies: the cell's rate is its add input times the sum of its gate inputs, weight times rate; for a `product` cell that sum is divided by the total of the gates' population, the share, which `peak` normalisation keeps above 0. Until C1 the file keeps the worm's fourth field, the type 0; C1 drops it, the edges three fields, `types.ts`'s edge tuple following; from C3 a fourth field names a kind.
 - A step updates in a fixed order of models: inputs, products, the population operators in the order `carry` (the ring's turn, then the stack's slide, both from the readouts taken before either), `forget`, `shift`; then evidence and normalisation, then relu cells in the file's order.
 - A population has `normalize` (`peak`: exp of the potential less the population's peak), `decode` (`peak`: the `angle` of the highest rate, with `length` 1 over the sum of the rates, the peak's share of the mass; `mean`: the rate-weighted mean of the cells' `cm` midpoints) and operators: `shift` by a cell's value in degrees; `carry` on a ring turns it by the parallax of the step at the believed distance, on a stack slides it by the step along the believed bearing, in bands, under `minCm` of step not at all and the slide not under `minShift` of a band; `forget` with the travel over `minCm`, by each cell's `tauCm` in cm or `tauParallax` in radians of the step over the believed distance floored at `floorCm`.
 - `outputs` names the neuron behind each output port, `readouts` the populations behind the estimate.
@@ -126,7 +127,7 @@ function fireRoll (bolt: Bolt, speed: number, heading: number): Promise<void>;
 
 ## Steps
 
-### L0, far data for the bench
+### L0, far data for the bench (**done**)
 
 The starts are the plotter's reference points (`plotter.ts`, `floor-plan.svg`): a Bolt reset on a point knows its place, the truth carries no drive out. The three distances of this plan: Sender/blue on rg and Seeker/green on u1, 1.2 m; Sender/blue on d1 and Seeker/green on u1, 2.4 m; Sender/blue on d1 and Seeker/green on u2, 3.2 m. L1 and S2 use them.
 
@@ -134,15 +135,15 @@ The starts are the plotter's reference points (`plotter.ts`, `floor-plan.svg`): 
 
 ### A, the package (behaviour identical)
 
-- **A1** the move: `packages/brain/` as `@bolt/brain`: `package.json` (exports `.`, `./circuit.json`, and `./load` for Node only); network, observation, motor, ring, ladder and load copied as they are, `circuit.json` and `sensory_map.jsonc` beside them; `bench/replay.mjs` and `bench/replay-network.mjs` copied from the experiments onto the package, with the digests and the per-run share of seconds under 30°; `bench/run.mjs` runs them, `OLD=1` the old modules. `ladder` is the sender's side, kept in the package as the referee's tool until core's `sendLadder` holds a code for two beats (not in this plan). Check: digests equal with and without `OLD=1`.
-- **A2** the types: the six modules as strict TypeScript; `tsconfig.json` as core's plus `"types": ["node"]` and `@types/node` for `load.ts`, the one module that imports `node:`; `types.ts` with the view's `Circuit`, `NeuronDef` and `Vis`. Check: tsc strict, digests equal.
-- **A3** the builder: `build-circuit` and `vis` into `packages/brain/build/`, with `senses.json`. Check: the rebuilt `circuit.json` is byte-identical.
+- **A1** the move: `packages/brain/` as `@bolt/brain`: `package.json` (exports `.`, `./circuit.json`, `./sensory_map.jsonc` until B2, and `./load` for Node only); network, observation, motor, ring, ladder and load copied as they are, an `index` exporting what the app and the bench import (`Network`, `parseJsonc`, `Observation`, `ringVector`, `LadderSender`, `motorCommand`, `fireRoll`, `MOTOR`), `circuit.json` and `sensory_map.jsonc` beside them; `replay.mjs` and `replay-network.mjs` copied from the experiments into the root `bench/`, beside `run.mjs`, `extract.mjs` and the runs, importing the package, with the digests and the per-run share of seconds under 30°; `bench/run.mjs` runs them, `OLD=1` the old modules. `ladder` is the sender's side, kept in the package as the referee's tool until core's `sendLadder` holds a code for two beats (not in this plan). Check: digests equal with and without `OLD=1`.
+- **A2** the types: the seven modules as strict TypeScript; `tsconfig.json` as core's plus `"types": ["node"]` and `@types/node` for `load.ts`, the one module that imports `node:`; `types.ts` with the view's `Circuit`, `NeuronDef` and `Vis`. Check: tsc strict, digests equal.
+- **A3** the builder: `build-circuit` and `vis` into `packages/brain/build/` as strict TypeScript, the package's `tsconfig.json` covering `build/` beside `src/`, run by `tsx`, with `senses.json`. Check: tsc strict, the rebuilt `circuit.json` is byte-identical.
 - **A4** the app on `@bolt/brain`: `runner.ts`, `connectome.ts` (`@bolt/brain/circuit.json`), `view.ts`, `anatomy.ts`. Check: the app type-checks and builds, digests equal.
 
 ### B, the interfaces (behaviour identical)
 
 - **B1** output ports: `outputs` in `circuit.json` and `Network.output`; the motor a class with its own state, `now` passed to `command`, reading ports only (`mode.near` instead of IR_NEAR); the referee reads `request.short`. The replay calls `command` once a second, after the step that crosses the second: `heading` the last motion sample's, `commanded` the motor's own last heading (the first sample's to start), `dtMs` since the last call capped at 400 as live, `now` the replay's clock; the old motor under `OLD=1` is called the same way. The replay prints the motor digest. Check: digests equal.
-- **B2** input ports: the input neurons carry `port`, `gain` and `rateTauMs`; `sensory_map.jsonc`'s channels dissolve into them; its `ir` block becomes `observation`, less `corners`, which is the builder's, plus the layer's constants now in code (the 100 ms second-notify window, the follow's 40 ms and 0.4, `expectMs`, the 3 s a channel stays expected, the watchdog's 1500 ms, the fired command's 300 ms); `MOTOR` becomes `motor`; the observation layer takes its clock, stamps the construction and `start` as ladder switches, and the replay's poke of `switchedAt` goes; `sensory_map.jsonc` leaves the package. Check: digests equal, the rebuild byte-identical.
+- **B2** input ports: the input neurons carry `port`, `gain` and `rateTauMs`; `sensory_map.jsonc`'s channels dissolve into them; its `ir` block becomes `observation`, less `corners`, which is the builder's, plus the layer's constants now in code (the 100 ms second-notify window, the follow's 40 ms and 0.4, `expectMs`, the 3 s a channel stays expected, the watchdog's 1500 ms, the fired command's 300 ms); `motor.mjs`'s `MOTOR` becomes `motor`; the observation layer takes its clock, stamps the construction and `start` as ladder switches, and the replay's poke of `switchedAt` goes; `sensory_map.jsonc` leaves the package. Check: digests equal, the rebuild byte-identical.
 - **L1** three seeks on the Bolts from the three starts of L0. Everything up to here is behaviour identical by the bench; L1 checks what the bench cannot see: the bundle on the rig, the link, the clock, the motor in the loop. It is the live baseline.
 
 ### C, the generic network (behaviour identical)
@@ -150,6 +151,13 @@ The starts are the plotter's reference points (`plotter.ts`, `floor-plan.svg`): 
 - **C1** models and populations: `model`, `population`, `populations` with `normalize` and `decode`, `readouts`, the edges three fields; the network dispatches on them, the self cells still found by `role` and `axis`; `checkCircuit`. Check: digests equal, the rebuild byte-identical.
 - **C2** the operators as data: `shift`, `carry` and `forget` declared on the populations with their cells and constants; `role` is not read from here on. Check: as C1.
 - **C3** the product cells as edges: `model: "product"`; `of` and `gate` become an add edge and gate edges; the brain view's grade reads `model` instead of `of`, so it compiles. Check: as C1. The stash `corner lobes drawn` is decided here: ported onto scheme 2 or dropped.
+
+### W, the weights by hand (the bench judges)
+
+The profiles of the senses onto the ring and the distance come from `senses.json`, the counted tables of 21 runs, read by the builder alone (`build-circuit.mjs:71`); their writer, `replay.mjs --senses --write`, is gone. Drawn by hand they need no table.
+
+- **W1** after C3, the short weights: the profiles drawn by hand over every band, tuned on runs 1 to 19; `senses.json` goes, with the builder's mention of its writer. Check: the bench's share of seconds under 30° and mean |err| on runs 1 to 19 both better than C3's; runs 20 to 23 reported.
+- **W2** after S2, before D1, the far weights and the bands: the builder's bands to 3.5 m (today 10 of 20 cm to 2 m, the belief ending at 190 cm), the profiles tuned on the far runs the bench holds by then, L0's 20 to 23 and the 2.4 m and 3.2 m runs of L1 and S2. Check: the far runs' two numbers better than W1's; runs 1 to 19 within phase D's bounds against W1.
 
 ### S, the silent slots at their beat (A/B with the Bolts)
 
@@ -181,5 +189,3 @@ Each step replaces one operator by cells and edges and is shown in full before i
 ## Open
 
 - The agent's `brain.mjs`, `seek.mjs`, `utils/link-load.mjs` and `pull.sh` onto the package or left, and `packages/brain` in `agent/sync.rules`: at E1.
-- The weights before D or after: at C3 every mechanism is data and the bench runs, so the weights can be drawn then and D follow on the better brain; D does not need them. Decided at C3.
-- The distance past 2 m: the builder's 10 bands of 20 cm end at 2 m, so the belief ends at 190 cm (L0, runs 20 to 23), while the goal runs to 3.5 m. Bands to 3.5 m come with the weights drawn by hand: at C3.
