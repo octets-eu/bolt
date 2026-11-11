@@ -27,9 +27,9 @@ const commitStamp: Plugin = {
 const certDir = resolve(import.meta.dirname, '../../Certificates/macos');
 
 export default defineConfig({
-  // completed days of session logs land in apps/browser/sessions as one zip per month
+  // completed days of session logs land in apps/browser/sessions as one zip per month; the running session, on Session.toFrames, in frames/
   // the phone over the floor through the forwarder on the rig, see vite-plugin-cam.ts
-  plugins: [commitStamp, sessionArchive(resolve(import.meta.dirname, 'sessions')), camForwarder()],
+  plugins: [commitStamp, sessionArchive(resolve(import.meta.dirname, 'sessions'), resolve(import.meta.dirname, '../../frames')), camForwarder()],
   server: {
     host: true,
     port: 8080,

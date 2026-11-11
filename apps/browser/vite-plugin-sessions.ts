@@ -12,10 +12,12 @@ import { join } from 'node:path';
  *   POST /__sessions/<day>    body { files: [{ name, text }] }
  *        -> { day, files, bytes } once the files are in <dir>/sessions-<yyyy-mm>.zip
  *           as <yyyy-mm>/<dd>/<name>. An entry with the same name is replaced.
+ *   POST /__sessions/current  body { name, text }, the running session (Session.toFrames)
+ *        -> { path, bytes } once it is written to <framesDir>/<name>, for bench/extract.mjs
  *
  * The zip is grown with the system `zip` command, so nothing is rewritten.
  */
-export function sessionArchive (dir: string): Plugin {
+export function sessionArchive (dir: string, framesDir: string): Plugin {
 
   const json = (res: ServerResponse, status: number, body: object) => {
     res.statusCode = status;
@@ -35,6 +37,14 @@ export function sessionArchive (dir: string): Plugin {
     const url = (req.url || '/').replace(/\/$/, '') || '/';
 
     if (req.method === 'GET' && url === '/') return json(res, 200, { ok: true });
+
+    if (req.method === 'POST' && url === '/current') {
+      const { name, text } = JSON.parse(await body(req)) as { name?: unknown, text?: unknown };
+      if (typeof name !== 'string' || !/^session-[\w-]+\.jsonl$/.test(name) || typeof text !== 'string') return json(res, 400, { error: 'bad file name or text' });
+      mkdirSync(framesDir, { recursive: true });
+      writeFileSync(join(framesDir, name), text);
+      return json(res, 200, { path: join(framesDir, name), bytes: Buffer.byteLength(text) });
+    }
 
     const day = req.method === 'POST' ? /^\/(\d{4}-\d{2})-(\d{2})$/.exec(url) : null;
     if (!day) return json(res, 404, { error: 'not found' });

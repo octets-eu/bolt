@@ -222,6 +222,14 @@ class SessionLog {
     return { name, bytes: text.length };
   }
 
+  /** The running session's text to the dev server, which writes it to frames/<name> (vite-plugin-sessions.ts), where bench/extract.mjs reads it. No picker, no gesture. */
+  async toFrames (): Promise<{ path: string, bytes: number }> {
+    const text = await this.toJsonl();
+    const res = await fetch('/__sessions/current', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ name: this.fileName, text }) });
+    if (!res.ok) throw new Error(`save: ${res.status} ${await res.text()}`);
+    return res.json() as Promise<{ path: string, bytes: number }>;
+  }
+
 }
 
 export const session = new SessionLog();

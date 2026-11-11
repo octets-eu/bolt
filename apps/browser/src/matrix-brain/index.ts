@@ -5,16 +5,24 @@
 // points (the plotter's buttons) and starts where the seeker stands: the
 // start distance is the points', and the sender's place in the seeker's
 // locator frame is known for the replay. A fullstop or a disconnect turns
-// either off.
+// either off. `Seek` is the same for the console and the browser tools, with
+// the seek's exits given for one run instead of the defaults.
 
 import type { Bolt } from '@bolt/core';
 import { NotConnectedError } from '@bolt/core';
+import type { IEventMessage } from '@bolt/protocol';
 import { Bolts } from '../bolts';
 import { Plotter } from '../components/plotter/plotter';
+import { session } from '../session';
 import { MatrixBrain } from './runner';
-import type { RunSummary } from './runner';
+import type { RunSummary, SeekOptions } from './runner';
 
 export const ROLES = { seeker: 'SB-9129', sender: 'SB-11DF' };   // green seeks, blue sends (2026-11-09)
+
+/** The seek's exits, the user's: the time limit by start distance, cm and s, a start taking the nearest listed distance's; the runaway fence beyond the start distance. */
+export const SEEK_DEFAULTS = { timeLimits: [[120, 60], [240, 100], [320, 130]] as [number, number][], fenceCm: 100 };
+/** The exits given for one run. */
+export type SeekOverrides = Partial<Pick<SeekOptions, 'limitS' | 'fenceCm'>>;
 
 let brain: MatrixBrain | null = null;
 let busy = false;
@@ -38,8 +46,8 @@ export const matrixBrain = {
     lastRun = null;
   },
 
-  /** `motors`: a seek run from the points both Bolts were reset on; otherwise the mode by hand. A running mode is turned off either way. */
-  async toggle (motors = false): Promise<void> {
+  /** `motors`: a seek run from the points both Bolts were reset on, its exits the defaults unless `overrides` gives them; otherwise the mode by hand. A running mode is turned off either way. */
+  async toggle (motors = false, overrides: SeekOverrides = {}): Promise<void> {
     if (busy) return;
     busy = true;
     try {
@@ -54,7 +62,8 @@ export const matrixBrain = {
         startCm = Math.round(Math.hypot(from.x - senderAt.x, from.y - senderAt.y));
         lastRun = null;
       }
-      const b = new MatrixBrain(seeker, sender, { motors, startCm, at });
+      const [, limitS] = SEEK_DEFAULTS.timeLimits.reduce((a, b) => (Math.abs(b[0] - startCm) < Math.abs(a[0] - startCm) ? b : a));
+      const b = new MatrixBrain(seeker, sender, { motors, startCm, at, limitS: overrides.limitS ?? limitS, fenceCm: overrides.fenceCm ?? SEEK_DEFAULTS.fenceCm });
       seeking = motors;
       if (motors) void b.ended.then(() => { lastRun = b.summary; if (brain === b) void matrixBrain.toggle(); });
       const off = () => { if (brain === b) void matrixBrain.toggle(); };
@@ -65,5 +74,18 @@ export const matrixBrain = {
       brain = b;
       await b.start();
     } finally { busy = false; }
+  },
+};
+
+/** For the console and the browser tools: `Seek.start({ limitS: 120 })` seeks with the exits given, `stop()` ends it, `last()` is the last run's brain lines in order, seconds first, without the step and roll lines unless asked. */
+export const Seek = {
+  defaults: SEEK_DEFAULTS,
+  start: (overrides: SeekOverrides = {}): Promise<void> => matrixBrain.toggle(true, overrides),
+  stop: (): Promise<void> => (matrixBrain.on ? matrixBrain.toggle() : Promise.resolve()),
+  async last ({ steps = false, rolls = false } = {}): Promise<string[]> {
+    const brain = (await session.messages()).filter((e): e is IEventMessage => e.kind === 'event' && e.name === 'info' && typeof e.data === 'string' && /^brain /.test(e.data));
+    const i0 = brain.map((e) => /^brain seek:/.test(e.data as string)).lastIndexOf(true);
+    const run = brain.slice(Math.max(0, i0)), t0 = run[0]?.t ?? 0;
+    return run.filter((e) => (steps || !/^brain step/.test(e.data as string)) && (rolls || !/^brain roll/.test(e.data as string))).map((e) => `${((e.t - t0) / 1000).toFixed(1)} ${e.data as string}`);
   },
 };

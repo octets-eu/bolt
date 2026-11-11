@@ -4,10 +4,13 @@
 // layer sees the frames and the timed corner reads as in a seek. With
 // `motors` the agent's motor layer drives the seeker as brain.mjs does, a
 // roll after each volley, both Bolts armed for collisions, and the run ends
-// on the tag (both reports within TAG_MS, brain/seek.mjs), the time limit
-// of the start distance (TIME_LIMITS), or a runaway by the locator. Logging into the session: a state line per second, the
-// landed reads, the ladder's switches, the rolls' modes, the collisions and
-// the result. The receiver already logs every notify and every read's reply.
+// on the tag (both reports within TAG_MS, brain/seek.mjs), the time limit or
+// the runaway fence of its options (index.ts, SEEK_DEFAULTS, or what
+// `Seek.start` was given). Logging into the session: the belief after every
+// network step (`brain step`, the file only, not the screen), every roll
+// (`brain roll`), a state line per second, the landed reads, the ladder's
+// switches, the collisions and the result. The receiver already logs every
+// notify and every read's reply.
 
 import type { Bolt, LadderRange } from '@bolt/core';
 import { mod360, StabilizationIndex } from '@bolt/core';
@@ -15,6 +18,7 @@ import { Network, Observation, ringVector, LadderSender, motorCommand, fireRoll,
 import type { Roll } from '@bolt/brain';
 import { connectome } from './connectome';
 import { ringPicture, peaks, PALETTE } from './render';
+import { session } from '../session';
 
 const OWNER = 'brain';
 /** The seeker's LEDs while the mode runs: the nose a dim yellow the camera tells from the blue-green ring, the tail off. */
@@ -27,14 +31,11 @@ const FLASH_MS = 200;
 const STATE_MS = 1000;
 const ROLL_MS = 100;         // before the frames are timed, a roll this often (brain.mjs)
 const TAG_MS = 300;          // both collision reports within this: found
-/** The seek's time limit by start distance, cm and s, the user's; a start takes the nearest listed distance's. */
-const TIME_LIMITS: [number, number][] = [[120, 60], [240, 100], [320, 130]];
-const RUNAWAY_CM = 100;      // the locator further than the start distance plus this from the start ends the run
 /** Collision thresholds of brain/seek.mjs: the seeker fires on contact, the standing sender on contact only. */
 const THRESHOLDS = { seeker: { xThreshold: 15, yThreshold: 15, xSpeed: 0, ySpeed: 0 }, sender: { xThreshold: 10, yThreshold: 10, xSpeed: 0, ySpeed: 0 } };
 
-/** `at`: the sender's place in the seeker's locator frame, from the sheet starts, for the replay's truth. */
-export interface SeekOptions { motors: boolean; startCm: number; at?: { x: number, y: number } | undefined }
+/** `at`: the sender's place in the seeker's locator frame, from the sheet starts, for the replay's truth; `limitS` ends the seek, `fenceCm` beyond the start distance ends it as a runaway. */
+export interface SeekOptions { motors: boolean; startCm: number; at?: { x: number, y: number } | undefined; limitS: number; fenceCm: number }
 /** What a run leaves for the `good` mark: the replay's truth and the outcome. */
 export interface RunSummary { seeker: string; sender: string; at: { x: number, y: number } | null; startCm: number; result: string; seconds: number }
 /** What a listener gets after each network step: the network, the sources it stepped on, the step in ms. */
@@ -77,7 +78,7 @@ export class MatrixBrain {
   readonly ended: Promise<string>;
   private finish!: (result: string) => void;
 
-  constructor (seeker: Bolt, sender: Bolt, options: SeekOptions = { motors: false, startCm: 100 }) {
+  constructor (seeker: Bolt, sender: Bolt, options: SeekOptions) {
     this.seeker = seeker;
     this.sender = sender;
     this.options = options;
@@ -113,7 +114,7 @@ export class MatrixBrain {
       this.heading = heading;
       if (this.options.motors) {
         if (!this.start0) this.start0 = { x: s.locator.positionX, y: s.locator.positionY };
-        else if (Math.hypot(s.locator.positionX - this.start0.x, s.locator.positionY - this.start0.y) > this.options.startCm + RUNAWAY_CM) this.end('runaway');
+        else if (Math.hypot(s.locator.positionX - this.start0.x, s.locator.positionY - this.start0.y) > this.options.startCm + this.options.fenceCm) this.end('runaway');
       }
       const motion = { heading, x: s.locator.positionX, y: s.locator.positionY };
       if (last === null) { last = s.t; this.obs.tick(motion); this.commanded = heading; return; }
@@ -128,6 +129,7 @@ export class MatrixBrain {
         this.seeker.log('info', `brain read landed: corners ${corners.join(' ') || 'none named'}`);
       }
       this.net.step(sources, dt);
+      this.step(heading);
       for (const f of MatrixBrain.steps) {
         try { f({ net: this.net, sources, dtMs: dt }); } catch (e) { MatrixBrain.steps.delete(f); this.seeker.log('warn', `brain step listener dropped: ${String(e)}`); }
       }
@@ -140,10 +142,9 @@ export class MatrixBrain {
     this.drawTimer = setInterval(() => { if (!this.obs.timed || (this.flashUntil && performance.now() > this.flashUntil)) void this.draw(); }, 100);
     this.stateTimer = setInterval(() => this.state(), STATE_MS);
     if (this.options.motors) {
-      const startCm = this.options.startCm;
-      const [, limitS] = TIME_LIMITS.reduce((a, b) => (Math.abs(b[0] - startCm) < Math.abs(a[0] - startCm) ? b : a));
+      const { startCm, limitS, fenceCm } = this.options;
       setTimeout(() => this.end('time'), limitS * 1000);
-      this.seeker.log('info', `brain seek: seeker ${this.seeker.name} on sender ${this.sender.name}, ${this.options.startCm} cm given, limit ${limitS.toFixed(0)} s, speed ${MOTOR.seekSpeed}`);
+      this.seeker.log('info', `brain seek: seeker ${this.seeker.name} on sender ${this.sender.name}, ${startCm} cm given, limit ${limitS.toFixed(0)} s, fence ${startCm + fenceCm} cm, speed ${MOTOR.seekSpeed}`);
     } else this.seeker.log('info', `brain on: seeker ${this.seeker.name}, sender ${this.sender.name}, ladder long`);
   }
 
@@ -156,7 +157,14 @@ export class MatrixBrain {
     this.commanded = mod360(this.cmd.heading);
     this.lastRoll = now;
     this.modes[this.cmd.mode] = (this.modes[this.cmd.mode] ?? 0) + 1;
+    this.seeker.log('info', `brain roll ${this.cmd.mode} dir ${this.cmd.dir === null ? '-' : this.cmd.dir.toFixed(1)} heading ${this.commanded} speed ${Math.round(this.cmd.speed)}`);
     void fireRoll(this.seeker, this.cmd.speed, this.commanded);
+  }
+
+  /** The belief after a network step, into the session file only: the ring's peak and its vector, the believed distance, the nose. 17 a second would flood the screen's logger. */
+  private step (heading: number): void {
+    const est = this.net.estimate(), vec = ringVector(this.net.ringRates());
+    session.note(this.seeker.name, 'info', `brain step peak ${est.angle} vec ${mod360(vec.angle).toFixed(1)} len ${vec.length.toFixed(2)} dist ${est.distance === undefined ? '-' : est.distance.toFixed(1)} yaw ${heading.toFixed(1)}`);
   }
 
   /** The run's end: the motor first, then the result into the log; the toggle does the rest. */

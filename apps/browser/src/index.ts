@@ -13,6 +13,7 @@ import { Debug } from './debug/debug';
 import { archiveSessions } from './archive';
 import { fatal } from './fatal';
 import './reload';
+import { Seek } from './matrix-brain';
 
 // any error ends the session, see fatal.ts
 window.addEventListener('error', (e) => fatal(e.error ?? e.message));
@@ -25,6 +26,8 @@ window.Tracker = tracker;
 window.Debug = Debug;
 // the brain tab's scene, light and resting network
 window.BrainView = brainView;
+// a seek with its exits given, Seek.start({ limitS: 120 }); Seek.last() the last run's brain lines
+window.Seek = Seek;
 
 // completed days of session files move from the private store into apps/browser/sessions/*.zip
 void archiveSessions();

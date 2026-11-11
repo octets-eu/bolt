@@ -131,7 +131,7 @@ function fireRoll (bolt: Bolt, speed: number, heading: number): Promise<void>;
 
 The starts are the plotter's reference points (`plotter.ts`, `floor-plan.svg`): a Bolt reset on a point knows its place, the truth carries no drive out. The three distances of this plan: Sender/blue on rg and Seeker/green on u1, 1.2 m; Sender/blue on d1 and Seeker/green on u1, 2.4 m; Sender/blue on d1 and Seeker/green on u2, 3.2 m. L1 and S2 use them.
 
-- **L0** at each distance a path, Seeker/green standing on its point facing four headings 8 s each, the truth on its start line, and a seek, marked; extracted into the bench as runs 18 to 23. A seek starts where Seeker/green stands, its time limit `TIME_LIMITS` in `runner.ts`, the runaway fence the start distance plus a metre.
+- **L0** at each distance a path, Seeker/green standing on its point facing four headings 8 s each, the truth on its start line, and a seek, marked; extracted into the bench as runs 18 to 23. A seek starts where Seeker/green stands, its time limit and runaway fence `SEEK_DEFAULTS` in `matrix-brain/index.ts` or what `Seek.start` was given.
 
 ### A, the package (behaviour identical)
 
