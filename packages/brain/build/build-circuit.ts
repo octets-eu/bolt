@@ -18,7 +18,8 @@
 // rate times the band's share of the distance belief), and its strength's
 // range profile to the distance; every slot of the sender's schedule that
 // went silent adds the profile of not hearing that channel; a corner read
-// adds its corner's profile. A profile is the log of a rate over its mean,
+// adds a lobe drawn at its receiver's angle (CORNER_G, CORNER_N). A frame's
+// or a silence's profile is the log of a rate over its mean,
 // the rate measured over the recordings with the sender's place known
 // (senses.json, counted once by a replay option since retired): frames per
 // second of the channel's ladder being sent with the sender in each of 8
@@ -36,7 +37,7 @@
 //   npx tsx packages/brain/build/build-circuit.ts
 //
 // OUT=<path> writes elsewhere, for a circuit under test on the replay bench
-// (CIRCUIT=<path>); N, TAU_CM, RING_TAU_RAD, W_DIST override.
+// (CIRCUIT=<path>); N, TAU_CM, RING_TAU_RAD, W_DIST, CORNER_G, CORNER_N override.
 //
 // Fields beyond the worm's, continued: `of` and `gate`, a gated neuron's
 // source and the distance neurons whose share scales it; `band`, its cm.
@@ -71,6 +72,13 @@ const TAU_CM   = Number(process.env['TAU_CM'] ?? 30);    // the distance forgets
 // 11-08 from 34 to 60 % but is the same near and far.
 const RING_TAU_RAD = Number(process.env['RING_TAU_RAD'] ?? 1);   // 1 rad, the user's pick (2026-11-09): the seek runs of 11-08 at 62 %, today's four at 38, the pass of run 11 followed; 0.5 gave 60 / 39, 0.3 53 / 44
 const W_DIST   = Number(process.env['W_DIST'] ?? 1);     // a frame's range profile onto the distance
+// a corner read onto the ring: a lobe drawn at the receiver's angle, G * max(0, cos(angle - corner))^n. The counted
+// profiles put the front-right receiver's peak at 0 deg and the front-left's at 320, so a sender ahead-right was
+// believed ahead and the belief sat left of the truth on every approach: the bench's side -13 deg, drawn +2, the
+// share of seconds under 30 deg 38 to 50 % (2026-11-11). The bench climbs slowly past 4 (53 % at 10) with the
+// belief sharper after each read; a wide lobe (n 1) beat a narrow one (n 2) at every gain
+const CORNER_G = Number(process.env['CORNER_G'] ?? 4);
+const CORNER_N = Number(process.env['CORNER_N'] ?? 1);
 
 // --- the senses, measured: senses.json, counted over the recordings with the sender's place known. Counts of
 // frames per channel and of landed reads per corner by sector of the sender's true bearing and by band of
@@ -101,8 +109,6 @@ const toBands = (a: number[]): number[] => Array.from({ length: BANDS }, (_, i) 
 const logOverMean = (v: (number | null)[]): number[] => { const d = v.filter((x): x is number => x !== null); const mean = d.reduce((a, b) => a + b, 0) / d.length; return v.map((x) => (x === null ? 0 : Math.log(x / mean))); };
 /** Frames per second of exposure per sector, null where the exposure is under MIN_EXPOSURE_S. */
 const sectorRate = (counts: number[], exposure: number[]): (number | null)[] => counts.map((c, i) => (secs(exposure[i]!) < MIN_EXPOSURE_S ? null : (c + EPS_SECTOR) / secs(exposure[i]!)));
-/** The ladder's exposure per sector, in seconds, over all distances. */
-const totalExposure = (k: 'sector' | 'band'): number[] => S.exposure.long[k].map((v, i) => v + S.exposure.short[k][i]!);
 const channels = Object.entries(map.ir.channels).map(([ch, [ladder, strength]]) => ({ ch: Number(ch), ladder, strength }));
 
 // motor: F, B, R, L read the ring's vector; SEARCH is on unless that vector has a length;
@@ -155,7 +161,7 @@ neuron('SELF_RIGHT', 'self', { axis: 'right', unit: 'cm' });
 for (let j = 0; j < N; j++) neuron(id(j), 'ring', { angle: ringAngle(j), evidence: true, ...(Number.isFinite(RING_TAU_RAD) ? { tauParallax: RING_TAU_RAD } : {}) });
 for (let i = 0; i < BANDS; i++) neuron(did(i), 'distance', { cm: [i * BAND_CM, (i + 1) * BAND_CM], tauCm: TAU_CM, evidence: true });
 const ontoRing = (pre: string, profile: number[]): void => profile.forEach((w, j) => edge(pre, id(j), w));
-for (const c of Object.keys(map.ir.corners)) ontoRing(`IR_${c}`, sectorProfile(sectorRate(S.corners[c]!.sector, totalExposure('sector'))));   // a read lands whatever the ladder
+for (const [c, a] of Object.entries(map.ir.corners)) ontoRing(`IR_${c}`, Array.from({ length: N }, (_, j) => CORNER_G * Math.max(0, Math.cos(deg(ringAngle(j) - a))) ** CORNER_N));   // a read lands whatever the ladder
 // a frame heard, gated by the believed distance: IR_CH<k>_B<j> is the receiver's rate times the share of the
 // distance neurons in band group j, with the group's own sector profile onto the ring (network.ts, `of` and `gate`)
 const inGroup = (j: number): string[] => { const lo = groupLo[j]!, hi = groupHi[j]!; return neurons.filter((n) => n.role === 'distance' && n.cm![0] >= lo && (hi === null || n.cm![0] < hi)).map((n) => n.id); };

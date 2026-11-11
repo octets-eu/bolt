@@ -8,7 +8,7 @@
 2. **circuit.json is the connectome.** Neurons, edges, populations, the ports to the observation layer and the motor, and the constants of all three layers are data. The network code knows a short list of cell models, synapse kinds and population operators, and no neuron names. The operators are a step on the way: at the end every mechanism is cells and edges.
 3. **Observation and motor are code behind interfaces.** The observation layer turns the Bolt's streams into input ports, the motor turns output ports into a roll; nothing crosses by a neuron's name.
 
-The weights of the senses onto the belief, the profiles the builder draws from `senses.json`, stay as the builder makes them through phases A to C and are drawn by hand in phase W, short first, then far with the bands to 3.5 m. The edges the steps add (C3's and D1 to D5's) are structural: their weights follow from the mechanism and are not drawn.
+The weights of the senses onto the belief, the profiles the builder draws from `senses.json`, stay as the builder makes them through phases A to C, except the four corner lobes, drawn first (W0), and are drawn by hand in phase W, short first, then far with the bands to 3.5 m. The edges the steps add (C3's and D1 to D5's) are structural: their weights follow from the mechanism and are not drawn.
 
 ## Rules for every step
 
@@ -18,7 +18,7 @@ The weights of the senses onto the belief, the profiles the builder draws from `
 - Phase W changes behaviour by the weights and the bands alone; the bench judges, each step's check names its runs and its reference.
 - Phase S changes behaviour in one variant, `"beat"`, judged by S2's A/B; the bench's numbers for it are reported, not bounded.
 - Phase D changes behaviour, in small deviations, each step against W2's numbers, the brain entering D, on the same runs, not against the step before: the share of seconds under 30° within ±3 points, the mean error within ±5°, no run over 40 s with its share of seconds under 30° more than 10 points down (on a 24 s run 10 points are two seconds). A step outside the bounds is not committed: it is debugged, or its cell form changed, until it is inside.
-- The old code in `packages/core/src/brain/` and `packages/core/src/experiments/replay.mjs`, `replay-network.mjs` stays untouched until E1. The package starts as a copy; `OLD=1` makes the package's replay import the old modules, `Date.now` patched onto the replay's clock for the old motor as `performance.now` is for the old observation; the old motor's timers are module state (`motor.mjs:54`), so the reference imports it afresh for every run, a query on the import's URL.
+- The old code in `packages/core/src/brain/` and `packages/core/src/experiments/replay.mjs`, `replay-network.mjs` stays untouched until E1; its `circuit.json` is a copy of the package's while both are scheme 1, so the reference runs the same weights. The package starts as a copy; `OLD=1` makes the package's replay import the old modules, `Date.now` patched onto the replay's clock for the old motor as `performance.now` is for the old observation; the old motor's timers are module state (`motor.mjs:54`), so the reference imports it afresh for every run, a query on the import's URL.
 - The brain tab is backlog 02's (`docs/hide-and-seek.plan.md`): it compiles against the package, nothing more is checked. It grows its anatomy on its first visit (`view.ts:34`), so a cell it cannot place breaks the tab and nothing else; D's new cells get their place there.
 - Live runs with the Bolts, L1 to L3 and the A/B runs of S2, go where the bench is blind: the bundle on the rig, the link, the clock, the motor and the closed loop. Each run is marked and extracted into the bench. L1 is the live baseline; phase D's reference on the bench is W2.
 
@@ -156,7 +156,8 @@ The starts are the plotter's reference points (`plotter.ts`, `floor-plan.svg`): 
 
 The profiles of the senses onto the ring and the distance come from `senses.json`, the counted tables of 21 runs, read by the builder alone (`build-circuit.mjs:71`); their writer, `replay.mjs --senses --write`, is gone. Drawn by hand they need no table.
 
-- **W1** after C3, the short weights: the profiles drawn by hand over every band, tuned on runs 1 to 19; `senses.json` goes, with the builder's mention of its writer. Check: the bench's share of seconds under 30° and mean |err| on runs 1 to 19 both better than C3's; runs 20 to 23 reported.
+- **W0** before B1, the corner lobes: each corner's profile onto the ring drawn as G·max(0, cos(θ − corner))^n at the receiver's angle (`CORNER_G`, `CORNER_N` in the builder), the frames' and silences' profiles as counted until W1; the old copy of `circuit.json` rewritten with it. Check: the bench's side within ±5°, share and mean |err| better than the counted circuit's; `OLD=1` byte-identical.
+- **W1** after C3, the short weights: the frames' and silences' profiles drawn by hand over every band, tuned on runs 1 to 19; `senses.json` goes, with the builder's mention of its writer. Check: the bench's share of seconds under 30° and mean |err| on runs 1 to 19 both better than C3's; runs 20 to 23 reported.
 - **W2** after S2, before D1, the far weights and the bands: the builder's bands to 3.5 m (today 10 of 20 cm to 2 m, the belief ending at 190 cm), the profiles tuned on the far runs the bench holds by then, L0's 20 to 23 and the 2.4 m and 3.2 m runs of L1 and S2. Check: the far runs' two numbers better than W1's; runs 1 to 19 within phase D's bounds against W1.
 
 ### S, the silent slots at their beat (A/B with the Bolts)
