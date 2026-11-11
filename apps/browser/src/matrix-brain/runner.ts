@@ -9,13 +9,10 @@
 // landed reads, the ladder's switches, the rolls' modes, the collisions and
 // the result. The receiver already logs every notify and every read's reply.
 
-import type { Bolt } from '@bolt/core';
+import type { Bolt, LadderRange } from '@bolt/core';
 import { mod360, StabilizationIndex } from '@bolt/core';
-import { Network } from '../../../../packages/core/src/brain/connectome/network.mjs';
-import { Observation } from '../../../../packages/core/src/brain/connectome/observation/observation.mjs';
-import { ringVector } from '../../../../packages/core/src/brain/connectome/ring/ring.mjs';
-import { LadderSender } from '../../../../packages/core/src/brain/utils/ladder.mjs';
-import { motorCommand, fireRoll, MOTOR } from '../../../../packages/core/src/brain/connectome/motor/motor.mjs';
+import { Network, Observation, ringVector, LadderSender, motorCommand, fireRoll, MOTOR } from '@bolt/brain';
+import type { Roll } from '@bolt/brain';
 import { connectome } from './connectome';
 import { ringPicture, peaks, PALETTE } from './render';
 
@@ -51,9 +48,9 @@ export class MatrixBrain {
   readonly seeker: Bolt;
   readonly sender: Bolt;
   private net = new Network(connectome);
-  private obs: Observation & { afterVolley?: () => void; onRead: (payload: number[]) => void };
+  private obs: Observation;
   private ladder: LadderSender;
-  private range = 'long';
+  private range: LadderRange = 'long';
   private release: (() => Promise<void>) | null = null;
   private running = false;
   private flashUntil = 0;
@@ -65,7 +62,7 @@ export class MatrixBrain {
   private landed = 0;
   private heading = 0;
   private readonly options: SeekOptions;
-  private cmd = { mode: 'scan', dir: null as number | null, heading: 0, speed: 0 };
+  private cmd: Roll = { mode: 'scan', dir: null, heading: 0, speed: 0 };
   private commanded: number | null = null;
   private lastRoll = 0;
   private modes: Record<string, number> = {};
@@ -135,7 +132,7 @@ export class MatrixBrain {
         try { f({ net: this.net, sources, dtMs: dt }); } catch (e) { MatrixBrain.steps.delete(f); this.seeker.log('warn', `brain step listener dropped: ${String(e)}`); }
       }
       // the referee's part: the sender follows the seeker's request for the short ladder (communication.ts, LADDERS)
-      const want: string = (this.net.get('REQ_SHORT') ?? 0) > 0.5 ? 'short' : 'long';
+      const want: LadderRange = this.net.get('REQ_SHORT') > 0.5 ? 'short' : 'long';
       if (want !== this.range) { this.range = want; this.ladder.switch(want); this.seeker.log('info', `brain ladder ${want}`); }
       if (this.options.motors && !this.obs.timed && Date.now() - this.lastRoll >= ROLL_MS) this.roll();
     });

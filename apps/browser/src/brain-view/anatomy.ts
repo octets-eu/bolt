@@ -1,6 +1,6 @@
 // The connectome as tissue: every cell's body, neurites and synapses derived
-// from the wiring of circuit.json and placed by its `vis` (vis.mjs beside the
-// circuit). Plain data, no three.js; scene.ts turns it into meshes.
+// from the wiring of circuit.json and placed by its `vis` (@bolt/brain's
+// build/vis.ts). Plain data, no three.js; scene.ts turns it into meshes.
 //
 // A cell's look follows from what it does (docs/brain-view.plan.md):
 // - grade: `product` for a cell with `of` and `gate`, whose second input is a
@@ -17,32 +17,10 @@
 // - a stand-in's fibres end without synapses, dashed;
 // - `tauCm` or `tauParallax` marks the soma: the cell forgets by a rule.
 
-export type V3 = [number, number, number];
-export type Grade = 'natural' | 'product' | 'stand-in';
+import type { Circuit, NeuronDef, V3, Vis } from '@bolt/brain';
 
-export interface NeuronDef {
-  id: string; role: string; angle?: number; channel?: number; ladder?: string; strength?: number;
-  of?: string; gate?: string[]; band?: (number | null)[]; cm?: number[]; tauCm?: number; tauParallax?: number;
-  bias?: number; evidence?: boolean; axis?: string; unit?: string;
-}
-export interface Vis {
-  ball: { r: number };
-  neuropils: {
-    ring: { at: V3; r: number; tube: number };
-    column: { at: V3; r: number; layers: Record<string, number> };
-    glomeruli: { r: number; at: Record<string, V3> };
-    earNuclei: { r: number; at: Record<string, V3> };
-    motor: { at: V3; r: number; flat: number };
-  };
-  organs: {
-    ears: { r: number; depth: number; at: Record<string, V3> };
-    hearing: { at: V3; r: number };
-    muscle: { at: V3; size: V3 };
-    wheels: { r: number; width: number; at: V3[] };
-  };
-  soma: Record<string, V3>;
-}
-export interface Circuit { neurons: NeuronDef[]; edges: [string, string, number, number][]; vis: Vis }
+export type { Circuit, NeuronDef, V3, Vis };
+export type Grade = 'natural' | 'product' | 'stand-in';
 
 export interface Tube { path: V3[]; r: number }
 export interface Cell {

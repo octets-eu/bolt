@@ -10,6 +10,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@bolt/brain": "*",
     "@bolt/core": "*",
     "@bolt/protocol": "*",
     "@bolt/web-ble": "*",

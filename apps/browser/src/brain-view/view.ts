@@ -10,12 +10,12 @@
 
 import m from 'mithril';
 import Factory from '../components/factory';
-import { Network } from '../../../../packages/core/src/brain/connectome/network.mjs';
+import { Network } from '@bolt/brain';
 import { connectome } from '../matrix-brain/connectome';
 import { MatrixBrain } from '../matrix-brain/runner';
 import type { BrainStep } from '../matrix-brain/runner';
 import { grow } from './anatomy';
-import type { Anatomy, Circuit } from './anatomy';
+import type { Anatomy } from './anatomy';
 import { Light } from './light';
 import { BrainScene, TOKENS } from './scene';
 
@@ -31,7 +31,7 @@ let selected: number | null = null;
 let timers: ReturnType<typeof setInterval>[] = [];
 
 function make (): World {
-  const anatomy = grow(connectome.circuit as unknown as Circuit);
+  const anatomy = grow(connectome.circuit);
   const light = new Light(anatomy.cells.length);
   const scene = new BrainScene(anatomy, light.shown);
   scene.onFrame = (dt) => light.frame(dt);
@@ -121,7 +121,7 @@ function panel (w: World) {
     n.tauParallax !== undefined ? `forgets over ${n.tauParallax} rad of potential parallax` : null,
     n.axis ? `the Bolt's own ${n.axis}, ${n.unit}` : null,
   ].filter(Boolean);
-  const note = cell.grade === 'product' ? `rate = ${n.of} × the share of ${(n.gate ?? []).join(' ')} in the distance belief: a rule in network.mjs, no synapses on the gate field`
+  const note = cell.grade === 'product' ? `rate = ${n.of} × the share of ${(n.gate ?? []).join(' ')} in the distance belief: a rule in network.ts, no synapses on the gate field`
     : cell.grade === 'stand-in' ? 'no synapses: the network reads it by name to turn and carry the ring and the distance' : null;
   return m('div', { style: box }, [
     m('div', { style: { ...text, fontSize: '14px' } }, n.id),
