@@ -37,20 +37,40 @@ plan.src    = '/floor-plan.svg';
 plan.onload = () => Plotter.render();
 
 /**
- * Where each Bolt stands at its reset, on the sheet in cm, and the heading it
- * faces there, clockwise from the sheet's top; see the plan's header. A Bolt
- * without a start is not plotted and not sent anywhere.
+ * The reference points on the floor, on the sheet in cm, and the heading a
+ * Bolt placed there faces, clockwise from the sheet's top; the plan draws and
+ * names them (see its header). By convention a Bolt reset on a point faces
+ * away from the room's centre, the midpoint of lf and rg, its nose the red
+ * LED. lf and rg on the partition's centre line, back to back; d1, u1 and u2
+ * on the line through their midpoint, 1.2 m down and 1.2 and 2 m up from it.
  */
-const starts: { [name: string]: { x: number, y: number, heading: number } } = {
-  'SB-9129': { x: 241, y: 317.5, heading: 270 },   // green, faces the left partition end
-  'SB-11DF': { x: 264, y: 317.5, heading:  90 },   // blue, faces the right partition end
+const points: { [point: string]: { x: number, y: number, heading: number } } = {
+  lf: { x: 241,   y: 317.5, heading: 270 },   // faces the left partition end
+  rg: { x: 264,   y: 317.5, heading:  90 },   // faces the right partition end
+  d1: { x: 252.5, y: 437.5, heading: 180 },
+  u1: { x: 252.5, y: 197.5, heading:   0 },
+  u2: { x: 252.5, y: 117.5, heading:   0 },
 };
+
+/**
+ * The point each Bolt was last reset on, kept in the browser, since the page
+ * reloads after every edit of the app; green on lf and blue on rg until then.
+ * A Bolt without a point is not plotted and not sent anywhere.
+ */
+const PLACED_KEY = 'plotter.placed';
+const placed: { [name: string]: string } = { 'SB-9129': 'lf', 'SB-11DF': 'rg' };
+try { Object.assign(placed, JSON.parse(localStorage.getItem(PLACED_KEY) ?? '{}')); } catch { /* private window */ }
+const startOf = (name: string) => points[placed[name] ?? ''];
+/** Every placed Bolt's point with its pose, for the session. */
+const starts = () => Object.fromEntries(Object.entries(placed).map(([name, point]) => [name, { point, ...points[point] }]));
 
 /** How far a sweep's ray reaches on the sheet, cm. */
 const RAY_CM = 200;
 
 /** The ends of the partition's two parts on the sheet, in the middle of their faces: the view always holds both. */
 const partitionEnds = [{ positionX: 181, positionY: 317.5 }, { positionX: 324, positionY: 317.5 }];
+/** What the view always holds: both partition ends and every reference point. */
+const frame = [...partitionEnds, ...Object.values(points).map((p) => ({ positionX: p.x, positionY: p.y }))];
 
 /**
  * A locator offset as a sheet offset, for a Bolt that faced `heading` at its
@@ -95,9 +115,9 @@ const Plotter = Factory.create('Plotter', {
 
   meta () { return meta },
 
-  /** The canvas fills its host and follows every change of the host's size. The start poses go into the session file once, as `starts`: a script needs them to put both Bolts in one frame. */
+  /** The canvas fills its host and follows every change of the host's size. The start poses go into the session file, as `starts`, here and at every reset on a point: a script needs them to put both Bolts in one frame. */
   oncreate ( vnode: any ) {
-    session.note('*', 'info', `starts ${JSON.stringify(starts)}`);
+    session.note('*', 'info', `starts ${JSON.stringify(starts())}`);
     vnode.dom.appendChild(cvs);
     vnode.state.resize = new ResizeObserver(([entry]) => {
       if (!entry) return;
@@ -143,15 +163,26 @@ const Plotter = Factory.create('Plotter', {
   },
 
 
+  /** The reference points by name, for the Bolts' reset buttons. */
+  points,
+
+  /** The Bolt is placed on `point`, facing its heading: a hard reset zeroes its frame there, and the plot counts from that point on. */
+  resetOn (bolt: Bolt, point: string): Promise<void> {
+    placed[bolt.name] = point;
+    try { localStorage.setItem(PLACED_KEY, JSON.stringify(placed)); } catch { /* private window */ }
+    session.note(bolt.name, 'info', `starts ${JSON.stringify(starts())}`);
+    return bolt.lifecycle.reset(true, point);
+  },
+
   /** A sheet point in the locator frame of the Bolt `name`, or null without a start for it. */
   toLocator (name: string, x: number, y: number): { x: number, y: number } | null {
-    const start = starts[name];
+    const start = startOf(name);
     return start ? turn(start.heading, x - start.x, y - start.y) : null;
   },
 
   /** Where the Bolt `name` stands at its reset, on the sheet. */
   startOf (name: string): { x: number, y: number } | null {
-    const start = starts[name];
+    const start = startOf(name);
     return start ? { x: start.x, y: start.y } : null;
   },
 
@@ -163,10 +194,10 @@ const Plotter = Factory.create('Plotter', {
    */
   attach (bolt: Bolt): () => void {
     return bolt.events.on('log', (entry: LogEntry) => {
-      const start = starts[bolt.name];
+      const start = startOf(bolt.name);
       if (!start) return;
       const color = Bolts.configFor(bolt.name).colors.plot;
-      if (entry.type === 'info' && entry.subtype === 'reset.out') {
+      if (entry.type === 'info' && entry.subtype.startsWith('reset.out')) {
         Plotter.placeBolt(bolt.name, { positionX: start.x, positionY: start.y }, color, start.heading);
         Plotter.render();
         return;
@@ -201,7 +232,7 @@ const Plotter = Factory.create('Plotter', {
     bolts  = {};
     rays   = [];
     Bolts.forEach((bolt: Bolt) => {
-      const start = starts[bolt.name];
+      const start = startOf(bolt.name);
       if (bolt.connected && start) Plotter.placeBolt(bolt.name, { positionX: start.x, positionY: start.y }, Bolts.configFor(bolt.name).colors.plot, start.heading);
     });
     Plotter.render();
@@ -300,9 +331,9 @@ const Plotter = Factory.create('Plotter', {
     // every sample since the last Reset
     const data = series;
 
-    // auto zoom: the points and both partition ends are on the canvas, a tenth of their extent free on every side (chosen)
-    const xs = [...partitionEnds, ...data].map((p: any) => p.positionX);
-    const ys = [...partitionEnds, ...data].map((p: any) => p.positionY);
+    // auto zoom: the samples, both partition ends and the reference points are on the canvas, a tenth of their extent free on every side (chosen)
+    const xs = [...frame, ...data].map((p: any) => p.positionX);
+    const ys = [...frame, ...data].map((p: any) => p.positionY);
     const minx = Math.min(...xs), maxx = Math.max(...xs), miny = Math.min(...ys), maxy = Math.max(...ys);
     meta.scale  = Math.min(width / (maxx - minx), height / (maxy - miny)) / 1.2;
     meta.transX = width  / 2 - (minx + maxx) / 2 * meta.scale;

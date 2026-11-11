@@ -29,7 +29,7 @@
 
 ## Backlog
 
-- 01, build proper brain from :
+- 01, build proper brain from : (**current task**)
     - Observation layer (code)
     - circuit.json to connectome 
     - Motor (code)

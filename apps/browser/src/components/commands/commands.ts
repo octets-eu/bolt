@@ -5,6 +5,7 @@ import Factory      from '../factory';
 import { Bolts }  from '../../bolts';
 import { Bolt, StabilizationIndex }   from '@bolt/core';
 import { Icon }   from '../icons';
+import { Plotter } from '../plotter/plotter';
 
 const BoltCommands = Factory.create('Layout', {
 
@@ -47,6 +48,12 @@ const BoltCommands = Factory.create('Layout', {
             onclick: run(() => streaming ? bolt.sensors.motion.disable() : bolt.sensors.motion.enable()),
           }, 'Sensor ' + (streaming ? 'on' : 'off')),
 
+          // a reset on a reference point: the Bolt stands there facing the point's heading
+          m('span.mono.pl2.cfff', 'Reset on'),
+          Object.keys(Plotter.points).map((p) => m('button.br2.mh1.cmd', { title: `Reset on ${p}, facing ${Plotter.points[p].heading}° on the sheet`, onclick: run(() => Plotter.resetOn(bolt, p)) }, p)),
+
+          // the roll commands, hidden
+          m('span', { style: { display: 'none' } }, [
           m('span.mono.pl2.cfff', 'Roll'),
           m('button.br2.mh1.cmd', { onclick: run(() => bolt.actuators.motor.roll(25,   0)) },                       '▲'),
           m('button.br2.mh1.cmd', { onclick: run(() => bolt.actuators.motor.roll(25, 270)) },                       '◀'),
@@ -58,6 +65,7 @@ const BoltCommands = Factory.create('Layout', {
           m('button.br2.mh1.cmd', { onclick: run(() => bolt.navigation.rotate(360)) },             '↻'),
           m('button.br2.mh1.cmd', { onclick: run(() => bolt.navigation.rotate(+30)) },                         '↱'),
           m('button.br2.mh1.cmd', { onclick: run(() => bolt.actuators.motor.roll(25, bolt.heading)) },              '↑'),
+          ]),
 
         ])
     );

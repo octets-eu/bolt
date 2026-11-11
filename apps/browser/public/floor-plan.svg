@@ -11,12 +11,16 @@
   computed from the points.
   Partition: both parts centred on y = 295, 19 cm thick with skirting board
   (y = 285.5 and 304.5), opening 143 cm.
-  Bolt starts: on the partition's centre line, green 60 cm from the left
-  part's end, blue 60 cm from the right part's end, 23 cm apart, circles of
-  the Bolt's diameter 7.3 cm, at 211, 295 and 234, 295 in the room frame.
-  Green faces -x, blue +x, back to back. With x, y a Bolt's locator after a
-  reset there, on the sheet (room frame plus 30, 22.5) green is at
-  241 - y, 317.5 - x and blue at 264 + y, 317.5 + x.
+  Reference points, named as the app's reset buttons, circles of the Bolt's
+  diameter 7.3 cm: lf and rg on the partition's centre line, 60 cm from the
+  left and the right part's end, 23 cm apart, at 211, 295 and 234, 295 in
+  the room frame; d1, u1 and u2 on the line through their midpoint, at
+  222.5, 415, 222.5, 175 and 222.5, 95, 1.2 m down and 1.2 and 2 m up from
+  it. A Bolt reset on a point faces away from that midpoint, its nose the red
+  LED: on lf -x, on rg +x, back to back, on d1 +y, on u1 and u2 -y. With x,
+  y a Bolt's locator after a reset on lf, on the sheet
+  (room frame plus 30, 22.5) it is at 241 - y, 317.5 - x, on rg at
+  264 + y, 317.5 + x.
   Headings on the sheet: clockwise from the top, 0 up, 90 right, 180 down.
   North: a compass on the floor reads 300 looking down the sheet, so magnetic
   north lies at sheet heading 240, down and to the left; the sheet's top is
@@ -92,9 +96,14 @@
       <text x="332.5" y="570">175x215</text>
     </g>
 
-    <!-- start points of the Bolts -->
-    <circle id="start-green" fill="#0a0" fill-opacity="0.35" cx="211" cy="295" r="3.65"/>
-    <circle id="start-blue"  fill="#06f" fill-opacity="0.35" cx="234" cy="295" r="3.65"/>
+    <!-- reference points, named as the app's reset buttons -->
+    <g id="points" fill="#333" font-family="Helvetica, Arial, sans-serif" font-size="7">
+      <circle id="lf" fill-opacity="0.35" cx="211"   cy="295" r="3.65"/><text x="205"   y="297.5" text-anchor="end">lf</text>
+      <circle id="rg" fill-opacity="0.35" cx="234"   cy="295" r="3.65"/><text x="240"   y="297.5">rg</text>
+      <circle id="d1" fill-opacity="0.35" cx="222.5" cy="415" r="3.65"/><text x="228.5" y="417.5">d1</text>
+      <circle id="u1" fill-opacity="0.35" cx="222.5" cy="175" r="3.65"/><text x="228.5" y="177.5">u1</text>
+      <circle id="u2" fill-opacity="0.35" cx="222.5" cy="95"  r="3.65"/><text x="228.5" y="97.5">u2</text>
+    </g>
   </g>
 
   <!-- magnetic north, sheet heading 240; in sheet coordinates, outside the room's cut corner -->

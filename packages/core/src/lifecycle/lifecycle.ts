@@ -88,18 +88,19 @@ export class Lifecycle {
   /**
    * Known body state. Safe to call at any time: a call during a run joins it,
    * a hard one during a soft run follows it. Hard sleeps and wakes the Bolt,
-   * which zeroes its frame at this pose; soft keeps the frame.
+   * which zeroes its frame at this pose; soft keeps the frame. `at` names
+   * the reference point the Bolt stands on, logged as `reset.out on <at>`.
    */
-  reset (hard = true): Promise<void> {
-    if (this.resetting && hard && !this.resettingHard) return this.resetting.then(() => this.reset());
+  reset (hard = true, at?: string): Promise<void> {
+    if (this.resetting && hard && !this.resettingHard) return this.resetting.then(() => this.reset(true, at));
     if (!this.resetting) {
       this.resettingHard = hard;
-      this.resetting     = this.doReset(hard);
+      this.resetting     = this.doReset(hard, at);
     }
     return this.resetting;
   }
 
-  private async doReset (hard: boolean): Promise<void> {
+  private async doReset (hard: boolean, at?: string): Promise<void> {
 
     this.ctx.log('info', hard ? 'reset.in' : 'reset.in soft');
     this.ctx.status.ready = false;
@@ -139,7 +140,7 @@ export class Lifecycle {
     this.resetting = null;
     this.ctx.changed();
   
-    this.ctx.log('info', 'reset.out');
+    this.ctx.log('info', at ? `reset.out on ${at}` : 'reset.out');
   
   }
 

@@ -16,7 +16,8 @@
     "typecheck": "npm run typecheck --workspaces --if-present",
     "lint": "eslint .",
     "rig": "tsx packages/node-socket/connect.mjs",
-    "camtest": "tsx packages/node-socket/camtest.mjs"
+    "camtest": "tsx packages/node-socket/camtest.mjs",
+    "cam": "export ADB_MDNS=0 && CAM_SERIAL=$(adb devices | awk 'NR>1 && $2==\"device\" {print $1; exit}') python3 agent/Rig/cam.py"
   },
   "engines": {
     "node": ">=22.12"
