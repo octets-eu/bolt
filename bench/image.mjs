@@ -22,6 +22,7 @@ process.chdir(new URL('..', import.meta.url).pathname);
 
 const COLORS = { 'SB-9129': 'green', 'SB-11DF': 'blue' };   // as apps/browser/src/bolts.ts
 const PX_PER_CM = 4, MARGIN_CM = 30, LEGEND_PX = 400, MIN_PX = 560;
+const DPR = 2;   // device pixels per pixel: the image is drawn at twice its layout
 const channels = loadCircuit().observation.channels;
 
 const picks = process.argv.slice(2).map((a) => a.split('-').map(Number));
@@ -75,7 +76,8 @@ function draw (run) {
   const grow = (lo, hi, min) => (hi - lo >= min ? [lo, hi] : [(lo + hi - min) / 2, (lo + hi + min) / 2]);
   [x0, x1] = grow(x0, x1, MIN_PX / PX_PER_CM); [y0, y1] = grow(y0, y1, MIN_PX / PX_PER_CM);
   const w = Math.round((x1 - x0) * PX_PER_CM), h = Math.round((y1 - y0) * PX_PER_CM), px = 1 / PX_PER_CM;
-  const canvas = createCanvas(w + LEGEND_PX, h), ctx = canvas.getContext('2d');
+  const canvas = createCanvas((w + LEGEND_PX) * DPR, h * DPR), ctx = canvas.getContext('2d');
+  ctx.scale(DPR, DPR);
   ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, w + LEGEND_PX, h);
 
   ctx.save();
@@ -141,7 +143,7 @@ function draw (run) {
     ly += 30;
   }
   writeFileSync(`bench/${run.n}/run.png`, canvas.toBuffer('image/png'));
-  return `${w + LEGEND_PX} x ${h}, ${track.length} samples, ${frames.length} frames, ${reads.length} of ${total} reads hit, ${pair[0]} to ${pair[1]}`;
+  return `${(w + LEGEND_PX) * DPR} x ${h * DPR}, ${track.length} samples, ${frames.length} frames, ${reads.length} of ${total} reads hit, ${pair[0]} to ${pair[1]}`;
 }
 
 for (const n of ns) console.log(`${String(n).padStart(3)} ${draw(read(n))}`);
