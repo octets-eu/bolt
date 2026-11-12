@@ -29,12 +29,17 @@
   Landmarks the frames show as well as this sheet, in the room frame: the
   partition's ends, the left part's at 151, 295 and the right part's at
   294, 295, each a face from y 285.5 to 304.5; the chest, Truhe,
-  furniture-1, with its two inner corners at 317, 229.5 and
-  317, 285.5. The other furniture lies outside the frames or in their dark.
-  Furniture: three rectangles filling corners on the right wall; the label
-  is the inner corner's distance from the horizontal wall x from the right
-  wall, in cm (71x108 the other way round). Distances from the outer walls'
-  centre lines and from the partition's skirting board.
+  furniture-1, with its two left corners at 334, 233.5 and
+  334, 275.5. The other furniture lies outside the frames or in their dark.
+  Furniture: the chest, 99 x 42 cm, stands free above the partition's right
+  part: 40 cm in from the partition's end, 10 cm off its skirting board and
+  10 cm off the right wall, measured; its label is its size. The other two
+  are rectangles filling corners on the right wall; their label is the inner
+  corner's distance from the horizontal wall x from the right wall, in cm
+  (71x108 the other way round). Distances from the outer walls' centre lines
+  and from the partition's skirting board. The partition's right part
+  measures 149 cm on the floor, 146 here, so the chest drawn from the
+  partition's end keeps 7 cm to the wall's centre line.
   Danger zones: floor where a Bolt gets stuck, cables lie there, with nothing
   to bump into; kept out of the play area. 421,0 60 wide 120 high; below the partition's left part,
   from the left wall and the lower skirting board, 150 wide 80 high.
@@ -67,7 +72,7 @@
 
     <!-- furniture, under the walls' strokes; furniture-1 is the chest, Truhe, the landmark the frames show -->
     <g id="furniture" fill="#8a8a8a">
-      <rect id="furniture-1" x="317" y="229.5" width="123" height="56"/>
+      <rect id="furniture-1" x="334" y="233.5" width="99"  height="42"/>
       <rect id="furniture-2" x="369" y="304.5" width="71"  height="108"/>
       <rect id="furniture-3" x="225" y="480"   width="215" height="175"/>
     </g>
@@ -91,7 +96,7 @@
 
     <!-- furniture measures -->
     <g font-family="Helvetica, Arial, sans-serif" font-size="9" text-anchor="middle" fill="#000">
-      <text x="378.5" y="255">56x123</text>
+      <text x="383.5" y="257.5">99x42</text>
       <text x="404.5" y="362">71x108</text>
       <text x="332.5" y="570">175x215</text>
     </g>
