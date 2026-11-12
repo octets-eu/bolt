@@ -14,11 +14,18 @@ import { points } from '../components/plotter/sheet';
 
 export const POSE = {
   under: { x: 252.5, y: 317.5 },   // the middle of the opening, between lf and rg
-  at:    { u: 0.5, v: 0.6392 },    // the partition's two ends lie mirrored about the frame's middle
-  rot:   2.2,                      // deg, the sheet's top against the frame's
-  scale: 0.0030723,                // frame widths per cm at the middle
-  k1:    -1.785e-6,                // per cm squared
+  at:    { u: 0.50116, v: 0.63608 },   // the partition's two ends lie mirrored about the frame's middle
+  rot:   2.24,                     // deg, the sheet's top against the frame's
+  scale: 0.00302,                  // frame widths per cm at the middle
+  k1:    -1.5143e-6,               // per cm squared
 };
+
+/**
+ * A Bolt's lit matrix sits on top of the ball, above the floor, so the camera
+ * sees it further from the point under the lens than the Bolt stands: its
+ * floor point is the glow's sheet point drawn in toward `under` by this.
+ */
+export const LIFT = 0.972;
 
 /** A sheet point, cm, in the frame: fractions of the frame's width, u right, v down. */
 export function toFrame (x: number, y: number, pose = POSE): { u: number, v: number } {
@@ -35,6 +42,12 @@ export function toSheet (u: number, v: number, pose = POSE): { x: number, y: num
   for (let i = 0; i < 20; i++) { const g = 1 + pose.k1 * (rx * rx + ry * ry); rx = qx / g; ry = qy / g; }
   const a = pose.rot * Math.PI / 180;
   return { x: pose.under.x + rx * Math.cos(a) + ry * Math.sin(a), y: pose.under.y - rx * Math.sin(a) + ry * Math.cos(a) };
+}
+
+/** Where a Bolt stands on the sheet, cm, from its lit matrix's place in the frame (glow.ts), fractions of the width. */
+export function boltOnSheet (u: number, v: number, pose = POSE): { x: number, y: number } {
+  const s = toSheet(u, v, pose);
+  return { x: pose.under.x + (s.x - pose.under.x) * LIFT, y: pose.under.y + (s.y - pose.under.y) * LIFT };
 }
 
 /** What the camera view draws for the alignment: the reference points, and the partition's two end faces at floor level. */
