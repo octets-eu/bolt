@@ -35,7 +35,7 @@
 // Score per run, from one estimate a second: lock = the first second from
 // which the error stays under LOCK_DEG for LOCK_S seconds; then the share
 // of seconds under LOCK_DEG after it and over the whole run, the mean absolute
-// error, the mean length, and the estimate digest (replay-network.mjs).
+// error, the mean length, and the estimate and the motor digest (replay-network.mjs).
 
 import { execFileSync } from 'node:child_process';
 import { readFileSync, readdirSync, writeFileSync } from 'node:fs';
@@ -197,7 +197,7 @@ function score (run, estimator) {
   const after = lock === null ? [] : secs.filter((s) => s.t >= lock);
   const mean = (a, f) => (a.length ? a.reduce((x, s) => x + f(s), 0) / a.length : NaN);
   const approach = secs.filter((s) => s.tcm >= SIDE_CM[0] && s.tcm <= SIDE_CM[1]);
-  return { offset, seconds: secs.length, frames, reads, hits, lock, lockedShare: after.length ? after.filter((s) => s.err < LOCK_DEG).length / after.length : 0, under: secs.length ? secs.filter((s) => s.err < LOCK_DEG).length / secs.length : 0, side: mean(approach, (s) => s.signed), sideN: approach.length, digest: estimator.digest?.(), meanErr: mean(secs, (s) => s.err), meanLen: mean(secs, (s) => s.length), secs };
+  return { offset, seconds: secs.length, frames, reads, hits, lock, lockedShare: after.length ? after.filter((s) => s.err < LOCK_DEG).length / after.length : 0, under: secs.length ? secs.filter((s) => s.err < LOCK_DEG).length / secs.length : 0, side: mean(approach, (s) => s.signed), sideN: approach.length, digest: estimator.digest?.(), motorDigest: estimator.motorDigest?.(), meanErr: mean(secs, (s) => s.err), meanLen: mean(secs, (s) => s.length), secs };
 }
 
 /**
@@ -239,10 +239,10 @@ for (const spec of specs) {
   for (const [k, r] of rs.entries()) {
     r.spec = spec; r.index = k;
     if (flag('--check')) { check(r); continue; }
-    const s = score(r, make());
+    const s = score(r, await make());
     if (!s) continue;
     all.push(s);
-    console.log(`  ${r.name} ${r.seeker} at (${r.at.x.toFixed(0)}, ${r.at.y.toFixed(0)}) offset ${s.offset.toFixed(0)}°: ${s.seconds} s, ${s.frames} frames, ${s.hits}/${s.reads} reads hit; lock ${s.lock === null ? 'never' : s.lock + ' s'}, locked share ${(s.lockedShare * 100).toFixed(0)} %, under ${LOCK_DEG}° ${(s.under * 100).toFixed(0)} %, side ${s.sideN ? `${s.side >= 0 ? '+' : ''}${s.side.toFixed(0)}° over ${s.sideN} s` : '-'}, mean |err| ${s.meanErr.toFixed(0)}°, mean len ${s.meanLen.toFixed(2)}; estimate ${s.digest}`);
+    console.log(`  ${r.name} ${r.seeker} at (${r.at.x.toFixed(0)}, ${r.at.y.toFixed(0)}) offset ${s.offset.toFixed(0)}°: ${s.seconds} s, ${s.frames} frames, ${s.hits}/${s.reads} reads hit; lock ${s.lock === null ? 'never' : s.lock + ' s'}, locked share ${(s.lockedShare * 100).toFixed(0)} %, under ${LOCK_DEG}° ${(s.under * 100).toFixed(0)} %, side ${s.sideN ? `${s.side >= 0 ? '+' : ''}${s.side.toFixed(0)}° over ${s.sideN} s` : '-'}, mean |err| ${s.meanErr.toFixed(0)}°, mean len ${s.meanLen.toFixed(2)}; estimate ${s.digest}, motor ${s.motorDigest}`);
   }
 }
 if (all.length) {

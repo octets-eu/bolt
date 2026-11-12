@@ -209,6 +209,11 @@ const circuit: Circuit = {
     + 'Evidence neurons sum their input per step and their rate is the softmax over their group; the ring is shifted against the Bolt\'s turn (yaw) and by the parallax '
     + 'of the believed distance as the locator moves and forgets by the potential parallax of the step (tauParallax), the distance slid along the bearing and forgetting with the travel (tauCm); every other neuron is max(0, bias + sum of weight * rate).',
   neurons, edges,
+  outputs: {
+    'steer.fwd': 'M_FWD', 'steer.back': 'M_BACK', 'steer.right': 'M_RIGHT', 'steer.left': 'M_LEFT',
+    'mode.search': 'M_SEARCH', 'mode.roam': 'M_ROAM', 'mode.axis': 'M_AXIS', 'mode.near': 'IR_NEAR',
+    'request.short': 'REQ_SHORT',
+  },
   vis: bodyLayout(neurons, map),
 };
 writeFileSync(process.env['OUT'] ?? new URL('../src/circuit.json', import.meta.url), JSON.stringify(circuit));

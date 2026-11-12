@@ -14,6 +14,16 @@
 // distance `-` without a distance population, printed as eight hex digits.
 // Two brains that step alike give the same digest; nothing less passes.
 // `step` answers true when the network stepped, for replay.mjs's --steps.
+//
+// The motor is called once a second, after the network step that crosses the
+// second: `heading` that motion sample's, `commanded` the motor's own last
+// heading (the first sample's to start), `dtMs` since the last call capped at
+// 400 as live, `now` the replay's clock. Nothing drives on its rolls; the
+// motor digest, FNV-1a over one line per call, `t mode heading speed` at six
+// decimals, says two motors answer the same network alike. The old motor
+// reads Date.now and keeps its timers as module state, so under OLD=1 the
+// replay's clock is put there too and the module is imported afresh for
+// every run.
 
 import { readFileSync } from 'node:fs';
 
@@ -21,6 +31,10 @@ const OLD = process.env.OLD === '1';
 const { Network, parseJsonc } = await import(OLD ? '../packages/core/src/brain/connectome/network.mjs' : '@bolt/brain');
 const { Observation } = await import(OLD ? '../packages/core/src/brain/connectome/observation/observation.mjs' : '@bolt/brain');
 const { loadConnectome } = await import(OLD ? '../packages/core/src/brain/connectome/load.mjs' : '@bolt/brain/load');
+const { Motor } = OLD ? {} : await import('@bolt/brain');
+
+const mod360 = (a) => ((a % 360) + 360) % 360;
+let made = 0;
 
 const STEP_MS = 25, SEEK_SPEED = 20;
 
@@ -38,7 +52,7 @@ function fnv () {
  * with OUT); MAP=<path>: a sensory map under test instead of sensory_map.jsonc.
  * `forward=0` as a parameter silences what the map multiplies by self.forward.
  */
-export function network (params = {}) {
+export async function network (params = {}) {
   const connectome = loadConnectome();
   if (process.env.CIRCUIT) connectome.circuit = JSON.parse(readFileSync(process.env.CIRCUIT, 'utf8'));
   if (process.env.MAP) connectome.map = parseJsonc(readFileSync(process.env.MAP, 'utf8'));
@@ -48,24 +62,43 @@ export function network (params = {}) {
   performance.now = () => now;
   obs.switchedAt = 0;
   let last = null;
-  const digest = fnv();
+  const digest = fnv(), motorDigest = fnv();
+  let command;
+  if (OLD) {
+    const { motorCommand } = await import(`../packages/core/src/brain/connectome/motor/motor.mjs?run=${made++}`);
+    Date.now = () => now;
+    command = (heading, commanded, dtMs) => motorCommand(net, heading, commanded, dtMs);
+  } else {
+    const motor = new Motor();
+    command = (heading, commanded, dtMs) => motor.command((port) => net.output(port), heading, commanded, dtMs, now);
+  }
+  let nextRoll = null, lastRoll = 0, commanded = 0;
   return {
     step (e) {
       now = e.t;
+      if (nextRoll === null) { nextRoll = e.t + 1000; lastRoll = e.t; }
       if (e.type === 'frame') { if (obs.channels.has(e.channel)) obs.onNotify(e.channel); return; }
       if (e.type === 'read') { if (e.payload.some((c) => obs.channels.has(c))) { obs.stats.landed++; obs.onRead(e.payload); } return; }
-      if (last === null) { last = e.t; obs.tick(e); return; }
+      if (last === null) { last = e.t; obs.tick(e); commanded = e.heading; return; }
       if (e.t - last < STEP_MS) return;
       const dt = Math.min(250, e.t - last);
       last = e.t;
       net.step(obs.tick(e, params.forward === 0 ? 0 : Math.min(1, e.speed / SEEK_SPEED)), dt);
       const est = net.estimate();
       digest.add(`${e.t.toFixed(6)} ${est.angle.toFixed(6)} ${est.length.toFixed(6)} ${est.distance === undefined ? '-' : est.distance.toFixed(6)}\n`);
+      if (e.t >= nextRoll) {
+        const roll = command(e.heading, commanded, Math.min(400, e.t - lastRoll));
+        commanded = mod360(roll.heading);
+        lastRoll = e.t;
+        while (nextRoll <= e.t) nextRoll += 1000;
+        motorDigest.add(`${e.t.toFixed(6)} ${roll.mode} ${roll.heading.toFixed(6)} ${roll.speed.toFixed(6)}\n`);
+      }
       return true;
     },
     /** The ring and the distance, for `--dump`. */
     debug () { return `ring ${Array.from(net.ringRates(), (v) => v.toFixed(1)).join(' ')} | d ${net.believedDistance().toFixed(0)} cm`; },
     estimate () { return net.estimate(); },
     digest () { return digest.hex(); },
+    motorDigest () { return motorDigest.hex(); },
   };
 }

@@ -9,6 +9,6 @@ export { Observation } from './observation';
 export type { ObservationStats } from './observation';
 export { ringVector } from './ring';
 export { LadderSender } from './ladder';
-export { motorCommand, fireRoll, MOTOR } from './motor';
+export { Motor, fireRoll, MOTOR } from './motor';
 export type { Roll } from './motor';
-export type { Circuit, NeuronDef, Vis, V3, SensoryMap, MapChannel, PipelineOp, IrConfig, Connectome, Sources, Motion, Estimate } from './types';
+export type { Circuit, NeuronDef, Vis, V3, SensoryMap, MapChannel, PipelineOp, IrConfig, Connectome, Sources, Motion, Estimate, OutputPort } from './types';

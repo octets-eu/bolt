@@ -1,6 +1,7 @@
 // The shapes of the brain's two data files, as the network, the loader and
 // the brain view read them. circuit.json: the neurons, the edges in the
-// worm's format [pre, post, weight, type], and `vis`, the view's anatomy.
+// worm's format [pre, post, weight, type], `outputs`, the neuron behind each
+// output port, and `vis`, the view's anatomy.
 // sensory_map.jsonc: the observation layer's constants, `ir`, and the
 // channels that turn its sources into the sensory neurons' drives. This is
 // scheme 1, what build/build-circuit.ts writes; docs/core-brain.plan.md's phases
@@ -38,7 +39,13 @@ export interface Vis {
   soma: Record<string, V3>;
 }
 
-export interface Circuit { about?: string; neurons: NeuronDef[]; edges: [string, string, number, number][]; vis: Vis }
+/** What the network hands out: the steering and the modes to the motor, the request for the short ladder to the referee. */
+export type OutputPort =
+  | 'steer.fwd' | 'steer.back' | 'steer.right' | 'steer.left'
+  | 'mode.search' | 'mode.roam' | 'mode.axis' | 'mode.near'
+  | 'request.short';
+
+export interface Circuit { about?: string; neurons: NeuronDef[]; edges: [string, string, number, number][]; outputs: Record<OutputPort, string>; vis: Vis }
 
 /** An op of a channel's pipeline (network.ts, `drive`). */
 export type PipelineOp =

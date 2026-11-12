@@ -18,11 +18,14 @@
 //   5. leaky neurons (tauMs) integrate their input, clamped to 0..1
 //   6. the rest, in the circuit's order, are max(0, bias + input) at once
 //
+// The motor and the referee read `output`, the neuron behind a port by
+// circuit.json's `outputs`, and no neuron's name.
+//
 // Nothing in here knows a Bolt; the constants are in the two data files,
 // read by load.ts in Node and by the browser app's bundler.
 
 import { shiftRing } from './ring';
-import type { Connectome, Estimate, MapChannel, NeuronDef, SensoryMap, Sources } from './types';
+import type { Connectome, Estimate, MapChannel, NeuronDef, OutputPort, SensoryMap, Sources } from './types';
 
 /** sensory_map.jsonc's text as an object: the `//` comments dropped. */
 export const parseJsonc = <T = unknown>(text: string): T => JSON.parse(text.replace(/^\s*\/\/.*$/gm, '').replace(/\s\/\/[^"\n]*$/gm, '')) as T;
@@ -48,6 +51,7 @@ export class Network {
   readonly self: Record<string, number>;      // the Bolt's own motion: axis -> neuron, turned, fwd, right
   readonly groups = new Map<string, number[]>();   // role -> the indexes of its evidence neurons
   readonly state: Record<number, number>[];   // per channel, what its ops remember
+  readonly outputs: Record<string, number>;   // output port -> neuron
 
   constructor ({ circuit, map }: Connectome) {
     this.map = map;
@@ -68,6 +72,7 @@ export class Network {
     this.self = Object.fromEntries(this.neurons.flatMap((n, i) => (n.role === 'self' && n.axis !== undefined ? [[n.axis, i] as [string, number]] : [])));
     for (const [i, n] of this.neurons.entries()) if (n.evidence) this.groups.set(n.role, [...(this.groups.get(n.role) ?? []), i]);
     this.state = map.channels.map(() => ({}));
+    this.outputs = Object.fromEntries(Object.entries(circuit.outputs).map(([port, name]) => [port, this.id(name)]));
     this.normalize();
   }
 
@@ -78,7 +83,8 @@ export class Network {
     return i;
   }
 
-  get (id: string): number { return this.rate[this.id(id)]!; }
+  /** The rate of the neuron behind an output port. */
+  output (port: OutputPort): number { return this.rate[this.outputs[port]!]!; }
 
   ringRates (): Float64Array { return Float64Array.from(this.ring, (i) => this.rate[i]!); }
 

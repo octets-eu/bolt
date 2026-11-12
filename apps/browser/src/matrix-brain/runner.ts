@@ -14,7 +14,7 @@
 
 import type { Bolt, LadderRange } from '@bolt/core';
 import { mod360, StabilizationIndex } from '@bolt/core';
-import { Network, Observation, ringVector, LadderSender, motorCommand, fireRoll, MOTOR } from '@bolt/brain';
+import { Network, Observation, ringVector, LadderSender, Motor, fireRoll, MOTOR } from '@bolt/brain';
 import type { Roll } from '@bolt/brain';
 import { connectome } from './connectome';
 import { ringPicture, peaks, PALETTE } from './render';
@@ -49,6 +49,7 @@ export class MatrixBrain {
   readonly seeker: Bolt;
   readonly sender: Bolt;
   private net = new Network(connectome);
+  private motor = new Motor();
   private obs: Observation;
   private ladder: LadderSender;
   private range: LadderRange = 'long';
@@ -134,7 +135,7 @@ export class MatrixBrain {
         try { f({ net: this.net, sources, dtMs: dt }); } catch (e) { MatrixBrain.steps.delete(f); this.seeker.log('warn', `brain step listener dropped: ${String(e)}`); }
       }
       // the referee's part: the sender follows the seeker's request for the short ladder (communication.ts, LADDERS)
-      const want: LadderRange = this.net.get('REQ_SHORT') > 0.5 ? 'short' : 'long';
+      const want: LadderRange = this.net.output('request.short') > 0.5 ? 'short' : 'long';
       if (want !== this.range) { this.range = want; this.ladder.switch(want); this.seeker.log('info', `brain ladder ${want}`); }
       if (this.options.motors && !this.obs.timed && Date.now() - this.lastRoll >= ROLL_MS) this.roll();
     });
@@ -153,7 +154,7 @@ export class MatrixBrain {
     if (this.commanded === null || !this.running || this.result) return;
     const now = Date.now();
     if (!this.t0) this.t0 = now;
-    this.cmd = motorCommand(this.net, this.heading, this.commanded, Math.min(400, now - this.lastRoll));
+    this.cmd = this.motor.command((port) => this.net.output(port), this.heading, this.commanded, Math.min(400, now - this.lastRoll), now);
     this.commanded = mod360(this.cmd.heading);
     this.lastRoll = now;
     this.modes[this.cmd.mode] = (this.modes[this.cmd.mode] ?? 0) + 1;
