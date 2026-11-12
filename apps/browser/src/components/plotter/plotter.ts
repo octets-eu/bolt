@@ -4,10 +4,15 @@ import { Logger } from '../logger/logger';
 import { Bolt, LogEntry } from '@bolt/core';
 import { Bolts } from '../../bolts';
 import { session } from '../../session';
+import { circuit } from '../../matrix-brain/connectome';
+import { SHEET, points, turn, mark } from './sheet';
 
 
-let series = [] as any;
-let marker = [] as any;
+// what the Bolts left on the sheet since the last Reset (sheet.ts): every locator sample, every frame of the
+// ladder heard, where its Bolt stood then, and every corner read that hit, with the nose of that moment
+let series = [] as { positionX: number, positionY: number, bolt: string, color: string }[];
+let frames = [] as { x: number, y: number, bolt: string, color: string, short: boolean }[];
+let reads  = [] as { x: number, y: number, bolt: string, color: string, heading: number, heard: boolean[] }[];
 let bolts  = {} as any;
 // the direction each sweep found, from where its Bolt stood, as a sheet heading; drawn as a ray
 let rays   = [] as { x: number, y: number, heading: number, color: string, bolt: string }[];
@@ -27,28 +32,10 @@ const ctx = cvs.getContext('2d') as CanvasRenderingContext2D;
 // canvas pixels per cm and the sheet's corner on the canvas, set by every render
 const meta = { scale: 1, transX: 0, transY: 0 };
 
-// The floor plan, public/floor-plan.svg: a sheet of 500 x 700 cm, origin upper
-// left, y down. The plot's coordinates are the sheet's.
-const SHEET = { width: 500, height: 700 };
+// The floor plan, public/floor-plan.svg; the plot's coordinates are the sheet's (sheet.ts).
 const plan  = new Image();
 plan.src    = '/floor-plan.svg';
 plan.onload = () => Plotter.render();
-
-/**
- * The reference points on the floor, on the sheet in cm, and the heading a
- * Bolt placed there faces, clockwise from the sheet's top; the plan draws and
- * names them (see its header). By convention a Bolt reset on a point faces
- * away from the room's centre, the midpoint of lf and rg, its nose the red
- * LED. lf and rg on the partition's centre line, back to back; d1, u1 and u2
- * on the line through their midpoint, 1.2 m down and 1.2 and 2 m up from it.
- */
-const points: { [point: string]: { x: number, y: number, heading: number } } = {
-  lf: { x: 241,   y: 317.5, heading: 270 },   // faces the left partition end
-  rg: { x: 264,   y: 317.5, heading:  90 },   // faces the right partition end
-  d1: { x: 252.5, y: 437.5, heading: 180 },
-  u1: { x: 252.5, y: 197.5, heading:   0 },
-  u2: { x: 252.5, y: 117.5, heading:   0 },
-};
 
 /**
  * The point each Bolt was last reset on, kept in the browser, since the page
@@ -69,43 +56,6 @@ const RAY_CM = 200;
 const partitionEnds = [{ positionX: 181, positionY: 317.5 }, { positionX: 324, positionY: 317.5 }];
 /** What the view always holds: both partition ends and every reference point. */
 const frame = [...partitionEnds, ...Object.values(points).map((p) => ({ positionX: p.x, positionY: p.y }))];
-
-/**
- * A locator offset as a sheet offset, for a Bolt that faced `heading` at its
- * reset, and a sheet offset as a locator offset: the same turn both ways,
- * since it holds the mirror between the locator's y to the front and the
- * sheet's y down.
- */
-function turn (heading: number, x: number, y: number) {
-  const c = Math.cos(heading * Math.PI / 180), s = Math.sin(heading * Math.PI / 180);
-  return { x: x * c + y * s, y: x * s - y * c };
-}
-
-
-const plot = {
-
-  strokeRect (ctx: CanvasRenderingContext2D, cx: number, cy: number, size: number) {
-    const s2 = size/2;
-    ctx.strokeRect(cx - s2, cy -s2, size, size);
-  },
-
-  fillRect (ctx: CanvasRenderingContext2D, cx: number, cy: number, size: number) {
-    const s2 = size/2;
-    ctx.fillRect(cx - s2, cy -s2, size, size);
-  },
-
-  circle(ctx: any, x: number, y: number, radius: number, fill: string, stroke?: string) {
-    ctx.beginPath();
-    ctx.arc(x, y, radius, 0, 2 * Math.PI, false);
-    ctx.fillStyle = fill;
-    ctx.lineWidth = 1;
-    ctx.strokeStyle = stroke;
-    fill && ctx.fill();
-    stroke && ctx.stroke();
-  },
-
-}
-
 
 const Plotter = Factory.create('Plotter', {
 
@@ -148,7 +98,9 @@ const Plotter = Factory.create('Plotter', {
     try { localStorage.setItem(PLACED_KEY, JSON.stringify(placed)); } catch { /* private window */ }
     session.note(bolt.name, 'info', `starts ${JSON.stringify(starts())}`);
     await bolt.lifecycle.reset(true, point);
-    series = series.filter((p: any) => p.bolt !== bolt.name);
+    series = series.filter((p) => p.bolt !== bolt.name);
+    frames = frames.filter((p) => p.bolt !== bolt.name);
+    reads  = reads.filter((p) => p.bolt !== bolt.name);
     rays = rays.filter((r) => r.bolt !== bolt.name);
     Plotter.render();
   },
@@ -170,6 +122,8 @@ const Plotter = Factory.create('Plotter', {
    * the Bolt's start; the sample's yaw gives the nose. A reset of the Bolt
    * alone puts its dot on the start, as the Reset button does for all. A
    * sweep's end line with a heading adds a ray from where the Bolt stands.
+   * A frame of the ladder heard and a corner read that hit leave their marks
+   * where the Bolt stands.
    */
   attach (bolt: Bolt): () => void {
     return bolt.events.on('log', (entry: LogEntry) => {
@@ -190,7 +144,23 @@ const Plotter = Factory.create('Plotter', {
         Plotter.render();
         return;
       }
-      if (entry.type !== 'event' || entry.subtype !== 'sensordata') return;
+      if (entry.type !== 'event') return;
+      const here = bolts[bolt.name], msg = (entry.data as any)?.msg;
+      if (entry.subtype === 'infrared' && here) {
+        const level = circuit.observation.channels[msg?.payload?.[0]];
+        if (!level) return;
+        frames.push({ x: here.locator.positionX, y: here.locator.positionY, bolt: bolt.name, color, short: level[0] === 'short' });
+        Plotter.render();
+        return;
+      }
+      if (entry.subtype === 'ack' && here && msg?.device === 24 && msg.command === 34 && msg.payload?.length === 4) {   // a corner read's reply
+        const heard: boolean[] = msg.payload.map((c: number) => !!circuit.observation.channels[c]);
+        if (!heard.some(Boolean)) return;
+        reads.push({ x: here.locator.positionX, y: here.locator.positionY, bolt: bolt.name, color, heading: here.heading ?? 0, heard });
+        Plotter.render();
+        return;
+      }
+      if (entry.subtype !== 'sensordata') return;
       const locator = (entry.data as any)?.sensordata?.locator;
       const yaw: number | undefined = (entry.data as any)?.sensordata?.angles?.yaw;
       if (!locator) return;
@@ -198,7 +168,8 @@ const Plotter = Factory.create('Plotter', {
       const location = { positionX: start.x + p.x, positionY: start.y + p.y, bolt: bolt.name };
       // the sheet's heading, clockwise from its top: the start's plus the measured one, which is -yaw
       Plotter.placeBolt(bolt.name, location, color, yaw === undefined ? null : start.heading - yaw);
-      Plotter.render(location, color);
+      series.push({ ...location, color });
+      Plotter.render();
     });
   },
 
@@ -207,7 +178,8 @@ const Plotter = Factory.create('Plotter', {
 
     Logger.info(this, 'Reset');
     series = [];
-    marker = [];
+    frames = [];
+    reads  = [];
     bolts  = {};
     rays   = [];
     Bolts.forEach((bolt: Bolt) => {
@@ -218,61 +190,17 @@ const Plotter = Factory.create('Plotter', {
 
   },
 
-  calculateStepSize(range: number, targetSteps: number){
-
-    // calculate an initial guess at step size
-      const tempStep = range/targetSteps;
-
-      // get the magnitude of the step size
-      const mag = Math.floor(Math.log10(tempStep));
-      const magPow = Math.pow(10, mag);
-
-      // calculate most significant digit of the new step size
-      let magMsd = ~~(tempStep/magPow + 0.5);
-
-      // promote the MSD to either 1, 2, or 5
-      if (magMsd > 5.0)
-          magMsd = 10.0;
-      else if (magMsd > 2.0)
-          magMsd = 5.0;
-      else if (magMsd > 1.0)
-          magMsd = 2.0;
-
-      return magMsd * magPow;
+  /** The marks of sheet.ts: the samples, the frames heard over them, the reads that hit on top. */
+  plotData (ctx: CanvasRenderingContext2D, meta: any) {
+    const px = 1 / meta.scale;
+    series.forEach((p) => mark.position(ctx, p.positionX, p.positionY, p.color, px));
+    frames.forEach((f) => mark.frame(ctx, f.x, f.y, f.color, f.short, px));
+    reads.forEach((r) => mark.read(ctx, r.x, r.y, r.heading, r.heard, r.color, px));
   },
 
-  plotData (ctx: CanvasRenderingContext2D, meta: any, data: any) {
-
-    data.forEach( (point:any) => {
-
-      ctx.strokeStyle = point.stroke;
-      ctx.fillStyle   = point.fill;
-      const x = point.positionX;
-      const y = point.positionY;
-      plot.fillRect(ctx, x, y, 2 / meta.scale);
-      plot.strokeRect(ctx, x, y, 2 / meta.scale);
-
-    });
-
-  },
-
-  /** A dot per Bolt and a nose the way it faces, from half the radius to twice it. */
+  /** Every Bolt where it stands, with its nose. */
   plotBolts (ctx: CanvasRenderingContext2D, meta: any) {
-
-    Object.keys(bolts).forEach( key => {
-      const { locator: loc, color: col, heading } = bolts[key];
-      const r = 8 / meta.scale;
-      plot.circle(ctx, loc.positionX, loc.positionY, r, col);
-      if (heading === null) return;
-      const a = heading * Math.PI / 180, dx = Math.sin(a), dy = -Math.cos(a);
-      ctx.beginPath();
-      ctx.moveTo(loc.positionX + dx * r / 2, loc.positionY + dy * r / 2);
-      ctx.lineTo(loc.positionX + dx * r * 2, loc.positionY + dy * r * 2);
-      ctx.lineWidth = 3 / meta.scale;
-      ctx.strokeStyle = col;
-      ctx.stroke();
-    })
-
+    Object.values(bolts).forEach(({ locator, color, heading }: any) => mark.bolt(ctx, locator.positionX, locator.positionY, heading, color, 1 / meta.scale));
   },
 
   /** A thin line of `RAY_CM` from where a sweep stood, the way it decided. */
@@ -288,24 +216,12 @@ const Plotter = Factory.create('Plotter', {
     });
   },
 
-  plotMarker (ctx: CanvasRenderingContext2D, meta: any) {
-    marker.forEach( ( point: any ) => {
-      plot.circle(ctx, point.x, point.y, 3 / meta.scale, marker.fill || '#F00');
-    })
-  },
-
   placeBolt (name: string, locator: any, color: string, heading: number | null = null) {
     bolts[name] = { locator, color, heading };
   },
 
 
-  render ( location: any, stroke: string, fill: string ) {
-
-    if (location) {
-      location.stroke = location.stroke || stroke || 'pink';
-      location.fill   = location.fill   || fill   || 'white';
-      series.push(location);
-    }
+  render () {
 
     // every sample since the last Reset
     const data = series;
@@ -328,8 +244,7 @@ const Plotter = Factory.create('Plotter', {
     ctx.scale(meta.scale, meta.scale);
 
     if (plan.complete && plan.naturalWidth) ctx.drawImage(plan, 0, 0, SHEET.width, SHEET.height);
-    Plotter.plotMarker(ctx, meta);
-    Plotter.plotData(ctx, meta, data);
+    Plotter.plotData(ctx, meta);
     Plotter.plotRays(ctx, meta);
     Plotter.plotBolts(ctx, meta);
 

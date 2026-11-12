@@ -2,8 +2,10 @@
 // the session files into bench/<n>/session.jsonl. bench/ is the store: a run
 // once written keeps its number and its file, so a mark added by hand stays;
 // a new run gets the next number. A run's file holds its session's header
-// line, the run's lines from its start to its end and, for a seek the user
-// marked good, the mark, verbatim. bench/index.tsv lists every run: its
+// line, the last `starts` line before the run, the reference points both
+// Bolts were reset on (the plotter's, for bench/image.mjs), the run's lines
+// from its start to its end and, for a seek the user marked good, the mark,
+// verbatim. bench/index.tsv lists every run: its
 // session, its start on the session's clock, kind, seeker, mark, length,
 // end line and source; it is rewritten from the store on every extract.
 //
@@ -20,6 +22,7 @@ import { existsSync, readFileSync, readdirSync, mkdirSync, writeFileSync } from 
 
 const START = /^brain (seek:|path start)/, END = /^brain (seek (found|time|runaway|stopped)|path done)/;
 const MARK = /^brain replay (\{.*\})$/;
+const STARTS = /^starts \{/;
 const VOID = /^brain path void/;   // the user's verdict on the path just ended: not for the bench
 const ZIPS = 'apps/browser/sessions';
 process.chdir(new URL('..', import.meta.url).pathname);
@@ -33,12 +36,13 @@ function runsOf (text) {
   const lines = raw.map((l) => { try { return JSON.parse(l); } catch { return null; } });   // a torn line stays out
   const head = lines.findIndex((e) => e?.kind === 'session');
   const out = [];
-  let open = null, last = null;
+  let open = null, last = null, starts = null;
   lines.forEach((e, k) => {
     const d = info(e);
     if (d === null) return;
-    if (START.test(d)) { open = { kind: d.startsWith('brain seek') ? 'seek' : 'path', from: k, t0: e.t, seeker: d.match(/seeker (\S+)/)?.[1] ?? e.bolt }; last = null; return; }
-    if (END.test(d) && open) { last = { ...open, to: k, t1: e.t, end: d, id: lines[head]?.id, lines: [raw[head], ...raw.slice(open.from, k + 1)] }; out.push(last); open = null; return; }
+    if (STARTS.test(d)) { starts = k; return; }
+    if (START.test(d)) { open = { starts, kind: d.startsWith('brain seek') ? 'seek' : 'path', from: k, t0: e.t, seeker: d.match(/seeker (\S+)/)?.[1] ?? e.bolt }; last = null; return; }
+    if (END.test(d) && open) { last = { ...open, to: k, t1: e.t, end: d, id: lines[head]?.id, lines: [raw[head], ...(open.starts === null ? [] : [raw[open.starts]]), ...raw.slice(open.from, k + 1)] }; out.push(last); open = null; return; }
     if (VOID.test(d) && last?.kind === 'path') { out.pop(); last = null; return; }
     const mark = d.match(MARK);
     if (mark && last?.kind === 'seek' && !last.mark) { last.mark = JSON.parse(mark[1]); last.lines.push(raw[k]); }   // the mark follows its run
