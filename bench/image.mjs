@@ -12,8 +12,14 @@
 // there green stood on lf and blue on rg, back to back.
 //
 //   npx tsx bench/image.mjs [n | n-m ...]
+//
+// --reads writes one map instead, bench/all/reads.png: the whole sheet with
+// every corner read that hit in the runs picked, each where its seeker stood,
+// in the seeker's colour, and the senders on the points they stood on.
+//
+//   npx tsx bench/image.mjs --reads [n | n-m ...]
 
-import { readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { createCanvas, loadImage } from '@napi-rs/canvas';
 import { loadCircuit } from '@bolt/brain/load';
 import { SHEET, points, turn, mark } from '../apps/browser/src/components/plotter/sheet.ts';
@@ -25,7 +31,8 @@ const PX_PER_CM = 4, MARGIN_CM = 30, LEGEND_PX = 400, MIN_PX = 560;
 const DPR = 2;   // device pixels per pixel: the image is drawn at twice its layout
 const channels = loadCircuit().observation.channels;
 
-const picks = process.argv.slice(2).map((a) => a.split('-').map(Number));
+const READS = process.argv.includes('--reads');
+const picks = process.argv.slice(2).filter((a) => /^\d/.test(a)).map((a) => a.split('-').map(Number));
 const ns = readdirSync('bench').filter((d) => /^\d+$/.test(d)).map(Number).sort((a, b) => a - b)
   .filter((n) => !picks.length || picks.some(([a, b = a]) => n >= a && n <= b));
 const plan = await loadImage('apps/browser/public/floor-plan.svg');
@@ -46,12 +53,10 @@ function read (n) {
   return { n, lines, session: lines[0].id, kind: /^brain seek/.test(info(start)) ? 'seek' : 'path', t0: start.t, t1: end.t, endLine: info(end), seeker, sender, pair: [starts[seeker]?.point, starts[sender]?.point], marked: !!markLine };
 }
 
-function draw (run) {
-  const pair = run.pair;
-  if (!points[pair[0]] || !points[pair[1]]) return `no start points for ${run.seeker} and ${run.sender}`;
-  const P = points[pair[0]], Q = points[pair[1]], color = COLORS[run.seeker] ?? 'brown';
-
-  // the seeker's samples, frames and reads on the sheet
+/** The seeker's samples, frames heard and reads that hit, on the sheet; `total` counts every read. Null without start points. */
+function onSheet (run) {
+  const P = points[run.pair[0]];
+  if (!P || !points[run.pair[1]]) return null;
   const track = [], frames = [], reads = [];
   let here = null, total = 0;
   for (const e of run.lines) {
@@ -69,6 +74,14 @@ function draw (run) {
       if (here && heard.some(Boolean)) reads.push({ ...here, heard });
     }
   }
+  return { track, frames, reads, total };
+}
+
+function draw (run) {
+  const pair = run.pair, seen = onSheet(run);
+  if (!seen) return `no start points for ${run.seeker} and ${run.sender}`;
+  const P = points[pair[0]], Q = points[pair[1]], color = COLORS[run.seeker] ?? 'brown';
+  const { track, frames, reads, total } = seen;
 
   // the cut: the drive, both points, a margin
   const xs = [...track.map((p) => p.x), P.x, Q.x], ys = [...track.map((p) => p.y), P.y, Q.y];
@@ -146,4 +159,48 @@ function draw (run) {
   return `${(w + LEGEND_PX) * DPR} x ${h * DPR}, ${track.length} samples, ${frames.length} frames, ${reads.length} of ${total} reads hit, ${pair[0]} to ${pair[1]}`;
 }
 
-for (const n of ns) console.log(`${String(n).padStart(3)} ${draw(read(n))}`);
+/** Every read that hit in the runs, on the whole sheet. */
+function readsMap (runs) {
+  const px = 1 / PX_PER_CM, w = SHEET.width * PX_PER_CM, h = SHEET.height * PX_PER_CM;
+  const canvas = createCanvas((w + LEGEND_PX) * DPR, h * DPR), ctx = canvas.getContext('2d');
+  ctx.scale(DPR, DPR);
+  ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, w + LEGEND_PX, h);
+  ctx.save();
+  ctx.scale(PX_PER_CM, PX_PER_CM);
+  ctx.drawImage(plan, 0, 0, SHEET.width, SHEET.height);
+  const by = {};   // per sender's point: runs, reads, hits
+  let total = 0, hit = 0, drawn = 0;
+  for (const run of runs) {
+    const seen = onSheet(run);
+    if (!seen) continue;
+    drawn++; total += seen.total; hit += seen.reads.length;
+    const b = by[run.pair[1]] ??= { color: COLORS[run.sender] ?? 'brown', runs: 0, total: 0, hit: 0 };
+    b.runs++; b.total += seen.total; b.hit += seen.reads.length;
+    for (const r of seen.reads) mark.read(ctx, r.x, r.y, r.heading, r.heard, COLORS[run.seeker] ?? 'brown', px);
+  }
+  for (const [point, b] of Object.entries(by)) mark.bolt(ctx, points[point].x, points[point].y, points[point].heading, b.color, px);
+  ctx.restore();
+  const lx = w + 20;
+  let ly = 34;
+  ctx.fillStyle = '#000'; ctx.textBaseline = 'middle';
+  const rows = [
+    ['bench: every corner read that hit', 'bold'],
+    [`${drawn} runs, ${ns[0]} to ${ns.at(-1)}`],
+    [`${total} reads, ${hit} hit, ${(100 * hit / total).toFixed(1)} %`],
+    [''],
+    ['by the sender\'s point:'],
+    ...Object.entries(by).map(([point, b]) => [`${point}: ${b.runs} runs, ${b.hit} of ${b.total} hit, ${(100 * b.hit / b.total).toFixed(1)} %`]),
+    [''],
+    ['a read where its seeker stood, in the'],
+    ['seeker\'s colour; red the corners that'],
+    ['heard, turned with the nose'],
+    ['a disc with a nose: a sender on its point'],
+  ];
+  for (const [text, weight] of rows) { ctx.font = `${weight ?? ''} 15px sans-serif`; ctx.fillText(text, lx, ly); ly += 24; }
+  mkdirSync('bench/all', { recursive: true });
+  writeFileSync('bench/all/reads.png', canvas.toBuffer('image/png'));
+  return `bench/all/reads.png: ${drawn} runs, ${hit} of ${total} reads hit; ${Object.entries(by).map(([p, b]) => `${p} ${b.hit}/${b.total}`).join(', ')}`;
+}
+
+if (READS) console.log(readsMap(ns.map(read)));
+else for (const n of ns) console.log(`${String(n).padStart(3)} ${draw(read(n))}`);
