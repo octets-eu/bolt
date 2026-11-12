@@ -7,11 +7,12 @@ import { Logger } from '../../components/logger/logger';
 import { Bolts } from '../../bolts';
 import { Bolt } from '@bolt/core';
 import { phone } from '../../phone';
+import { MARKS, POSE, toFrame } from '../../tracking/floorcam';
 
 let clicks: TPoint[] = [];
 
 /** The phone picture's zoom about a clicked point (fractions of the frame), and its contrast and brightness. */
-const look = { zoom: 1, cx: 0.5, cy: 0.5, contrast: 1, brightness: 1 };
+const look = { zoom: 1, cx: 0.5, cy: 0.5, contrast: 1, brightness: 1, marks: true };
 
 const BORDER = 8;
 window.addEventListener('resize', () => m.redraw());
@@ -36,6 +37,23 @@ function drawPhone (cv: HTMLCanvasElement) {
   const ctx = cv.getContext('2d')!;
   ctx.filter = `contrast(${look.contrast}) brightness(${look.brightness})`;
   ctx.drawImage(img, sx, sy, sw, sh, 0, 0, cv.width, cv.height);
+  ctx.filter = 'none';
+  if (!look.marks) return;
+  // the alignment marks (floorcam.ts): where the reference points and the partition's ends lie in the frame when the phone sits right
+  const onCanvas = (x: number, y: number): [number, number] => { const f = toFrame(x, y); return [(f.u * w - sx) / sw * cv.width, (f.v * w - sy) / sh * cv.height]; };
+  const r = 3.65 * POSE.scale * w / sw * cv.width;   // a Bolt's radius, 3.65 cm, on the canvas
+  ctx.strokeStyle = ctx.fillStyle = 'yellow';
+  ctx.lineWidth = 1.5;
+  ctx.font = '14px monospace';
+  for (const [name, p] of Object.entries(MARKS.points)) {
+    const [x, y] = onCanvas(p.x, p.y);
+    ctx.beginPath(); ctx.arc(x, y, r, 0, 2 * Math.PI); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x - 3, y); ctx.lineTo(x + 3, y); ctx.moveTo(x, y - 3); ctx.lineTo(x, y + 3); ctx.stroke();
+    ctx.fillText(name, x + r + 4, y + 5);
+  }
+  for (const [a, b] of MARKS.ends) {
+    ctx.beginPath(); ctx.moveTo(...onCanvas(a!.x, a!.y)); ctx.lineTo(...onCanvas(b!.x, b!.y)); ctx.stroke();
+  }
 }
 
 /** The phone on the partition's ceiling: the forwarder's stream as polled JPEGs, zoomed and filtered to read a matrix. */
@@ -67,6 +85,7 @@ const PhoneView = {
         slider('contrast', 'contrast', 0.5, 4, 0.1),
         slider('brightness', 'brightness', 0.2, 3, 0.1),
         m('button.cmd.br2.ml1', { title: 'Zoom 1, centre, no filter', onclick: () => Object.assign(look, { zoom: 1, cx: 0.5, cy: 0.5, contrast: 1, brightness: 1 }) }, 'Reset'),
+        m('button.cmd.br2.ml1', { class: look.marks ? 'on' : '', title: 'Draw where the reference points and the partition\'s ends lie when the phone is aligned', onclick: () => { look.marks = !look.marks; } }, 'Marks'),
         m('span.mono.f6.cfff.ml2', 'click the picture to zoom there'),
       ]),
       p.image
