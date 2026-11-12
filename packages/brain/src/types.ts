@@ -1,22 +1,23 @@
-// The shapes of the brain's two data files, as the network, the loader and
-// the brain view read them. circuit.json: the neurons, the edges in the
-// worm's format [pre, post, weight, type], `outputs`, the neuron behind each
-// output port, and `vis`, the view's anatomy.
-// sensory_map.jsonc: the observation layer's constants, `ir`, and the
-// channels that turn its sources into the sensory neurons' drives. This is
-// scheme 1, what build/build-circuit.ts writes; docs/core-brain.plan.md's phases
-// B and C change it.
+// The shape of the brain's data file, circuit.json, as the network, the
+// observation layer, the motor and the brain view read it: `observation` and
+// `motor`, the constants of the two layers; the neurons, an input neuron
+// with the `port` of the observation layer it takes its value from; the
+// edges in the worm's format [pre, post, weight, type]; `outputs`, the neuron
+// behind each output port; and `vis`, the view's anatomy. This is scheme 1,
+// what build/build-circuit.ts writes; docs/core-brain.plan.md's phase C
+// changes it.
 
 import type { LadderRange } from '@bolt/core';
 
 export type V3 = [number, number, number];
 
-/** A neuron of circuit.json. The network reads `role`, `evidence`, `cm`, `tauCm`, `tauParallax`, `bias`, `tauMs`, `of`, `gate`, `axis` and `angle`; the view the rest. */
+/** A neuron of circuit.json. The network reads `port`, `gain`, `rateTauMs`, `role`, `evidence`, `cm`, `tauCm`, `tauParallax`, `bias`, `tauMs`, `of`, `gate`, `axis` and `angle`; the view the rest. */
 export interface NeuronDef {
   id: string; type: string; role: string; side: string; pos: V3;
   angle?: number; channel?: number; ladder?: string; strength?: number;
   of?: string; gate?: string[]; band?: [number, number | null]; cm?: [number, number]; tauCm?: number; tauParallax?: number;
   bias?: number; tauMs?: number; evidence?: boolean; axis?: string; unit?: string;
+  port?: InputPort; gain?: number; rateTauMs?: number;   // an input neuron: the port's value, with `rateTauMs` its events per second smoothed, times `gain`
 }
 
 /** The brain view's anatomy, what the wiring cannot say: the neuropils' places and shapes and the somata, in the Bolt's body frame, cm, nose along +y. */
@@ -45,35 +46,40 @@ export type OutputPort =
   | 'mode.search' | 'mode.roam' | 'mode.axis' | 'mode.near'
   | 'request.short';
 
-export interface Circuit { about?: string; neurons: NeuronDef[]; edges: [string, string, number, number][]; outputs: Record<OutputPort, string>; vis: Vis }
+export interface Circuit { about?: string; observation: ObservationConfig; motor: MotorConfig; neurons: NeuronDef[]; edges: [string, string, number, number][]; outputs: Record<OutputPort, string>; vis: Vis }
 
-/** An op of a channel's pipeline (network.ts, `drive`). */
-export type PipelineOp =
-  | { op: 'gain'; k: number } | { op: 'mul'; by: string } | { op: 'sub'; k: number }
-  | { op: 'clamp'; lo: number; hi: number } | { op: 'adapt'; tauMs: number } | { op: 'rate'; tauMs: number };
+export type Corner = 'FL' | 'FR' | 'BR' | 'BL';
 
-/** A channel of sensory_map.jsonc: a source of the observation layer, through its pipeline, onto a neuron's drive. */
-export interface MapChannel { drive: string; source: string; pipeline: PipelineOp[] }
+/** What the observation layer hands in, a value per port per tick. */
+export type InputPort =
+  | `frame.ch${number}` | `slot.ch${number}` | `corner.${Corner}`
+  | 'frame.any' | 'frame.carrier' | 'frame.miss' | 'frame.closeness' | 'carrier.down' | 'carrier.up'
+  | 'ladder.near' | 'ladder.settled'
+  | 'self.turned' | 'self.fwd' | 'self.right' | 'self.still' | 'self.forward';
 
-/** The observation layer's constants, sensory_map.jsonc's `ir`. */
-export interface IrConfig {
+export type Sources = Partial<Record<InputPort, number>>;
+
+/** The observation layer's constants, circuit.json's `observation`; build/build-circuit.ts says what each is. */
+export interface ObservationConfig {
   channels: Record<string, [LadderRange, number]>;   // infrared channel -> its ladder and strength
-  corners: Record<string, number>;                    // the receivers' angles off the nose, the builder's
   beatMs: number;
-  repeat?: number;
+  repeat: number;
+  secondNotifyMs: number;
+  follow: { withinMs: number; pull: number };
+  expectMs: number;
   volley: { leadMs: number; reads: number; stepMs: number };
   carrier: { windowMs: number; minFrames: number };
   near: { windowMs: number; minFrames: number; lostMs: number };
   settleMs: number;
+  watchdogMs: number;
+  fireMs: number;
 }
 
-export interface SensoryMap { ir: IrConfig; channels: MapChannel[] }
-
-/** The two data files together, as `Network` takes them. */
-export interface Connectome { circuit: Circuit; map: SensoryMap }
-
-/** The observation layer's output, a value per source name, read by the map's channels. */
-export type Sources = Record<string, number>;
+/** The motor's constants, circuit.json's `motor`; build/build-circuit.ts says what each is. */
+export interface MotorConfig {
+  seekSpeed: number; probeSpeed: number; listenMs: number; scanStep: number; scanHoldMs: number; roamSpeed: number;
+  maxTurn: number; castDeg: number; castMs: number; nearCastDeg: number; nearDriveDeg: number;
+}
 
 /** The motion sample the brain steps on: heading clockwise from the locator's +y, the locator in cm. */
 export interface Motion { heading: number; x: number; y: number }

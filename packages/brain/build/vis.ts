@@ -25,7 +25,7 @@
 //   self neurons' low in the body, where the motion comes from.
 
 import type { LadderRange } from '@bolt/core';
-import type { NeuronDef, SensoryMap, V3, Vis } from '../src/types';
+import type { NeuronDef, ObservationConfig, V3, Vis } from '../src/types';
 
 const BALL_R = 3.5;
 const RIND_R = 3.05;
@@ -52,14 +52,13 @@ const onRindAt = (azimuth: number, elevation: number): V3 => around(azimuth, RIN
 /** A value the circuit must provide: a channel's or a corner's place, a neuron's layer. */
 const must = <T>(v: T | undefined, what: string): T => { if (v === undefined) throw new Error(`vis: no ${what}`); return v; };
 
-/** `vis` for the circuit's neurons; `map` is sensory_map.jsonc, for the channels and the corners. */
-export function bodyLayout (neurons: NeuronDef[], map: SensoryMap): Vis {
-  const channels = Object.entries(map.ir.channels).map(([ch, [ladder, strength]]) => ({ ch: Number(ch), ladder, strength }));
+/** `vis` for the circuit's neurons; `ir` the observation layer's channels, `corners` the receivers' angles off the nose. */
+export function bodyLayout (neurons: NeuronDef[], ir: ObservationConfig['channels'], corners: Record<string, number>): Vis {
+  const channels = Object.entries(ir).map(([ch, [ladder, strength]]) => ({ ch: Number(ch), ladder, strength }));
   const order = [...channels].sort((a, b) => (a.ladder === b.ladder ? a.strength - b.strength : a.ladder === 'long' ? -1 : 1));
   const azimuthOf = new Map<number, number>();
   for (const ladder of ['long', 'short'] as const) order.filter((c) => c.ladder === ladder).forEach((c, k) => azimuthOf.set(c.ch, GLOMERULI.azimuths[ladder][k]!));
   const slotOf = new Map(order.map((c, k) => [c.ch, k]));   // a channel's place in the row of afferents
-  const corners = map.ir.corners;
   const distance = neurons.filter((n) => n.role === 'distance').sort((a, b) => a.cm![0] - b.cm![0]);
   const layerZ = new Map(distance.map((n, i) => [n.id, COLUMN.z0 + i * COLUMN.dz]));
   const bandLows = [...new Set(neurons.filter((n) => n.role === 'gated').map((n) => n.band![0]))].sort((a, b) => a - b);   // the band groups, nearest first

@@ -7,8 +7,11 @@
 // over its role's group (network.ts); `cm`, a distance neuron's band;
 // `tauCm`, its evidence forgets with the travel in cm; `tauParallax`, it
 // forgets with the travel over the believed distance, radians; `bias`; `tauMs` for leaky
-// neurons. Every constant of the brain is here or in sensory_map.jsonc; the
-// runtime has none.
+// neurons. An input neuron carries `port`, the observation layer's value it
+// takes each tick (an event counts on the tick it happened, else 0), `gain`
+// and `rateTauMs`, its events per second smoothed. Every constant of the
+// brain is here, the observation layer's and the motor's written out as
+// `observation` and `motor`; the runtime has none.
 //
 // The belief is the ring plus distance (found from 122 cm in 23.5 s,
 // 2026-11-08): N ring neurons hold the log-evidence of the sender's bearing
@@ -48,8 +51,7 @@
 
 import { readFileSync, writeFileSync } from 'node:fs';
 import type { LadderRange } from '@bolt/core';
-import { parseJsonc } from '../src/network';
-import type { Circuit, NeuronDef, SensoryMap } from '../src/types';
+import type { Circuit, Corner, MotorConfig, NeuronDef, ObservationConfig } from '../src/types';
 import { bodyLayout } from './vis';
 
 /** senses.json: counts by sector of the sender's true bearing (8 x 45 deg, 0 ahead, clockwise) and by band of distance (bandCm, the last open), in samples at `hz`. */
@@ -61,7 +63,61 @@ interface Senses {
   corners: Record<string, { sector: number[]; bandSector: number[][] }>;   // reads landed per corner
 }
 
-const map = parseJsonc<SensoryMap>(readFileSync(new URL('../src/sensory_map.jsonc', import.meta.url), 'utf8'));
+// --- the observation layer's constants, circuit.json's `observation`: what it knows of the ladder and the
+// receivers (docs/bolt-reference.md section 7, communication.ts)
+const OBSERVATION: ObservationConfig = {
+  // channel -> ladder and strength; a frame names its ladder and level
+  channels: { 0: ['long', 2], 1: ['long', 4], 2: ['long', 8], 3: ['long', 16], 4: ['short', 1], 5: ['short', 2], 6: ['short', 4] },
+  // the sender's beat: one command per 200 ms on its schedule (ladder.ts), the notify 45 ms after the frame;
+  // a read lands only while the frame is in the air, 7.5 ms (behavior/beat.ts)
+  beatMs: 200,
+  // beats each level is held by the sender: 1 for the browser's runs; ladder.ts can hold 2
+  repeat: 1,
+  // a second notify of one frame comes within this (one in ten, 45 ms after the first) and is no new frame
+  secondNotifyMs: 100,
+  // a channel's expected notify is pulled `pull` of the way to each notify that comes within `withinMs` of it
+  follow: { withinMs: 40, pull: 0.4 },
+  // a channel stays expected, its frames read into, this long after it was last heard
+  expectMs: 3000,
+  // over the bridge a read lands at a 40 to 55 ms lead (utils/read-timing.mjs, 2026-11-06), and
+  // commands reach the Bolt on a 15 ms grid: three reads 7 ms apart, leads 60 to 46, span a grid
+  // slot (behavior/beat.ts: three land in 35 to 39 % of frames, five in 43 %); five loaded the link
+  // so that the seeker's collision report came 400 ms after the sender's (2026-11-06)
+  volley: { leadMs: 60, reads: 3, stepMs: 7 },
+  // the carrier: the weakest level heard at least `minFrames` times in `windowMs`;
+  // the level that is just arriving has an edge, nose or tail (communication.ts, LADDERS)
+  carrier: { windowMs: 3000, minFrames: 2 },
+  // near: the long ladder's weakest level heard in `minFrames` of the last
+  // `windowMs` asks for the short ladder; nothing of the short one in `lostMs` asks back;
+  // the referee switches the sender between the two (communication.ts, LADDERS)
+  near: { windowMs: 3500, minFrames: 3, lostMs: 3000 },
+  // after the frames change ladder, the closeness is not compared for this long
+  settleMs: 3000,
+  // the watchdog: nothing heard for this long, the listen is re-armed through the queue
+  watchdogMs: 1500,
+  // ack timeout of a fired command that is not a timed read
+  fireMs: 300,
+};
+// receivers at the corners, front left, front right, back right, back left, deg off the nose
+const CORNERS: Record<string, number> = { FL: -45, FR: 45, BR: 135, BL: -135 };
+// a read that landed is worth about three frames (replay bench, 2026-11-08)
+const CORNER_GAIN = 3;
+
+// --- the motor's constants, circuit.json's `motor` (motor.ts)
+const MOTOR: MotorConfig = {
+  seekSpeed:   32,    // roll speed, about 17 cm/s (40 gave 22); at 21 cm/s runs passed 15 cm off, at 13 a touch went unreported
+  probeSpeed:  28,
+  listenMs:    2500,  // standing on the axis before the probe
+  scanStep:    45,    // deg per turn of the scan
+  scanHoldMs:  1300,  // standing after each, a round and a half of the long ladder
+  roamSpeed:   25,
+  maxTurn:     35,    // deg per command
+  castDeg:     45,    // weave amplitude while targeting: past the edge of the carrier's lobe
+  castMs:      2500,  // weave period
+  nearCastDeg: 15,
+  nearDriveDeg: 30,
+};
+
 const N        = Number(process.env['N'] ?? 36);         // ring neurons, 10 deg apart; 16 bins lost nine points against 36 on the bench (2026-11-08)
 const BANDS = 10, BAND_CM = 20;                        // distance neurons
 const TAU_CM   = Number(process.env['TAU_CM'] ?? 30);    // the distance forgets with the travel: recordings 72 to 75 %, the day's runs 56 to 65 %, |off| 28 to 27 cm
@@ -109,7 +165,7 @@ const toBands = (a: number[]): number[] => Array.from({ length: BANDS }, (_, i) 
 const logOverMean = (v: (number | null)[]): number[] => { const d = v.filter((x): x is number => x !== null); const mean = d.reduce((a, b) => a + b, 0) / d.length; return v.map((x) => (x === null ? 0 : Math.log(x / mean))); };
 /** Frames per second of exposure per sector, null where the exposure is under MIN_EXPOSURE_S. */
 const sectorRate = (counts: number[], exposure: number[]): (number | null)[] => counts.map((c, i) => (secs(exposure[i]!) < MIN_EXPOSURE_S ? null : (c + EPS_SECTOR) / secs(exposure[i]!)));
-const channels = Object.entries(map.ir.channels).map(([ch, [ladder, strength]]) => ({ ch: Number(ch), ladder, strength }));
+const channels = Object.entries(OBSERVATION.channels).map(([ch, [ladder, strength]]) => ({ ch: Number(ch), ladder, strength }));
 
 // motor: F, B, R, L read the ring's vector; SEARCH is on unless that vector has a length;
 // ROAM is the part of search with nothing heard at all
@@ -128,7 +184,7 @@ const sectorProfile = (rates: (number | null)[]): number[] => {
   return Array.from({ length: N }, (_, j) => { const pos = ringAngle(j) / 45, k = Math.floor(pos), f = pos - k; return ll[k % 8]! * (1 - f) + ll[(k + 1) % 8]! * f; });
 };
 /** Slots per round of the ladder: a channel is sent once per round. */
-const roundS = (ladder: LadderRange): number => map.ir.beatMs * channels.filter((c) => c.ladder === ladder).length / 1000;
+const roundS = (ladder: LadderRange): number => OBSERVATION.beatMs * channels.filter((c) => c.ladder === ladder).length / 1000;
 /**
  * Chance per slot of the channel to hear it: frames heard over slots sent (the exposure in rounds), a count
  * added on both sides so it stays off 0 and 1; null where the exposure is under MIN_EXPOSURE_S. As a rate
@@ -146,22 +202,25 @@ const neurons: NeuronDef[] = [], edges: [string, string, number, number][] = [];
 const neuron = (nid: string, role: string, extra: Partial<NeuronDef> = {}): void => { neurons.push({ id: nid, type: role, role, side: 'mid', pos: [0, 0, neurons.length], ...extra }); };
 const edge = (pre: string, post: string, w: number): void => { if (Math.abs(w) >= 0.001) edges.push([pre, post, r3(w), 0]); };
 
-// observation: what the IR tells, see sensory_map.jsonc
-for (const [c, a] of Object.entries(map.ir.corners)) neuron(`IR_${c}`, 'corner', { angle: a });
-for (const { ch, ladder, strength } of channels) neuron(`IR_CH${ch}`, 'frame', { channel: ch, ladder, strength });    // a frame of the channel heard
-for (const { ch, ladder, strength } of channels) neuron(`IR_SLOT${ch}`, 'slot', { channel: ch, ladder, strength });   // a slot of the channel gone silent
-neuron('IR_ANY', 'presence');
-neuron('IR_NEAR', 'near');
-// the Bolt's own motion, from the yaw and the locator: read by the network's shift rules, not by weights
-neuron('SELF_TURN', 'self', { axis: 'turned', unit: 'deg' });
-neuron('SELF_FWD', 'self', { axis: 'fwd', unit: 'cm' });
-neuron('SELF_RIGHT', 'self', { axis: 'right', unit: 'cm' });
+// observation: what the IR tells, each input neuron on its port (observation.ts)
+// a read that landed: the corners that heard the frame, unless all four (the sender on top, or a level heard
+// all round) or two opposite ones
+for (const [c, a] of Object.entries(CORNERS)) neuron(`IR_${c}`, 'corner', { angle: a, port: `corner.${c as Corner}`, gain: CORNER_GAIN });
+for (const { ch, ladder, strength } of channels) neuron(`IR_CH${ch}`, 'frame', { channel: ch, ladder, strength, port: `frame.ch${ch}` });    // a frame of the channel heard, its second notify not counted
+for (const { ch, ladder, strength } of channels) neuron(`IR_SLOT${ch}`, 'slot', { channel: ch, ladder, strength, port: `slot.ch${ch}` });   // a slot of the sender's schedule on the channel gone silent
+neuron('IR_ANY', 'presence', { port: 'frame.any', rateTauMs: 3000 });   // anything of the ladder: the sender is in range at all; frames per second
+neuron('IR_NEAR', 'near', { port: 'ladder.near' });                     // the ladder's state, held by the observation layer with its hysteresis
+// the Bolt's own motion since the last tick, from the yaw and the locator: the turn in degrees clockwise, the step
+// in cm in its own frame; read by the network's shift rules, not by weights
+neuron('SELF_TURN', 'self', { axis: 'turned', unit: 'deg', port: 'self.turned' });
+neuron('SELF_FWD', 'self', { axis: 'fwd', unit: 'cm', port: 'self.fwd' });
+neuron('SELF_RIGHT', 'self', { axis: 'right', unit: 'cm', port: 'self.right' });
 
 // the belief: the ring and the distance, evidence neurons
 for (let j = 0; j < N; j++) neuron(id(j), 'ring', { angle: ringAngle(j), evidence: true, ...(Number.isFinite(RING_TAU_RAD) ? { tauParallax: RING_TAU_RAD } : {}) });
 for (let i = 0; i < BANDS; i++) neuron(did(i), 'distance', { cm: [i * BAND_CM, (i + 1) * BAND_CM], tauCm: TAU_CM, evidence: true });
 const ontoRing = (pre: string, profile: number[]): void => profile.forEach((w, j) => edge(pre, id(j), w));
-for (const [c, a] of Object.entries(map.ir.corners)) ontoRing(`IR_${c}`, Array.from({ length: N }, (_, j) => CORNER_G * Math.max(0, Math.cos(deg(ringAngle(j) - a))) ** CORNER_N));   // a read lands whatever the ladder
+for (const [c, a] of Object.entries(CORNERS)) ontoRing(`IR_${c}`, Array.from({ length: N }, (_, j) => CORNER_G * Math.max(0, Math.cos(deg(ringAngle(j) - a))) ** CORNER_N));   // a read lands whatever the ladder
 // a frame heard, gated by the believed distance: IR_CH<k>_B<j> is the receiver's rate times the share of the
 // distance neurons in band group j, with the group's own sector profile onto the ring (network.ts, `of` and `gate`)
 const inGroup = (j: number): string[] => { const lo = groupLo[j]!, hi = groupHi[j]!; return neurons.filter((n) => n.role === 'distance' && n.cm![0] >= lo && (hi === null || n.cm![0] < hi)).map((n) => n.id); };
@@ -208,13 +267,14 @@ const circuit: Circuit = {
   about: `Bolt seeker: IR observation -> ${N}-neuron egocentric ring of log-evidence plus ${BANDS} distance bands -> steering. `
     + 'Evidence neurons sum their input per step and their rate is the softmax over their group; the ring is shifted against the Bolt\'s turn (yaw) and by the parallax '
     + 'of the believed distance as the locator moves and forgets by the potential parallax of the step (tauParallax), the distance slid along the bearing and forgetting with the travel (tauCm); every other neuron is max(0, bias + sum of weight * rate).',
+  observation: OBSERVATION, motor: MOTOR,
   neurons, edges,
   outputs: {
     'steer.fwd': 'M_FWD', 'steer.back': 'M_BACK', 'steer.right': 'M_RIGHT', 'steer.left': 'M_LEFT',
     'mode.search': 'M_SEARCH', 'mode.roam': 'M_ROAM', 'mode.axis': 'M_AXIS', 'mode.near': 'IR_NEAR',
     'request.short': 'REQ_SHORT',
   },
-  vis: bodyLayout(neurons, map),
+  vis: bodyLayout(neurons, OBSERVATION.channels, CORNERS),
 };
 writeFileSync(process.env['OUT'] ?? new URL('../src/circuit.json', import.meta.url), JSON.stringify(circuit));
 console.log(`${neurons.length} neurons, ${edges.length} edges`);

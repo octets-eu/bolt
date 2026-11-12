@@ -11,7 +11,7 @@
 import m from 'mithril';
 import Factory from '../components/factory';
 import { Network } from '@bolt/brain';
-import { connectome } from '../matrix-brain/connectome';
+import { circuit } from '../matrix-brain/connectome';
 import { MatrixBrain } from '../matrix-brain/runner';
 import type { BrainStep } from '../matrix-brain/runner';
 import { grow } from './anatomy';
@@ -31,12 +31,12 @@ let selected: number | null = null;
 let timers: ReturnType<typeof setInterval>[] = [];
 
 function make (): World {
-  const anatomy = grow(connectome.circuit);
+  const anatomy = grow(circuit);
   const light = new Light(anatomy.cells.length);
   const scene = new BrainScene(anatomy, light.shown);
   scene.onFrame = (dt) => light.frame(dt);
   scene.onPick = (i) => pick(i);
-  return { anatomy, light, scene, rest: new Network(connectome) };
+  return { anatomy, light, scene, rest: new Network(circuit) };
 }
 
 /** For the console and the browser tools: the scene, the light and the resting network, once the tab was shown. */

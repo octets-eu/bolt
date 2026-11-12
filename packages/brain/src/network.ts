@@ -1,10 +1,10 @@
-// The connectome as a running network: circuit.json's neurons and edges,
-// fed by sensory_map.jsonc's channels. One `step` per motion sample:
+// The connectome as a running network: circuit.json's neurons and edges. One
+// `step` per motion sample:
 //
-//   1. sensory neurons take their drives, the map's pipelines over the sources,
-//      added where two channels drive one neuron; among them the Bolt's own
-//      motion, role `self`: its turn (axis turned, deg) and its step over the
-//      floor (axes fwd and right, cm), from the observation layer; then the
+//   1. input neurons take their port's value from the observation layer,
+//      with `rateTauMs` its events per second smoothed, times `gain`; among
+//      them the Bolt's own motion, role `self`: its turn (axis turned, deg)
+//      and its step over the floor (axes fwd and right, cm); then the
 //      gated neurons (`of`, `gate`): a receiver's rate times the share of the
 //      gate neurons in their group's rates, the distance belief of the last step
 //   2. the step carries the belief along: the ring turns by the parallax of
@@ -21,14 +21,11 @@
 // The motor and the referee read `output`, the neuron behind a port by
 // circuit.json's `outputs`, and no neuron's name.
 //
-// Nothing in here knows a Bolt; the constants are in the two data files,
-// read by load.ts in Node and by the browser app's bundler.
+// Nothing in here knows a Bolt; the constants are in circuit.json, read by
+// load.ts in Node and by the browser app's bundler.
 
 import { shiftRing } from './ring';
-import type { Connectome, Estimate, MapChannel, NeuronDef, OutputPort, SensoryMap, Sources } from './types';
-
-/** sensory_map.jsonc's text as an object: the `//` comments dropped. */
-export const parseJsonc = <T = unknown>(text: string): T => JSON.parse(text.replace(/^\s*\/\/.*$/gm, '').replace(/\s\/\/[^"\n]*$/gm, '')) as T;
+import type { Circuit, Estimate, NeuronDef, OutputPort, Sources } from './types';
 
 const mod360 = (a: number): number => ((a % 360) + 360) % 360;
 const wrap180 = (a: number): number => ((a + 540) % 360) - 180;
@@ -38,30 +35,28 @@ type Gated = [number, number, number[], number[]];
 
 export class Network {
 
-  readonly map: SensoryMap;
   readonly neurons: NeuronDef[];
   readonly index: Map<string, number>;
   readonly rate: Float64Array;
   readonly evidence: Float64Array;
   readonly inputs: [number, number][][];      // per neuron, its [pre, weight]
-  readonly sensory: Set<number>;
+  readonly sensory: Set<number>;                // the input neurons
   readonly ring: number[];
   readonly distance: number[];
   readonly gated: Gated[];
   readonly self: Record<string, number>;      // the Bolt's own motion: axis -> neuron, turned, fwd, right
   readonly groups = new Map<string, number[]>();   // role -> the indexes of its evidence neurons
-  readonly state: Record<number, number>[];   // per channel, what its ops remember
+  readonly smoothed = new Map<number, number>();   // per input neuron with rateTauMs, its events per second
   readonly outputs: Record<string, number>;   // output port -> neuron
 
-  constructor ({ circuit, map }: Connectome) {
-    this.map = map;
+  constructor (circuit: Circuit) {
     this.neurons = circuit.neurons;
     this.index = new Map(this.neurons.map((n, i) => [n.id, i]));
     this.rate = new Float64Array(this.neurons.length);
     this.evidence = new Float64Array(this.neurons.length);
     this.inputs = this.neurons.map(() => []);
     for (const [pre, post, w] of circuit.edges) this.inputs[this.id(post)]!.push([this.id(pre), w]);
-    this.sensory = new Set(map.channels.map((c) => this.id(c.drive)));
+    this.sensory = new Set(this.neurons.flatMap((n, i) => (n.port ? [i] : [])));
     this.ring = this.neurons.flatMap((n, i) => (n.role === 'ring' ? [i] : []));
     this.distance = this.neurons.flatMap((n, i) => (n.role === 'distance' ? [i] : []));
     this.gated = this.neurons.flatMap((n, i): Gated[] => {
@@ -71,7 +66,6 @@ export class Network {
     });
     this.self = Object.fromEntries(this.neurons.flatMap((n, i) => (n.role === 'self' && n.axis !== undefined ? [[n.axis, i] as [string, number]] : [])));
     for (const [i, n] of this.neurons.entries()) if (n.evidence) this.groups.set(n.role, [...(this.groups.get(n.role) ?? []), i]);
-    this.state = map.channels.map(() => ({}));
     this.outputs = Object.fromEntries(Object.entries(circuit.outputs).map(([port, name]) => [port, this.id(name)]));
     this.normalize();
   }
@@ -99,34 +93,6 @@ export class Network {
     let sum = 0, acc = 0;
     for (const i of this.distance) { const [lo, hi] = this.neurons[i]!.cm!; sum += this.rate[i]!; acc += this.rate[i]! * (lo + hi) / 2; }
     return acc / sum;
-  }
-
-  drive (channel: MapChannel, sources: Sources, dtMs: number, mem: Record<number, number>): number {
-    let v = sources[channel.source] ?? 0;
-    for (const [k, op] of channel.pipeline.entries()) {
-      switch (op.op) {
-        case 'gain':  v *= op.k; break;
-        case 'mul':   v *= sources[op.by] ?? 0; break;
-        case 'sub':   v -= op.k; break;
-        case 'clamp': v = Math.min(op.hi, Math.max(op.lo, v)); break;
-        case 'adapt': {  // what is new: v less its own mean over tauMs, the worm's ASE dC/dt
-          const a = Math.min(1, dtMs / op.tauMs);
-          const m = (mem[k] ?? v) + a * (v - (mem[k] ?? v));
-          mem[k] = m;
-          v -= m;
-          break;
-        }
-        case 'rate': {   // events per second, smoothed over tauMs
-          const a = Math.min(1, dtMs / op.tauMs);
-          const m = (mem[k] ?? 0) + a * (v * 1000 / dtMs - (mem[k] ?? 0));
-          mem[k] = m;
-          v = m;
-          break;
-        }
-        default: throw new Error(`sensory_map: unknown op ${(op as { op: string }).op}`);
-      }
-    }
-    return v;
   }
 
   /** The ring's values, evidence for evidence neurons, else rates, shifted by `d` degrees (ring.ts). */
@@ -181,8 +147,16 @@ export class Network {
 
   /** One step of `dtMs`: `sources` from the observation layer, the Bolt's own motion among them. */
   step (sources: Sources, dtMs: number): void {
-    for (const i of this.sensory) this.rate[i] = 0;
-    for (const [c, channel] of this.map.channels.entries()) { const i = this.id(channel.drive); this.rate[i] = this.rate[i]! + this.drive(channel, sources, dtMs, this.state[c]!); }
+    for (const i of this.sensory) {
+      const n = this.neurons[i]!;
+      let v = sources[n.port!] ?? 0;
+      if (n.rateTauMs !== undefined) {
+        const m = this.smoothed.get(i) ?? 0;
+        v = m + Math.min(1, dtMs / n.rateTauMs) * (v * 1000 / dtMs - m);
+        this.smoothed.set(i, v);
+      }
+      this.rate[i] = v * (n.gain ?? 1);
+    }
     for (const [i, of, gate, group] of this.gated) {
       let share = 0, total = 0;
       for (const g of gate) share += this.rate[g]!;

@@ -30,7 +30,7 @@
 
 import { DeviceId, DrivingCommand, Target, mod360 } from '@bolt/core';
 import type { Bolt } from '@bolt/core';
-import type { OutputPort } from './types';
+import type { MotorConfig, OutputPort } from './types';
 
 /** A roll: the mode it serves, the ring's direction off the nose it followed (none for the scan and the roam), the heading and speed to send. */
 export interface Roll { mode: 'target' | 'listen' | 'probe' | 'scan' | 'roam'; dir: number | null; heading: number; speed: number }
@@ -42,28 +42,18 @@ export function fireRoll (bolt: Pick<Bolt, 'status' | 'queue'>, speed: number, h
   return bolt.queue.fire({ name: 'roll', device: DeviceId.driving, id: DrivingCommand.driveWithHeading, target: Target.st, data: [v, (h >> 8) & 0xff, h & 0xff, 0] }, 300).then(() => undefined, () => undefined);
 }
 
-export const MOTOR = {
-  seekSpeed:   32,    // roll speed, about 17 cm/s (40 gave 22); at 21 cm/s runs passed 15 cm off, at 13 a touch went unreported
-  probeSpeed:  28,
-  listenMs:    2500,  // standing on the axis before the probe
-  scanStep:    45,    // deg per turn of the scan
-  scanHoldMs:  1300,  // standing after each, a round and a half of the long ladder
-  roamSpeed:   25,
-  maxTurn:     35,    // deg per command
-  castDeg:     45,    // weave amplitude while targeting: past the edge of the carrier's lobe
-  castMs:      2500,  // weave period
-  nearCastDeg: 15,
-  nearDriveDeg: 30,
-};
-
 /** A seek's motor: the listen's and the scan's timers are its own. */
 export class Motor {
 
   private axisSince: number | null = null;
   private scanAt = 0;
 
+  /** `config`: circuit.json's `motor`. */
+  constructor (private readonly config: MotorConfig) {}
+
   /** `out`: the network's output ports; `heading`: where the nose points; `commanded`: the last roll's heading, which listening and the scan's stand hold; `dtMs` since that roll; `now` from the caller's clock, ms. */
   command (out: (port: OutputPort) => number, heading: number, commanded: number, dtMs: number, now: number): Roll {
+    const MOTOR = this.config;
     const F = out('steer.fwd'), B = out('steer.back'), R = out('steer.right'), L = out('steer.left');
     if (out('mode.search') <= 0.5) {
       const dir = Math.atan2(R - L, F - B) * 180 / Math.PI;

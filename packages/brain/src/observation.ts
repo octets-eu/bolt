@@ -1,12 +1,13 @@
 // The observation layer: what the seeker's receivers make of the sender's
-// ladder, as the sources sensory_map.jsonc names. Two ways in:
+// ladder, as the input ports of circuit.json's input neurons. Its constants
+// are circuit.json's `observation`. Two ways in:
 //
 // - The listen notify, one per frame heard, carries the channel only: which
 //   ladder and level arrived, not from where. The weakest level arriving is
 //   the carrier, heard with the sender inside its lobe ahead or behind.
 // - Each frame heard says which level got through, `frame.ch<k>`, and the
 //   beats between heard frames are slots that went silent, `slot.ch<k>`
-//   (see `slots`); the map weighs both per level.
+//   (see `slots`); the circuit weighs both per level.
 // - The four corner receivers show the channel while a frame is in the air.
 //   A volley of reads fired 46 to 60 ms before a frame's expected notify
 //   lands in it three times in ten; the corners that heard name the side.
@@ -26,23 +27,22 @@
 // `tick` turns what came since the last tick into the sources and clears the
 // events. Uses the Bolt's lower layers only: the infrared stream and the
 // queue's fire, for the reads and for the listen's re-arm, so neither waits
-// behind a queued command. The clock is performance.now(); the bench puts
-// its own there.
+// behind a queued command. The clock is performance.now() unless the caller
+// gives its own, as the bench does. The construction and `start` each count
+// as a switch of ladder: the closeness has no mean yet.
 
 import { DeviceId, SensorCommand, Target } from '@bolt/core';
 import type { Bolt, LadderRange, Release } from '@bolt/core';
-import type { IrConfig, Motion, Sources } from './types';
+import type { Corner, Motion, ObservationConfig, Sources } from './types';
 
 const READ = { name: 'infraredReadings' as const, device: DeviceId.sensor, id: SensorCommand.getInfraredReadings, target: Target.st, data: [] };
 // the listen's re-arm, fired past the queue like the reads: behind a command that lost its ack (a matrix picture,
 // 2026-11-09, run 10) the queued re-arm waited 3 s and the ear was off for the last 2.3 s of the approach.
 // A fired write can fail on a busy link, and one that does leaves the ear off for good (the near path of
 // 2026-11-09, pass 1: 11 frames in 3 s, then none in 200 s): `tick` re-arms through the queue, the watchdog,
-// after SILENT_MS without a notify
+// after `watchdogMs` without a notify
 const LISTEN = { name: 'listenInfrared' as const, device: DeviceId.sensor, id: SensorCommand.listenInfraredMessages, target: Target.st, data: [255, 255, 255, 255, 255] };
-const FIRE_MS = 300;   // ack timeout of a fired command that is not a timed read
-const SILENT_MS = 1500;   // the watchdog: nothing heard for this long, re-arm the listen through the queue
-const CORNER_NAMES = ['FL', 'FR', 'BR', 'BL'];
+const CORNER_NAMES: readonly Corner[] = ['FL', 'FR', 'BR', 'BL'];
 const wait = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
 
 type Level = { range: LadderRange; strength: number };
@@ -56,7 +56,8 @@ export interface ObservationStats { misses: number; frames: number; reads: numbe
 export class Observation {
 
   readonly bolt: Pick<Bolt, 'sensors' | 'queue'>;
-  readonly ir: IrConfig;
+  readonly ir: ObservationConfig;
+  readonly clock: { now (): number };
   readonly channels: Map<number, Level>;
   readonly heard: Heard[] = [];                 // the notifies, the last windows' worth
   events: Events;
@@ -67,7 +68,7 @@ export class Observation {
   readonly turns: { t: number; turned: number }[] = [];   // the last second's turns, for self.still
   readonly stats: ObservationStats = { misses: 0, frames: 0, reads: 0, landed: 0, named: 0, flooded: 0, bunched: 0 };
   running = false;
-  switchedAt: number | undefined;               // the last change of ladder; the bench sets it
+  private switchedAt: number;                   // the last change of ladder
   afterVolley: (() => void) | undefined;        // the runner's hook: a roll goes after the replies, not between the reads
   private release: Release | undefined;
   private armedAt: number | undefined;
@@ -78,9 +79,11 @@ export class Observation {
   private carrierRange: LadderRange | undefined;
   private nearSince: number | undefined;
 
-  constructor (bolt: Pick<Bolt, 'sensors' | 'queue'>, ir: IrConfig) {
+  constructor (bolt: Pick<Bolt, 'sensors' | 'queue'>, ir: ObservationConfig, clock: { now (): number } = performance) {
     this.bolt = bolt;
     this.ir = ir;
+    this.clock = clock;
+    this.switchedAt = clock.now();
     this.channels = new Map(Object.entries(ir.channels).map(([c, [range, strength]]): [number, Level] => [Number(c), { range, strength }]));
     this.events = this.fresh();
   }
@@ -89,9 +92,9 @@ export class Observation {
 
   async start (): Promise<void> {
     this.running = true;
-    this.switchedAt = performance.now();   // the closeness has no mean yet: as after a switch of ladder
+    this.switchedAt = this.clock.now();   // the closeness has no mean yet: as after a switch of ladder
     this.release = await this.bolt.sensors.infrared.subscribe(({ payload }) => this.onNotify(payload[0] ?? 255));
-    this.armedAt = performance.now();
+    this.armedAt = this.clock.now();
     await this.bolt.sensors.listenInfrared(true);
     void this.volleys();
   }
@@ -102,17 +105,17 @@ export class Observation {
   }
 
   onNotify (channel: number): void {
-    this.armedAt = performance.now();
-    void this.bolt.queue.fire(LISTEN, FIRE_MS).catch(() => { this.armedAt = 0; });   // a listen ends with the first message; past the queue, the ear never waits behind the hand; failed, the watchdog re-arms
+    this.armedAt = this.clock.now();
+    void this.bolt.queue.fire(LISTEN, this.ir.fireMs).catch(() => { this.armedAt = 0; });   // a listen ends with the first message; past the queue, the ear never waits behind the hand; failed, the watchdog re-arms
     const level = this.channels.get(channel);
     if (!level) return;
-    const t = performance.now();
+    const t = this.clock.now();
     this.stats.frames++;
     this.slots(channel, level.range, t);
     if (this.heard.length && level.range !== this.range()) this.switchedAt = t;
     this.heard.push({ t, channel, ...level });
     this.events.any = 1;
-    if (!this.heardAt || t - this.heardAt > 100) this.events.frames[channel] = (this.events.frames[channel] ?? 0) + 1;   // one frame, not its second notify
+    if (!this.heardAt || t - this.heardAt > this.ir.secondNotifyMs) this.events.frames[channel] = (this.events.frames[channel] ?? 0) + 1;   // one frame, not its second notify
     this.heardAt = t;
     this.events.closeness += Math.log2(32 / level.strength);   // 16 says 1, 1 says 5: weaker frames arrive only near
     if (level.strength === this.carrier && level.range === this.range()) { this.events.carrier = 1; this.carrierAt = t; }
@@ -128,16 +131,16 @@ export class Observation {
    * ladder's channels in order, each held `ir.repeat` beats, so the beats
    * between the last heard frame and this one are known slots that went
    * unheard, each on a known channel. A second notify of one frame, within
-   * 100 ms, is no new frame. Every level's silence is evidence too: without
+   * `secondNotifyMs`, is no new frame. Every level's silence is evidence too: without
    * it every heard frame says "ahead", the front receivers hear better
    * (replay bench, 2026-11-08).
    */
   slots (channel: number, range: LadderRange, t: number): void {
     const last = this.lastFrame;
     this.lastFrame = { t, channel, range };
-    if (!last || last.range !== range || t - last.t < 100) return;
+    if (!last || last.range !== range || t - last.t < this.ir.secondNotifyMs) return;
     const order = [...this.channels].filter(([, c]) => c.range === range).map(([ch]) => ch).sort((a, b) => a - b);
-    const repeat = this.ir.repeat ?? 1, beats = Math.round((t - last.t) / this.ir.beatMs) - 1;
+    const repeat = this.ir.repeat, beats = Math.round((t - last.t) / this.ir.beatMs) - 1;
     if (beats < 1 || beats > order.length * repeat * 2) return;
     // the sending position after the last heard frame: its channel's last beat is assumed
     let pos = order.indexOf(last.channel) * repeat + repeat - 1;
@@ -157,23 +160,24 @@ export class Observation {
   roundMs (range: LadderRange): number { return this.ir.beatMs * [...this.channels.values()].filter((c) => c.range === range).length; }
 
   /**
-   * The channel's expected notify, a round on from the last, pulled 40 % of
-   * the way to each notify that comes within 40 ms of it; a second notify of
-   * the same frame (one in ten, 45 ms after the first) left out.
+   * The channel's expected notify, a round on from the last, pulled `follow.pull`
+   * of the way to each notify that comes within `follow.withinMs` of it; a second
+   * notify of the same frame (one in ten, 45 ms after the first) left out.
    */
   follow (channel: number, range: LadderRange, t: number): void {
     const e = this.expect.get(channel), round = this.roundMs(range);
-    if (e && t - e.heard < 100) return;
+    const { withinMs, pull } = this.ir.follow;
+    if (e && t - e.heard < this.ir.secondNotifyMs) return;
     const pred = e ? e.t + Math.round((t - e.t) / round) * round : t;
-    this.expect.set(channel, { t: Math.abs(t - pred) < 40 ? pred + 0.4 * (t - pred) : t, heard: t, range });
+    this.expect.set(channel, { t: Math.abs(t - pred) < withinMs ? pred + pull * (t - pred) : t, heard: t, range });
   }
 
-  /** When the next volley's first read goes: before the soonest expected notify of a channel heard in the last 3 s. */
+  /** When the next volley's first read goes: before the soonest expected notify of a channel heard within `expectMs`. */
   nextVolley (now: number): number {
     const { leadMs } = this.ir.volley, range = this.range();
     let next = Infinity;
     for (const e of this.expect.values()) {
-      if (e.range !== range || now - e.heard > 3000) continue;
+      if (e.range !== range || now - e.heard > this.ir.expectMs) continue;
       const round = this.roundMs(range);
       next = Math.min(next, e.t + Math.ceil((now + leadMs + 5 - e.t) / round) * round);
     }
@@ -184,12 +188,12 @@ export class Observation {
   async volleys (): Promise<void> {
     const { reads, stepMs } = this.ir.volley;
     while (this.running) {
-      let at = this.nextVolley(performance.now());
+      let at = this.nextVolley(this.clock.now());
       if (at === Infinity) { await wait(100); continue; }
       const replies: Promise<readonly number[] | null>[] = [];
       for (let k = 0; k < reads; k++, at += stepMs) {
-        await wait(Math.max(0, at - performance.now() - 4));
-        while (performance.now() < at) { /* the last ms spun */ }
+        await wait(Math.max(0, at - this.clock.now() - 4));
+        while (this.clock.now() < at) { /* the last ms spun */ }
         this.stats.reads++;
         replies.push(this.bolt.queue.fire(READ, 90).then((a) => a.payload, () => null));
       }
@@ -246,9 +250,9 @@ export class Observation {
    * efference copy.
    */
   tick (motion: Motion, forward = 0): Sources {
-    const now = performance.now();
+    const now = this.clock.now();
     this.update(now);
-    if (this.running && now - (this.heardAt ?? this.armedAt ?? now) > SILENT_MS && now - (this.armedAt ?? 0) > SILENT_MS) {   // the watchdog
+    if (this.running && now - (this.heardAt ?? this.armedAt ?? now) > this.ir.watchdogMs && now - (this.armedAt ?? 0) > this.ir.watchdogMs) {   // the watchdog
       this.armedAt = now;
       this.stats.rearmed = (this.stats.rearmed ?? 0) + 1;
       void this.bolt.sensors.listenInfrared(true).catch(() => {});
@@ -265,7 +269,7 @@ export class Observation {
     const s: Sources = { 'frame.carrier': e.carrier, 'frame.miss': e.miss, 'frame.any': e.any, 'carrier.down': e.down, 'carrier.up': e.up,
       'ladder.near': this.near ? 1 : 0, 'self.forward': forward, 'self.still': still,
       'self.turned': turned, 'self.fwd': dx * Math.sin(h) + dy * Math.cos(h), 'self.right': dx * Math.cos(h) - dy * Math.sin(h),
-      'frame.closeness': e.closeness, 'ladder.settled': now - (this.switchedAt ?? -Infinity) > this.ir.settleMs ? 1 : 0 };
+      'frame.closeness': e.closeness, 'ladder.settled': now - this.switchedAt > this.ir.settleMs ? 1 : 0 };
     for (const c of CORNER_NAMES) s[`corner.${c}`] = e.corners.has(c) ? 1 : 0;
     for (const ch of this.channels.keys()) { s[`frame.ch${ch}`] = e.frames[ch] ?? 0; s[`slot.ch${ch}`] = e.slots[ch] ?? 0; }
     return s;

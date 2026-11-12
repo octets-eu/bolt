@@ -14,9 +14,9 @@
 
 import type { Bolt, LadderRange } from '@bolt/core';
 import { mod360, StabilizationIndex } from '@bolt/core';
-import { Network, Observation, ringVector, LadderSender, Motor, fireRoll, MOTOR } from '@bolt/brain';
-import type { Roll } from '@bolt/brain';
-import { connectome } from './connectome';
+import { Network, Observation, ringVector, LadderSender, Motor, fireRoll } from '@bolt/brain';
+import type { Roll, Sources } from '@bolt/brain';
+import { circuit } from './connectome';
 import { ringPicture, peaks, PALETTE } from './render';
 import { session } from '../session';
 
@@ -39,7 +39,7 @@ export interface SeekOptions { motors: boolean; startCm: number; at?: { x: numbe
 /** What a run leaves for the `good` mark: the replay's truth and the outcome. */
 export interface RunSummary { seeker: string; sender: string; at: { x: number, y: number } | null; startCm: number; result: string; seconds: number }
 /** What a listener gets after each network step: the network, the sources it stepped on, the step in ms. */
-export interface BrainStep { net: Network; sources: Record<string, number>; dtMs: number }
+export interface BrainStep { net: Network; sources: Sources; dtMs: number }
 
 export class MatrixBrain {
 
@@ -48,8 +48,8 @@ export class MatrixBrain {
 
   readonly seeker: Bolt;
   readonly sender: Bolt;
-  private net = new Network(connectome);
-  private motor = new Motor();
+  private net = new Network(circuit);
+  private motor = new Motor(circuit.motor);
   private obs: Observation;
   private ladder: LadderSender;
   private range: LadderRange = 'long';
@@ -83,7 +83,7 @@ export class MatrixBrain {
     this.seeker = seeker;
     this.sender = sender;
     this.options = options;
-    this.obs = new Observation(seeker, connectome.map.ir);
+    this.obs = new Observation(seeker, circuit.observation);
     this.ladder = new LadderSender(sender, 'long', 1);   // one beat per level, as brain/seek.mjs
     this.ended = new Promise((r) => { this.finish = r; });
   }
@@ -122,8 +122,8 @@ export class MatrixBrain {
       if (s.t - last < STEP_MS) { this.obs.stats.bunched++; return; }
       const dt = Math.min(250, s.t - last);
       last = s.t;
-      const sources: Record<string, number> = this.obs.tick(motion, this.options.motors ? this.cmd.speed / MOTOR.seekSpeed : 0);   // the motor's efference copy; by hand, 0
-      const corners = ['FL', 'FR', 'BR', 'BL'].filter((c) => sources[`corner.${c}`]);
+      const sources = this.obs.tick(motion, this.options.motors ? this.cmd.speed / circuit.motor.seekSpeed : 0);   // the motor's efference copy; by hand, 0
+      const corners = (['FL', 'FR', 'BR', 'BL'] as const).filter((c) => sources[`corner.${c}`]);
       if (sources['frame.carrier'] || sources['frame.miss'] || corners.length) this.flashUntil = performance.now() + FLASH_MS;
       if (this.obs.stats.landed > this.landed) {
         this.landed = this.obs.stats.landed;
@@ -145,7 +145,7 @@ export class MatrixBrain {
     if (this.options.motors) {
       const { startCm, limitS, fenceCm } = this.options;
       setTimeout(() => this.end('time'), limitS * 1000);
-      this.seeker.log('info', `brain seek: seeker ${this.seeker.name} on sender ${this.sender.name}, ${startCm} cm given, limit ${limitS.toFixed(0)} s, fence ${startCm + fenceCm} cm, speed ${MOTOR.seekSpeed}`);
+      this.seeker.log('info', `brain seek: seeker ${this.seeker.name} on sender ${this.sender.name}, ${startCm} cm given, limit ${limitS.toFixed(0)} s, fence ${startCm + fenceCm} cm, speed ${circuit.motor.seekSpeed}`);
     } else this.seeker.log('info', `brain on: seeker ${this.seeker.name}, sender ${this.sender.name}, ladder long`);
   }
 
