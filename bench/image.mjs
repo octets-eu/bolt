@@ -17,7 +17,10 @@
 // every corner read that hit in the runs picked, each where its seeker stood,
 // in the seeker's colour, and the senders on the points they stood on.
 //
-//   npx tsx bench/image.mjs --reads [n | n-m ...]
+// --sender <point> keeps the runs with the sender on that point and writes
+// bench/all/reads-<point>.png.
+//
+//   npx tsx bench/image.mjs --reads [--sender d1] [n | n-m ...]
 
 import { mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { createCanvas, loadImage } from '@napi-rs/canvas';
@@ -32,6 +35,7 @@ const DPR = 2;   // device pixels per pixel: the image is drawn at twice its lay
 const channels = loadCircuit().observation.channels;
 
 const READS = process.argv.includes('--reads');
+const SENDER = process.argv.includes('--sender') ? process.argv[process.argv.indexOf('--sender') + 1] : null;
 const picks = process.argv.slice(2).filter((a) => /^\d/.test(a)).map((a) => a.split('-').map(Number));
 const ns = readdirSync('bench').filter((d) => /^\d+$/.test(d)).map(Number).sort((a, b) => a - b)
   .filter((n) => !picks.length || picks.some(([a, b = a]) => n >= a && n <= b));
@@ -161,6 +165,7 @@ function draw (run) {
 
 /** Every read that hit in the runs, on the whole sheet. */
 function readsMap (runs) {
+  const file = `bench/all/reads${SENDER ? `-${SENDER}` : ''}.png`;
   const px = 1 / PX_PER_CM, w = SHEET.width * PX_PER_CM, h = SHEET.height * PX_PER_CM;
   const canvas = createCanvas((w + LEGEND_PX) * DPR, h * DPR), ctx = canvas.getContext('2d');
   ctx.scale(DPR, DPR);
@@ -185,7 +190,7 @@ function readsMap (runs) {
   ctx.fillStyle = '#000'; ctx.textBaseline = 'middle';
   const rows = [
     ['bench: every corner read that hit', 'bold'],
-    [`${drawn} runs, ${ns[0]} to ${ns.at(-1)}`],
+    [`${drawn} runs: ${runs.map((r) => r.n).join(' ')}`.slice(0, 48)],
     [`${total} reads, ${hit} hit, ${(100 * hit / total).toFixed(1)} %`],
     [''],
     ['by the sender\'s point:'],
@@ -198,9 +203,9 @@ function readsMap (runs) {
   ];
   for (const [text, weight] of rows) { ctx.font = `${weight ?? ''} 15px sans-serif`; ctx.fillText(text, lx, ly); ly += 24; }
   mkdirSync('bench/all', { recursive: true });
-  writeFileSync('bench/all/reads.png', canvas.toBuffer('image/png'));
-  return `bench/all/reads.png: ${drawn} runs, ${hit} of ${total} reads hit; ${Object.entries(by).map(([p, b]) => `${p} ${b.hit}/${b.total}`).join(', ')}`;
+  writeFileSync(file, canvas.toBuffer('image/png'));
+  return `${file}: ${drawn} runs, ${hit} of ${total} reads hit; ${Object.entries(by).map(([p, b]) => `${p} ${b.hit}/${b.total}`).join(', ')}`;
 }
 
-if (READS) console.log(readsMap(ns.map(read)));
+if (READS) console.log(readsMap(ns.map(read).filter((r) => !SENDER || r.pair[1] === SENDER)));
 else for (const n of ns) console.log(`${String(n).padStart(3)} ${draw(read(n))}`);
