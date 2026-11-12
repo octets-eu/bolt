@@ -13,6 +13,8 @@ import type { NegotiateResult } from './negotiate-ladder';
 import type { LadderRange } from '../communication/communication';
 import type { LadderAuthority } from '../referee/referee';
 import type { SweepOptions, SweepResult } from './sweep';
+import { archimedean } from './archimedean';
+import type { ArchimedeanOptions, ArchimedeanResult } from './archimedean';
 import { log } from '../lifecycle/log';
 
 /**
@@ -58,6 +60,12 @@ export class Behavior {
   @log
   async sweep (options: SweepOptions): Promise<SweepResult> {
     return sweep(this.ctx, this.actuators, this.sensors, this.communication, options);
+  }
+
+  /** Drive a spiral outward from where the Bolt stands; see archimedean.ts. */
+  @log
+  async archimedean (options: ArchimedeanOptions = {}): Promise<ArchimedeanResult> {
+    return archimedean(this.ctx, this.actuators, this.sensors, options);
   }
 
 }
