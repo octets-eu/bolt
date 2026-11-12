@@ -31,20 +31,26 @@ export interface ArchimedeanResult {
  * floor around a point in one move, the same on every run: for a survey of
  * what arrives where, the Bolt's senses running beside it.
  *
- * Motor commands only, its own loop: on every motion sample the spiral point
- * `lookCm` ahead of the Bolt is aimed at, at one speed; the point only moves
- * forward along the spiral. The shape is as good as the locator, which
+ * Motor commands only, its own loop: every motion sample moves the spiral
+ * point `lookCm` ahead of the Bolt on, forward only, and every `rollMs` one
+ * roll aims at it, at one speed. A roll on every sample, 13 a second, took
+ * the link from the senses running beside it: of the corner reads fired
+ * during two spirals 32 and 43 % got no ack, against none to 1 % in seeks
+ * that roll 3 to 4 times a second (2026-11-12). The shape is as good as the locator, which
  * drifts; whoever needs the true track takes it from outside, a camera.
  * Stabilization on before and off after. Ends on fullstop. It does not end
  * on a collision: on open floor the collision report fires from the Bolt's
  * own accelerations.
  *
- * Not measured yet: the track against the spiral asked for, and the speed
- * over the floor at the command; `lookCm` and `budgetCmPerSec` are chosen.
+ * At speed 30 a spiral asked for 90 cm with 20 cm pitch ended in 70 s; by
+ * a camera its track was 14.2 m, reaching 82 to 100 cm from the centre, the
+ * locator 9.5 cm off it in the median (2026-11-12, with a roll on every
+ * sample). `lookCm`, `rollMs` and `budgetCmPerSec` are chosen.
  */
 export async function archimedean (ctx: Context, actuators: Actuators, sensors: Sensors, { radius = 80, pitch = 20, clockwise = true, speed = 30 }: ArchimedeanOptions = {}): Promise<ArchimedeanResult> {
 
   const lookCm         = 12;   // the point aimed at lies this far ahead
+  const rollMs         = 280;  // between two rolls: 3.6 a second, a seek's rate
   const stepRad        = 0.02; // the point's step along the spiral
   const budgetCmPerSec = 8;    // the budget is twice the spiral's length at this speed
 
@@ -58,11 +64,11 @@ export async function archimedean (ctx: Context, actuators: Actuators, sensors: 
     return { x: r * Math.sin(sign * a), y: r * Math.cos(a) };
   }
 
-  let a = 0, at: Point = { x: 0, y: 0 }, ended = false, reason: ArchimedeanResult['reason'] = 'done';
+  let a = 0, at: Point = { x: 0, y: 0 }, ended = false, rolledAt = -Infinity, reason: ArchimedeanResult['reason'] = 'done';
   let done = (): void => {};
   const arrived = new Promise<void>((resolve) => { done = () => { ended = true; resolve(); }; });
 
-  ctx.log('info', `archimedean start ${JSON.stringify({ radius, pitch, clockwise, speed, lookCm, budgetMs: Math.round(budgetMs) })}`);
+  ctx.log('info', `archimedean start ${JSON.stringify({ radius, pitch, clockwise, speed, lookCm, rollMs, budgetMs: Math.round(budgetMs) })}`);
   await actuators.motor.stabilize(StabilizationIndex.full);
   const release = await sensors.motion.subscribe((sample) => {
     if (ended) return;
@@ -72,6 +78,8 @@ export async function archimedean (ctx: Context, actuators: Actuators, sensors: 
     let q = point(a);
     while (a < end && Math.hypot(q.x - at.x, q.y - at.y) < lookCm) { a += stepRad; q = point(a); }
     if (a >= end && Math.hypot(q.x - at.x, q.y - at.y) < lookCm / 2) { done(); return; }
+    if (ctx.now() - rolledAt < rollMs) return;
+    rolledAt = ctx.now();
     actuators.motor.rollIfIdle(speed, Math.atan2(q.x - at.x, q.y - at.y) * 180 / Math.PI);
   });
   await arrived;
