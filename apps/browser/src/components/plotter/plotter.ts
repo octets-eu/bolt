@@ -11,7 +11,6 @@ let marker = [] as any;
 let bolts  = {} as any;
 // the direction each sweep found, from where its Bolt stood, as a sheet heading; drawn as a ray
 let rays   = [] as { x: number, y: number, heading: number, color: string, bolt: string }[];
-let rolling = false;
 
 // the canvas in CSS pixels, from its host's size; drawn in device pixels
 let width  = 512;
@@ -23,7 +22,6 @@ let dpr    = 1;
 const cvs = document.createElement('canvas');
 cvs.className = 'plotter bg-white';
 cvs.style.position = 'absolute';
-cvs.addEventListener('click', (e) => Plotter.onClick(e));
 const ctx = cvs.getContext('2d') as CanvasRenderingContext2D;
 
 // canvas pixels per cm and the sheet's corner on the canvas, set by every render
@@ -140,28 +138,6 @@ const Plotter = Factory.create('Plotter', {
   view () {
     return m('div.plotter-host', { style: { position: 'relative', overflow: 'hidden' } });
   },
-
-  onClick (event: MouseEvent) {
-
-    const rect = cvs.getBoundingClientRect();
-    const x    = ( event.x - rect.left -  meta.transX ) / meta.scale ;
-    const y    = ( event.y - rect.top  -  meta.transY ) / meta.scale ;
-
-    Plotter.render({positionX: x, positionY: y, stroke: 'red', fill: 'red'});
-
-    Logger.info(Plotter, `Click:  x: ${ x }, y: ${ y }`);
-
-    // one roll at a time; SPACE ends it, then the next click counts
-    if (rolling) return;
-    const rolls = Bolts.map((bolt: Bolt) => {
-      const target = Plotter.toLocator(bolt.name, x, y);
-      return bolt.connected && target && bolt.navigation.rollToPoint(target);
-    });
-    rolling = true;
-    Promise.all(rolls).finally(() => { rolling = false; });
-
-  },
-
 
   /** The reference points by name, for the Bolts' reset buttons. */
   points,
