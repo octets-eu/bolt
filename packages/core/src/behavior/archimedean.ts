@@ -12,12 +12,16 @@ export interface ArchimedeanOptions {
   clockwise?: boolean | undefined;
   /** The motor's command the whole way, 0..255. */
   speed?: number | undefined;
+  /** The spiral's width over its height: 1 round, more a flat one, wider across the nose's line. */
+  stretch?: number | undefined;
+  /** Out, back in along the same turns, out again turned by `phase`, until fullstop. */
+  repeat?: boolean | undefined;
 }
 
 export interface ArchimedeanResult {
-  /** done: the spiral's end reached. budget: the time for twice its length at `budgetCmPerSec` spent first. */
+  /** done: the spiral's end reached. budget: the time for twice its length at `budgetCmPerSec` spent first. aborted: a fullstop, the one way a repeated spiral ends. */
   reason: 'done' | 'budget' | 'aborted';
-  /** Turns of the spiral covered. */
+  /** Turns of the spiral covered, out and in counted alike. */
   turns: number;
   /** Locator position at the end. */
   at: Point;
@@ -27,9 +31,14 @@ export interface ArchimedeanResult {
 /**
  * Drive an Archimedean spiral outward from where the Bolt stands: the
  * locator's origin is the centre, the first step goes along the nose, the
- * turns lie `pitch` apart and the spiral ends `radius` out. A sweep of the
- * floor around a point in one move, the same on every run: for a survey of
- * what arrives where, the Bolt's senses running beside it.
+ * turns lie `pitch` apart and the spiral ends `radius` out; `stretch` widens
+ * it across the nose's line into a flat one, the turns `pitch` times
+ * `stretch` apart at its sides. A sweep of the floor around a point in one
+ * move, the same on every run: for a survey of what arrives where, the
+ * Bolt's senses running beside it. With `repeat` it goes on until fullstop:
+ * back in along the turns it came out on, so every place is passed nose
+ * first both ways, then out again on a spiral turned by `phase`, whose turns
+ * fall between the last one's.
  *
  * Motor commands only, its own loop: every motion sample moves the spiral
  * point `lookCm` ahead of the Bolt on, forward only, and every `rollMs` one
@@ -47,37 +56,39 @@ export interface ArchimedeanResult {
  * locator 9.5 cm off it in the median (2026-11-12, with a roll on every
  * sample). `lookCm`, `rollMs` and `budgetCmPerSec` are chosen.
  */
-export async function archimedean (ctx: Context, actuators: Actuators, sensors: Sensors, { radius = 80, pitch = 20, clockwise = true, speed = 30 }: ArchimedeanOptions = {}): Promise<ArchimedeanResult> {
+export async function archimedean (ctx: Context, actuators: Actuators, sensors: Sensors, { radius = 80, pitch = 20, clockwise = true, speed = 30, stretch = 1, repeat = false }: ArchimedeanOptions = {}): Promise<ArchimedeanResult> {
 
   const lookCm         = 12;   // the point aimed at lies this far ahead
   const rollMs         = 280;  // between two rolls: 3.6 a second, a seek's rate
   const stepRad        = 0.02; // the point's step along the spiral
-  const budgetCmPerSec = 8;    // the budget is twice the spiral's length at this speed
+  const budgetCmPerSec = 8;    // the budget is twice the spiral's length at this speed; none for a repeated one
+  const phase          = 2.4;  // rad, the golden angle: each new spiral out is turned by this against the last
 
   const t0 = ctx.now();
   const s = ctx.motion;
   const end = 2 * Math.PI * radius / pitch, sign = clockwise ? 1 : -1;
   const budgetMs = 2 * 1000 * (Math.PI * radius * radius / pitch) / budgetCmPerSec;
-  /** The spiral's point at angle `a`, locator frame: y along the nose at the start. */
-  function point (a: number): Point {
+  /** The track's point after the angle `s` driven, locator frame, y along the nose at the start: out to `end`, in again, out turned by `phase`, and so on. */
+  function point (s: number): Point {
+    const lap = Math.floor(s / end), on = s - lap * end, a = lap % 2 ? end - on : on, turned = Math.floor(lap / 2) * phase;
     const r = pitch * a / (2 * Math.PI);
-    return { x: r * Math.sin(sign * a), y: r * Math.cos(a) };
+    return { x: stretch * r * Math.sin(sign * (a + turned)), y: r * Math.cos(a + turned) };
   }
 
   let a = 0, at: Point = { x: 0, y: 0 }, ended = false, rolledAt = -Infinity, reason: ArchimedeanResult['reason'] = 'done';
   let done = (): void => {};
   const arrived = new Promise<void>((resolve) => { done = () => { ended = true; resolve(); }; });
 
-  ctx.log('info', `archimedean start ${JSON.stringify({ radius, pitch, clockwise, speed, lookCm, rollMs, budgetMs: Math.round(budgetMs) })}`);
+  ctx.log('info', `archimedean start ${JSON.stringify({ radius, pitch, clockwise, speed, stretch, repeat, lookCm, rollMs, budgetMs: Math.round(budgetMs) })}`);
   await actuators.motor.stabilize(StabilizationIndex.full);
   const release = await sensors.motion.subscribe((sample) => {
     if (ended) return;
     at = { x: sample.locator.positionX, y: sample.locator.positionY };
     if (s.aborted) { reason = 'aborted'; done(); return; }
-    if (ctx.now() - t0 > budgetMs) { reason = 'budget'; done(); return; }
+    if (!repeat && ctx.now() - t0 > budgetMs) { reason = 'budget'; done(); return; }
     let q = point(a);
-    while (a < end && Math.hypot(q.x - at.x, q.y - at.y) < lookCm) { a += stepRad; q = point(a); }
-    if (a >= end && Math.hypot(q.x - at.x, q.y - at.y) < lookCm / 2) { done(); return; }
+    while ((repeat || a < end) && Math.hypot(q.x - at.x, q.y - at.y) < lookCm) { a += stepRad; q = point(a); }
+    if (!repeat && a >= end && Math.hypot(q.x - at.x, q.y - at.y) < lookCm / 2) { done(); return; }
     if (ctx.now() - rolledAt < rollMs) return;
     rolledAt = ctx.now();
     actuators.motor.rollIfIdle(speed, Math.atan2(q.x - at.x, q.y - at.y) * 180 / Math.PI);
