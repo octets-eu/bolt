@@ -19,6 +19,8 @@ diary/
 
 # the bench's runs, cut from apps/browser/sessions/ and frames/ by bench/extract.mjs; their list, bench/index.tsv, is tracked
 bench/*/
+# runs kept by name as references, tracked: the session's cut, the camera's track, the image
+!bench/ref/
 
 # retired work and documentation material, kept locally, not in the repo
 /archive/

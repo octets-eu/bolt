@@ -11,7 +11,12 @@
 // (bench/extract.mjs). The runs from before the points were named have none:
 // there green stood on lf and blue on rg, back to back.
 //
-//   npx tsx bench/image.mjs [n | n-m ...]
+//   npx tsx bench/image.mjs [n | n-m | ref/<name> ...]
+//
+// A run kept by name, bench/ref/<name>/, is drawn when named. Where a run's
+// folder holds track.tsv, the seeker's true track from the camera
+// (bench/camtrack.mjs), every place is the camera's at that moment and the
+// locator gives only the nose; else the places are the locator's.
 //
 // --reads writes one map instead, bench/all/reads.png: the whole sheet with
 // every corner read that hit in the runs picked, each where its seeker stood,
@@ -22,7 +27,7 @@
 //
 //   npx tsx bench/image.mjs --reads [--sender d1] [n | n-m ...]
 
-import { mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { createCanvas, loadImage } from '@napi-rs/canvas';
 import { loadCircuit } from '@bolt/brain/load';
 import { SHEET, points, turn, mark } from '../apps/browser/src/components/plotter/sheet.ts';
@@ -37,8 +42,9 @@ const channels = loadCircuit().observation.channels;
 const READS = process.argv.includes('--reads');
 const SENDER = process.argv.includes('--sender') ? process.argv[process.argv.indexOf('--sender') + 1] : null;
 const picks = process.argv.slice(2).filter((a) => /^\d/.test(a)).map((a) => a.split('-').map(Number));
-const ns = readdirSync('bench').filter((d) => /^\d+$/.test(d)).map(Number).sort((a, b) => a - b)
-  .filter((n) => !picks.length || picks.some(([a, b = a]) => n >= a && n <= b));
+const refs = process.argv.slice(2).filter((a) => a.startsWith('ref/'));
+const ns = [...(refs.length && !picks.length ? [] : readdirSync('bench').filter((d) => /^\d+$/.test(d)).map(Number).sort((a, b) => a - b)
+  .filter((n) => !picks.length || picks.some(([a, b = a]) => n >= a && n <= b))), ...refs];
 const plan = await loadImage('apps/browser/public/floor-plan.svg');
 
 /** The run of a bench file: its lines, start and end, the two Bolts, the sender's place in the seeker's frame. */
@@ -62,13 +68,23 @@ function onSheet (run) {
   const P = points[run.pair[0]];
   if (!P || !points[run.pair[1]]) return null;
   const track = [], frames = [], reads = [];
+  // the camera's track, when the run has one: the place at a moment, between its points, held before the first and after the last
+  const file = `bench/${run.n}/track.tsv`;
+  const cam = existsSync(file) ? readFileSync(file, 'utf8').split('\n').slice(1).filter(Boolean).map((l) => { const [t, x, y] = l.split('\t').map(Number); return { t, x, y }; }) : null;
+  const seenAt = (t) => {
+    const k = cam.findIndex((p) => p.t >= t);
+    if (k <= 0) return k === 0 ? cam[0] : cam.at(-1);
+    const a = cam[k - 1], b = cam[k], f = (t - a.t) / (b.t - a.t);
+    return { x: a.x + f * (b.x - a.x), y: a.y + f * (b.y - a.y) };
+  };
   let here = null, total = 0;
   for (const e of run.lines) {
     if (e.bolt !== run.seeker || e.t < run.t0 || e.t > run.t1) continue;
     const d = e.data;
     if (e.name === 'sensordata' && d?.sensordata?.locator && d.sensordata.angles) {
       const o = turn(P.heading, d.sensordata.locator.positionX, d.sensordata.locator.positionY);
-      here = { t: e.t, x: P.x + o.x, y: P.y + o.y, heading: P.heading - d.sensordata.angles.yaw };
+      const place = cam ? seenAt(e.t) : { x: P.x + o.x, y: P.y + o.y };
+      here = { t: e.t, x: place.x, y: place.y, heading: P.heading - d.sensordata.angles.yaw };
       track.push(here);
     } else if (here && e.name === 'infrared' && channels[d?.msg?.payload?.[0]]) {
       frames.push({ ...here, short: channels[d.msg.payload[0]][0] === 'short' });
@@ -78,14 +94,14 @@ function onSheet (run) {
       if (here && heard.some(Boolean)) reads.push({ ...here, heard });
     }
   }
-  return { track, frames, reads, total };
+  return { track, frames, reads, total, camera: !!cam };
 }
 
 function draw (run) {
   const pair = run.pair, seen = onSheet(run);
   if (!seen) return `no start points for ${run.seeker} and ${run.sender}`;
   const P = points[pair[0]], Q = points[pair[1]], color = COLORS[run.seeker] ?? 'brown';
-  const { track, frames, reads, total } = seen;
+  const { track, frames, reads, total, camera } = seen;
 
   // the cut: the drive, both points, a margin
   const xs = [...track.map((p) => p.x), P.x, Q.x], ys = [...track.map((p) => p.y), P.y, Q.y];
@@ -133,6 +149,8 @@ function draw (run) {
     [`frames heard ${frames.length}: ${long} long, ${frames.length - long} short`],
     [`${(frames.length / seconds).toFixed(1)} a second`],
     [`corner reads ${total}, ${reads.length} hit`],
+    [''],
+    [camera ? 'places: the camera\'s track' : 'places: the locator\'s'],
   ];
   const lx = w + 20;
   let ly = 34;

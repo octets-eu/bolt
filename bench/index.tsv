@@ -30,3 +30,5 @@ n	session	start	kind	seeker	mark	s	end	source
 29	2026-11-11T20-25-23-351Z	86970.5	seek	SB-11DF	no	30.2	brain seek stopped after 30.2 s: frames 104, reads 342, land	apps/browser/sessions/sessions-2026-11.zip:2026-11/11/session-2026-11-11T20-25-23-351Z.jsonl
 30	2026-11-12T18-28-36-895Z	232751.2	seek	SB-9129	yes	15.3	brain seek found after 15.2 s: frames 53, reads 150, landed 	frames/session-2026-11-12T18-28-36-895Z.jsonl
 31	2026-11-12T18-28-36-895Z	547793.4	seek	SB-9129	no	50.3	brain seek stopped after 50.2 s: frames 37, reads 201, lande	frames/session-2026-11-12T18-28-36-895Z.jsonl
+32	2026-11-12T20-56-30-615Z	167749	path	SB-9129	no	81.1	brain path done: spiral {"reason":"done","turns":4.5,"at":{"	frames/session-2026-11-12T20-56-30-615Z.jsonl
+33	2026-11-12T20-56-30-615Z	322373.1	path	SB-9129	no	79.3	brain path done: spiral {"reason":"done","turns":4.5,"at":{"	frames/session-2026-11-12T20-56-30-615Z.jsonl
