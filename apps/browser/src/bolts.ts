@@ -48,6 +48,13 @@ class bolts {
        }
     },
 
+    'SB-2B96' : {
+      colors: {
+        console: '#a77f19', plot: 'goldenrod', backcolor: '#bb9951', log: '#c1983a44',
+        front: [10, 0, 0], back: [ 5, 5, 5], black: [0, 0, 0], matrix: [240, 200, 30]
+      },
+    },
+
   };
 
   private defaultConfig: BoltConfig = {
