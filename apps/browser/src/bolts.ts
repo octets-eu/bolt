@@ -85,6 +85,25 @@ class bolts {
   public count () {return this.bolts.length;}
   public get (name: string) { return this.find( (bolt: Bolt) => bolt.name === name); }
 
+  /** The state of every Bolt on the list as plain data, one row per Bolt; what a script reads in place of the chips. */
+  public summary () {
+    return this.bolts.map(bolt => {
+      const { ready, awake, voltage, battery, charger, stabilization, streaming, rssi } = bolt.status;
+      return { name: bolt.name, plot: bolt.config.colors.plot, connected: bolt.connected, ready, awake, voltage, battery, charger, stabilization, streaming: streaming.active, rssi };
+    });
+  }
+
+  /** Resolves with the summary once every Bolt in `names` is connected and ready; rejects with the summary's state after `timeoutMs`. */
+  public async whenReady (names: string[], timeoutMs = 30000) {
+    const until = Date.now() + timeoutMs;
+    const ready = () => names.every(name => { const bolt = this.get(name); return bolt?.connected && bolt.status.ready; });
+    while (!ready()) {
+      if (Date.now() > until) throw new Error(`whenReady: not ready after ${timeoutMs} ms: ${JSON.stringify(this.summary())}`);
+      await new Promise(resolve => setTimeout(resolve, 200));
+    }
+    return this.summary();
+  }
+
   /** The seekToCollision experiment with two connected Bolts by name, `method` 'edge' (default) or 'belief'; see @bolt/core experiments/seek-to-collision.ts. */
   public seekToCollision ({ seeker, sender, seconds = 60, method = 'edge' }: { seeker: string, sender: string, seconds?: number, method?: SeekMethod }) {
     const a = this.get(seeker), b = this.get(sender);
@@ -138,6 +157,11 @@ class bolts {
     const a = this.get(roller), b = this.get(sender);
     if (!a || !b) throw new NotConnectedError(a ? sender : roller);
     return passBy(a, b, from, to, passes, cmPerSec, ladder);
+  }
+
+  /** As Bolt.format, for a device that is no Bolt yet. */
+  private format (name: string, text: string): [string, string] {
+    return [`%c${name} ${text}`, `color: ${this.configFor(name).colors.console}; font-weight: 800`];
   }
 
   configFor (name: string): BoltConfig {
@@ -205,6 +229,7 @@ class bolts {
   private async reconnect (device: BluetoothDevice) {
 
     await waitForAdvertisement(device, {
+      log: (text) => console.log(...this.format(device.name!, text)),
       onAdvertisement: ({ rssi, txPower }) => {
         const bolt = device.name ? this.get(device.name) : undefined;
         if (bolt) {
@@ -215,7 +240,7 @@ class bolts {
       },
     });
 
-    console.log('%c' + device.name + ' connecting...', 'color: darkorange; font-weight: 800');
+    console.log(...this.format(device.name!, 'connecting...'));
     await this.connectBolt(device);
 
   }
@@ -257,7 +282,7 @@ class bolts {
     try {
       await transport.connect();
     } catch (err) {
-      console.log('Bolts.connectBolt', device.name, err);
+      console.log(...bolt.format('connect failed'), err);
       this.remove(bolt);
       m.redraw();
       return;
@@ -278,7 +303,7 @@ class bolts {
 
   public async disconnectBolt ( bolt: Bolt ) {
 
-    console.log(bolt.name, 'Disconnecting ...');
+    console.log(...bolt.format('disconnecting ...'));
 
     if (bolt.connected) {
       this.remove(bolt);
@@ -286,7 +311,7 @@ class bolts {
       Logger.info(bolt, 'disconnected');
 
     } else {
-      console.log(bolt.name, 'is already disconnected');
+      console.log(...bolt.format('is already disconnected'));
 
     }
 

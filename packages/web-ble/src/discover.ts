@@ -38,6 +38,8 @@ export interface IWatchOptions {
   timeoutMs?: number;
   /** Cap for the backoff between re-arms. */
   maxBackoffMs?: number;
+  /** Takes the watch's console lines, so the caller can print them in the Bolt's colour; without it they go to the console under the device name. */
+  log?: (text: string) => void;
   /** Called for every advertisement, before and after the first. */
   onAdvertisement?: (advertisement: IAdvertisement) => void;
 }
@@ -52,7 +54,10 @@ export async function waitForAdvertisement (device: BluetoothDevice, options: IW
   const timeoutMs    = options.timeoutMs    ?? 4000;
   const maxBackoffMs = options.maxBackoffMs ?? 30000;
 
+  const log = options.log ?? ((text: string) => console.log(device.name, text));
+
   let attempt = 0;
+  const started = Date.now();
 
   for (;;) {
 
@@ -69,7 +74,7 @@ export async function waitForAdvertisement (device: BluetoothDevice, options: IW
     try {
       await device.watchAdvertisements({ signal: controller.signal });
     } catch (error) {
-      console.warn(device.name, 'watchAdvertisements failed', error);
+      log(`watchAdvertisements failed: ${error}`);
     }
 
     const wait = Math.min(timeoutMs * 2 ** attempt, maxBackoffMs);
@@ -89,9 +94,12 @@ export async function waitForAdvertisement (device: BluetoothDevice, options: IW
       return result;
     }
 
+    // the page's side only: whether the Bolt advertises is not known here
+    const watching = device.watchingAdvertisements;
     controller.abort();
     attempt += 1;
-    console.log(device.name, `no advertisement in ${wait} ms, re-arming watch (attempt ${attempt + 1})`);
+    const total = Math.round((Date.now() - started) / 1000);
+    log(`Chrome delivered no advertisement event in ${wait} ms (${total} s in total, watching ${watching}, focus ${document.hasFocus()}, ${document.visibilityState}); re-arming the watch, attempt ${attempt + 1}`);
 
   }
 
