@@ -25,11 +25,11 @@ const reload = async () => {
 const Header = Factory.create('Header', {
   view () {
 
-    return m('header.w-100.pa2.bg-777.flex.items-center.flex-wrap',
+    return m('header.w-100.pa1.bg-777.flex.items-center.flex-wrap',
 
       !Bolts.count()
         ? m('[',[
-            m('div.f3.di.mono.cfff.ma2', m.trust('Bolts&nbsp;&nbsp;')),
+            m('div.di.mono.cfff.mh1', { style: { fontSize: '1.05rem', fontWeight: '600' } }, m.trust('Bolts&nbsp;&nbsp;')),
             Bolts.hasBluetooth
               ? m('img', {src: iconBluetooth, width: 24 })
               : m('img', {src: iconGreyBluetooth, width: 24  }),
@@ -38,7 +38,7 @@ const Header = Factory.create('Header', {
             m('button.cmd.br2.ml1', { title: 'Clears the log on screen; the session file keeps everything', onclick: () => Logger.clear() }, 'Clear log'),
           ])
         : m('[',[
-            m('div.f3.di.mono.cfff.ma2', m.trust('Bolts&nbsp;&nbsp;')),
+            m('div.di.mono.cfff.mh1', { style: { fontSize: '1.05rem', fontWeight: '600' } }, m.trust('Bolts&nbsp;&nbsp;')),
             m('button.cmd.stop.br2.ml1', { title: 'Fullstop all, like space', onclick: () => Bolts.forEach( (bolt: Bolt) => void bolt.lifecycle.fullstop() ) }, 'STOP'),
             m('button.cmd.br2.ml1', { onclick: Bolts.pairBolt.bind(Bolts) },                                    'Pair'),
             m('button.cmd.br2.ml1', { onclick: saved(() => Bolts.disconnect()) },                               'DisConnect'),

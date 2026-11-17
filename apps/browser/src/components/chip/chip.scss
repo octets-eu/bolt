@@ -1,0 +1,16 @@
+.boltchip {
+  min-width: 190px;
+  color: #222;
+  user-select: none;
+}
+.boltchip:hover { filter: brightness(1.06); }
+
+.chip-name {
+  font-weight: 600;
+  font-size: 1.05rem;
+}
+
+.chip-pill {
+  padding: 1px 5px;
+  margin-left: 4px;
+}

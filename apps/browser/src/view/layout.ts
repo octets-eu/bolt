@@ -1,6 +1,7 @@
 import m from "mithril";
 
 import { Header }       from '../components/header/header';
+import { BoltChips }   from '../components/chip/chip';
 import { Plotter }     from '../components/plotter/plotter';
 import { Last }         from '../components/last';
 import Factory      from '../components/factory';
@@ -17,7 +18,7 @@ const Links = Factory.create('Links', {
 
   view () {
 
-    const style = { color: '#fff', textDecoration: 'none' };
+    const style = { color: '#fff', textDecoration: 'none', marginTop: '2px', marginBottom: '2px' };
 
     return m('nav.w-100.bg-333.flex.flex-row.items-center', [
       m(m.route.Link, { style, class: 'mono ph2', href: '/'       }, 'Bolts'),
@@ -40,6 +41,7 @@ const Layout = Factory.create('Layout', {
 
       m(Links, { route, params }),
       m(Header, { route, params }),
+      m('div.bolts.w-100.bg-999', m(BoltChips)),
       m("section", vnode.children),
       m(Last, { msecs: Date.now() }),
 
