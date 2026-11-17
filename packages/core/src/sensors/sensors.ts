@@ -206,7 +206,8 @@ export class Sensors {
 
   /** Listen for robot-to-robot infrared messages on all channels, or stop. */
   async listenInfrared (on: boolean): Promise<void> {
-    await this.send('listenInfrared', DeviceId.sensor, SensorCommand.listenInfraredMessages, on ? [255, 255, 255, 255, 255] : [0]);
+    // both forms are 5 bytes: the firmware rejects a shorter one with badDataLength (probed 2026-11-17)
+    await this.send('listenInfrared', DeviceId.sensor, SensorCommand.listenInfraredMessages, on ? [255, 255, 255, 255, 255] : [0, 0, 0, 0, 0]);
   }
 
   /** Streaming mask and interval. Interval 0 or mask 0 stops the stream. `motion` does the bookkeeping. */
