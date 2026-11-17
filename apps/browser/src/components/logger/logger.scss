@@ -9,7 +9,7 @@ div.logger {
     max-width: 32ch;
     overflow: hidden;
     text-overflow: ellipsis;
-    white-space: nowrap;
+    white-space: pre;   // no wrap, an entry's own line breaks kept
   }
 
   table {
@@ -17,9 +17,9 @@ div.logger {
     font-family: monospace;
     border-collapse: collapse;
 
-    // one line per entry: only the last cell of a row may wrap
+    // one line per entry: only the last cell of a row may wrap, and it keeps an entry's own line breaks
     td            { white-space: nowrap; }
-    td:last-child { white-space: normal; }
+    td:last-child { white-space: pre-wrap; }
 
     td.id, td.device, td.target, td.source, td.command {
       text-align: right;

@@ -33,6 +33,9 @@ export interface AckPayloads {
   infraredReadings: readonly number[];
   /** Lux, null when the ack was short. */
   ambientLight:     number | null;
+  /** 'major.minor.revision', null when the ack was short. */
+  appVersion:        string | null;
+  bootloaderVersion: string | null;
 }
 
 export type AckPayload<N extends string> = N extends keyof AckPayloads ? AckPayloads[N] : undefined;
@@ -64,6 +67,12 @@ export function voltage (bytes: Bytes): number | null {
 /** float32 lux. */
 export function lux (bytes: Bytes): number | null {
   return float32At(bytes, 0);
+}
+
+/** Three uint16: major, minor, revision. */
+export function version (bytes: Bytes): string | null {
+  const major = uint16At(bytes, 0), minor = uint16At(bytes, 2), revision = uint16At(bytes, 4);
+  return major === null || minor === null || revision === null ? null : `${major}.${minor}.${revision}`;
 }
 
 /** uint16 degrees: where magnetic north lies in the current yaw frame. */
@@ -100,6 +109,8 @@ export const ACK_DECODERS: { readonly [N in keyof AckPayloads]: Decoder<AckPaylo
   chargerState,
   infraredReadings: (bytes) => bytes,
   ambientLight:     lux,
+  appVersion:        version,
+  bootloaderVersion: version,
 };
 
 /** The decoder for a command name, or none: the command carries nothing. */

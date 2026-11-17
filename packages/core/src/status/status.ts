@@ -27,6 +27,8 @@ export class Status {
   voltage:       number | null = null;
   battery:       BatteryState | null = null;
   charger:       ChargerState | null = null;
+  /** Application and bootloader version per processor, 'major.minor.revision'. */
+  firmware:      { [P in 'nordic' | 'st']: { app: string | null; bootloader: string | null } } = { nordic: { app: null, bootloader: null }, st: { app: null, bootloader: null } };
   /** Lux. */
   ambient:       number | null = null;
   /** Four receiver strengths: front left, front right, back right, back left. */

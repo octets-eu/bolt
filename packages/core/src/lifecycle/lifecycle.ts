@@ -4,7 +4,7 @@ import type { Communication } from '../communication/communication';
 import { mod360 } from '../helpers/math';
 import { describe } from '../helpers/utils';
 import type { Navigation } from '../navigation/navigation';
-import { StabilizationIndex } from '../protocol/constants';
+import { StabilizationIndex, Target } from '../protocol/constants';
 import type { Sensors } from '../sensors/sensors';
 
 export interface WakeResult {
@@ -176,7 +176,19 @@ export class Lifecycle {
     if (awakeSeen) await this.resetting;
     else await this.reset(false);
     await this.readAll();
+    await this.readFirmware();
     this.ctx.log('info', 'takeover.out');
+  }
+
+  /** Both processors' versions into the status and the log, one entry of two lines. Once per connection: they do not change while connected. */
+  private async readFirmware (): Promise<void> {
+    const lines: string[] = [];
+    for (const [name, target] of [['nordic', Target.nordic], ['st', Target.st]] as const) {
+      const app        = await this.sensors.appVersion(target);
+      const bootloader = await this.sensors.bootloaderVersion(target);
+      lines.push(`${name} ${app ?? '?'}, bootloader ${bootloader ?? '?'}`);
+    }
+    this.ctx.log('info', lines.join('\n'));
   }
 
   /** One read of every polled value into the status. */

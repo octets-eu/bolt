@@ -30,6 +30,12 @@ export const ApiCommand = {
   ping: 0x00,
 } as const;
 
+/** Sent to either processor, each answers for itself. */
+export const SystemInfoCommand = {
+  appVersion:        0x00,
+  bootloaderVersion: 0x01,
+} as const;
+
 export const PowerCommand = {
   deepSleep:                        0x00,
   sleep:                            0x01,

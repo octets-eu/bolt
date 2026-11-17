@@ -1,6 +1,6 @@
 import type { Context } from '../context';
 import type { BoltEvents } from '../events/events';
-import { DeviceId, PowerCommand, SensorCommand, Target } from '../protocol/constants';
+import { DeviceId, PowerCommand, SensorCommand, SystemInfoCommand, Target } from '../protocol/constants';
 import type { BatteryState, ChargerState } from '../protocol/constants';
 import type { AckPayload } from '../protocol/payloads';
 import type { Ack } from '../protocol/queue';
@@ -163,6 +163,19 @@ export class Sensors {
   async ambientLight (): Promise<number | null> {
     const { payload } = await this.send('ambientLight', DeviceId.sensor, SensorCommand.getAmbientLight);
     this.ctx.status.ambient = payload;
+    return payload;
+  }
+
+  /** A processor's application version, e.g. '4.2.41'. */
+  async appVersion (target: Target): Promise<string | null> {
+    const { payload } = await this.send('appVersion', DeviceId.systemInfo, SystemInfoCommand.appVersion, [], target);
+    this.ctx.status.firmware[target === Target.nordic ? 'nordic' : 'st'].app = payload;
+    return payload;
+  }
+
+  async bootloaderVersion (target: Target): Promise<string | null> {
+    const { payload } = await this.send('bootloaderVersion', DeviceId.systemInfo, SystemInfoCommand.bootloaderVersion, [], target);
+    this.ctx.status.firmware[target === Target.nordic ? 'nordic' : 'st'].bootloader = payload;
     return payload;
   }
 
