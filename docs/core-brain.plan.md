@@ -8,17 +8,18 @@
 2. **circuit.json is the connectome.** Neurons, edges, populations, the ports to the observation layer and the motor, and the constants of all three layers are data. The network code knows a short list of cell models, synapse kinds and population operators, and no neuron names. The operators are a step on the way: at the end every mechanism is cells and edges.
 3. **Observation and motor are code behind interfaces.** The observation layer turns the Bolt's streams into input ports, the motor turns output ports into a roll; nothing crosses by a neuron's name.
 
-The weights of the senses onto the belief, the profiles the builder draws from `senses.json`, stay as the builder makes them through phases A to C, except the four corner lobes, drawn first (W0), and are drawn by hand in phase W, short first, then far with the bands to 3.5 m. The edges the steps add (C3's and D1 to D5's) are structural: their weights follow from the mechanism and are not drawn.
+The weights of the senses onto the belief are drawn by hand: the four corner lobes first (W0), the long levels with the new ladder and the bands to 4 m (U), the short ladder's and the far redraw in phase W. Until W1 the short ladder's profiles are the builder's from `senses.json`. Phase C changes no weight. The edges the steps add (C3's and D1 to D5's) are structural: their weights follow from the mechanism and are not drawn.
 
 ## Rules for every step
 
 - One step, one commit; its check and the bench's numbers go in the commit message.
-- Every step runs the bench before and after, `node bench/run.mjs`, all scored runs, the same set before and after. Runs added by L0 to L3 and S2 join the set from the next step on; the reference of phase D is re-run on the set as it grows.
+- Every step runs the bench before and after, `node bench/run.mjs`, the same set before and after. Until F5 the set is the scored runs on the old ladder; from F5 on it is the reference runs, and the seeks of L1 to L3 and S2 join it from the next step on; the reference of phase D is re-run on the set as it grows.
 - Phases A to C change no behaviour. The replay prints per run two digests, 32-bit FNV-1a over one line per event: the estimate digest over every network step, `t angle length distance` at six decimals; the motor digest, from B1 on, over every motor call, `t mode heading speed` at six decimals. Equal digests pass, nothing less does. A rebuilt `circuit.json` is byte-identical to the committed one.
+- R, F1, U and M1 change behaviour: R2 by the ladder, judged with the Bolts standing; F1 by the read schedule, judged on F4's run; U by the weights, the bands and the near rule, judged by the bench against F5's numbers; M1 by the motor alone, judged on the Bolts. B3 leaves the estimate digest equal.
 - Phase W changes behaviour by the weights and the bands alone; the bench judges, each step's check names its runs and its reference.
 - Phase S changes behaviour in one variant, `"beat"`, judged by S2's A/B; the bench's numbers for it are reported, not bounded.
 - Phase D changes behaviour, in small deviations, each step against W2's numbers, the brain entering D, on the same runs, not against the step before: the share of seconds under 30° within ±3 points, the mean error within ±5°, no run over 40 s with its share of seconds under 30° more than 10 points down (on a 24 s run 10 points are two seconds). A step outside the bounds is not committed: it is debugged, or its cell form changed, until it is inside.
-- The old code in `packages/core/src/brain/` and `packages/core/src/experiments/replay.mjs`, `replay-network.mjs` stays untouched until E1; its `circuit.json` is a copy of the package's while both are scheme 1, so the reference runs the same weights. The package starts as a copy; `OLD=1` makes the package's replay import the old modules, `Date.now` patched onto the replay's clock for the old motor as `performance.now` is for the old observation; the old motor's timers are module state (`motor.mjs:54`), so the reference imports it afresh for every run, a query on the import's URL.
+- The old code in `packages/core/src/brain/` and `packages/core/src/experiments/replay.mjs`, `replay-network.mjs` stays untouched until E1; its `circuit.json` is a copy of the package's while both are scheme 1, so the reference runs the same weights. The package starts as a copy; `OLD=1` makes the package's replay import the old modules, `Date.now` patched onto the replay's clock for the old motor as `performance.now` is for the old observation; the old motor's timers are module state (`motor.mjs:54`), so the reference imports it afresh for every run, a query on the import's URL. From R2 on the old modules no longer run what the package runs, holding neither the new ladder nor F1's schedule: `OLD=1` is the reference up to B2 and leaves the bench with F5, and the old `circuit.json` is no longer rewritten. The old code itself stays until E1.
 - The brain tab is backlog 02's (`docs/hide-and-seek.plan.md`): it compiles against the package, nothing more is checked. It grows its anatomy on its first visit (`view.ts:34`), so a cell it cannot place breaks the tab and nothing else; D's new cells get their place there.
 - Live runs with the Bolts, L1 to L3 and the A/B runs of S2, go where the bench is blind: the bundle on the rig, the link, the clock, the motor and the closed loop. Each run is marked and extracted into the bench. L1 is the live baseline; phase D's reference on the bench is W2.
 
@@ -131,7 +132,7 @@ function fireRoll (bolt: Bolt, speed: number, heading: number): Promise<void>;
 
 The starts are the plotter's reference points (`plotter.ts`, `floor-plan.svg`): a Bolt reset on a point knows its place, the truth carries no drive out. The three distances of this plan: Sender/blue on rg and Seeker/green on u1, 1.2 m; Sender/blue on d1 and Seeker/green on u1, 2.4 m; Sender/blue on d1 and Seeker/green on u2, 3.2 m. L1 and S2 use them.
 
-- **L0** at each distance a path, Seeker/green standing on its point facing four headings 8 s each, the truth on its start line, and a seek, marked; extracted into the bench as runs 18 to 23. A seek starts where Seeker/green stands, its time limit and runaway fence `SEEK_DEFAULTS` in `matrix-brain/index.ts` or what `Seek.start` was given.
+- **L0** at each distance a path, Seeker/green standing on its point facing four headings 8 s each, the truth on its start line, and a seek, marked; extracted into the bench as runs 18 to 23. A seek starts where Seeker/green stands, its time limit and runaway fence `SEEK_DEFAULTS` in `matrix-brain/index.ts` or what `Seek.start` was given. Runs 18 to 23 retire with the old ladder at F5; the three starts stay.
 
 ### A, the package (behaviour identical)
 
@@ -144,7 +145,33 @@ The starts are the plotter's reference points (`plotter.ts`, `floor-plan.svg`): 
 
 - **B1** output ports: `outputs` in `circuit.json` and `Network.output`; the motor a class with its own state, `now` passed to `command`, reading ports only (`mode.near` instead of IR_NEAR); the referee reads `request.short`. The replay calls `command` once a second, after the step that crosses the second: `heading` the last motion sample's, `commanded` the motor's own last heading (the first sample's to start), `dtMs` since the last call capped at 400 as live, `now` the replay's clock; the old motor under `OLD=1` is called the same way. The replay prints the motor digest. Check: digests equal.
 - **B2** input ports: the input neurons carry `port`, `gain` and `rateTauMs`; `sensory_map.jsonc`'s channels dissolve into them; its `ir` block becomes `observation`, less `corners`, which is the builder's, plus the layer's constants now in code (the 100 ms second-notify window, the follow's 40 ms and 0.4, `expectMs`, the 3 s a channel stays expected, the watchdog's 1500 ms, the fired command's 300 ms); `motor.mjs`'s `MOTOR` becomes `motor`; the observation layer takes its clock, stamps the construction and `start` as ladder switches, and the replay's poke of `switchedAt` goes; `sensory_map.jsonc` leaves the package. Check: digests equal, the rebuild byte-identical.
-- **L1** three seeks on the Bolts from the three starts of L0. Everything up to here is behaviour identical by the bench; L1 checks what the bench cannot see: the bundle on the rig, the link, the clock, the motor in the loop. It is the live baseline.
+### R, the ladder to 4 m (the Bolts standing)
+
+The long ladder is chosen before the brain's far weights: which levels arrive is the brain's cue for distance. The recorded runs carry the old ladder and retire with it (F).
+
+- **R1** code 7: Sender/blue sends code 7, Seeker/green listens beside it. Heard, the ladders have eight codes; not heard, seven, all in use, and a further long level takes a code of the short ladder.
+- **R2** the ladder: candidate strengths behind the long ladder's codes, each measured with both Bolts placed by hand and standing, at 1, 2, 3 and 4 m, Seeker/green on four headings: frames a second per level, and corner reads fired, acked and hit. The user picks; core's `LADDERS` and the builder's `channels` carry the pick. Check: at 4 m the strongest level arrives in every round and corner reads hit; at each distance the set of levels arriving differs from the next.
+
+### F, the reference run (the bench's new ground)
+
+The bench's run is the coil: Sender/blue on d1, Seeker/green from u2, a spiral out round u2, loops creeping down the line to d1 as wide as the floor allows, a last spiral round the sender. It covers 20 to 365 cm on the line of sight and shows the sender every side of the seeker at every distance. Its truth is the camera's track. `bench/ref/coil/target.png` is the path.
+
+- **F1** the read schedule: the last heard channel stays expected for 10 s, the others 3 s as today (`observation.ts`, `nextVolley`). Check: the bench's numbers before and after go in the commit message.
+- **F2** the coil: a behavior in core beside `archimedean`, the radius given to it per step, the room's widths in the app's survey code, a roll every 280 ms. Check: the dry run's track lies on `target.png`.
+- **F3** the track beyond the camera's top edge: `bench/camtrack.mjs` bridges it by the locator between the camera's points. Check: on `ref/archimedean`, a stretch of the camera's track left out and bridged lies within the distance camera and locator are apart on that run.
+- **F4** the run: the coil driven on R2's ladder, kept as `bench/ref/coil` with the session's cut, the track and the image. Check: frames a second and corner reads hit by distance from the sender go in the commit message.
+- **F5** the bench on it: `replay.mjs` scores a reference run against its `track.tsv`, `run.mjs` runs the reference runs. The replay leaves a sense out on request, `--without corners`, `frames` or `slots`, so one run judges each sense's weights alone. Bench runs 1 to 34, `index.tsv` and `ref/archimedean` move to `archive/bench/`; `OLD=1` and the old motor's reference leave the bench. Check: `node bench/run.mjs` scores `ref/coil`; its numbers are the reference of the steps that follow.
+
+### U, the brain on the new ladder (the bench judges)
+
+The minimum that makes the present brain run on R2's ladder. The full drawing by hand is W, after C.
+
+- **U1** the levels and the bands: the builder's `channels` as R2's ladder; the distance bands to 4 m (today 10 of 20 cm to 2 m); the long levels' frames and silences onto ring and distance drawn by hand, `senses.json` counting the old strengths; the short ladder's profiles and the corner lobes as they are; the brain tab's places for the channels. Check: on `ref/coil` the share of seconds under 30° and the mean error both better than F5's, with the corner reads and without them.
+- **U2** the near rule: which level of R2's ladder, heard `minFrames` times in `windowMs`, asks for the short ladder; today it is the long ladder's weakest. Check: on `ref/coil` the rule is on inside the distance the user sets and off beyond it.
+
+### L1, the live baseline
+
+- **L1** three seeks on the Bolts from the three starts of L0, on R2's ladder with U's brain, each marked and extracted into the bench beside the reference run. L1 checks what the bench cannot see: the bundle on the rig, the link, the clock, the motor in the loop. It is the live baseline. A seeker that loses the line of sight drives on blind, its rolls tied to volleys (M1); such a seek is stopped by the user, stays unmarked and is repeated.
 
 ### C, the generic network (behaviour identical)
 
@@ -152,19 +179,26 @@ The starts are the plotter's reference points (`plotter.ts`, `floor-plan.svg`): 
 - **C2** the operators as data: `shift`, `carry` and `forget` declared on the populations with their cells and constants; `role` is not read from here on. Check: as C1.
 - **C3** the product cells as edges: `model: "product"`; `of` and `gate` become an add edge and gate edges; the brain view's grade reads `model` instead of `of`, so it compiles. Check: as C1. The stash `corner lobes drawn` is decided here: ported onto scheme 2 or dropped.
 
+### B3 and M1, the link and the silence (with the Bolts)
+
+One Bluetooth link per Bolt carries its rolls, its corner reads, the listen's re-arm, the motion stream and every ack; infrared goes first. Today each drive keeps to that by its own care, and the brain rolls only after a volley, so silence stops the rolls.
+
+- **B3** the link gate: the observation layer owns the link's timetable and answers whether the link is free; the motor rolls on its own clock and yields to a volley; core's command queue holds the same gate, so every drive obeys it without knowing who reserved the link. Check: the estimate digest equal; on the Bolts, the share of corner reads without an ack not above L1's.
+- **M1** the motor's answer to silence: the motor is asked on B3's clock with or without frames; what it does without them is the circuit's, cells reading the belief and its length, shown in full before the step starts. Check: on the Bolts, a seek from 2.4 m that loses the line of sight behind the partition does not drive on at its last command.
+
 ### W, the weights by hand (the bench judges)
 
-The profiles of the senses onto the ring and the distance come from `senses.json`, the counted tables of 21 runs, read by the builder alone (`build-circuit.mjs:71`); their writer, `replay.mjs --senses --write`, is gone. Drawn by hand they need no table.
+The profiles of the senses onto the ring and the distance are drawn by hand from the body and scored on the bench. U drew the long levels'; the short ladder's still come from `senses.json`, the counted tables of the retired runs, read by the builder alone.
 
 - **W0** before B1, the corner lobes: each corner's profile onto the ring drawn as G·max(0, cos(θ − corner))^n at the receiver's angle (`CORNER_G`, `CORNER_N` in the builder), the frames' and silences' profiles as counted until W1; the old copy of `circuit.json` rewritten with it. Check: the bench's side within ±5°, share and mean |err| better than the counted circuit's; `OLD=1` byte-identical.
-- **W1** after C3, the short weights: the frames' and silences' profiles drawn by hand over every band, tuned on runs 1 to 19; `senses.json` goes, with the builder's mention of its writer. Check: the bench's share of seconds under 30° and mean |err| on runs 1 to 19 both better than C3's; runs 20 to 23 reported.
-- **W2** after S2, before D1, the far weights and the bands: the builder's bands to 3.5 m (today 10 of 20 cm to 2 m, the belief ending at 190 cm), the profiles tuned on the far runs the bench holds by then, L0's 20 to 23 and the 2.4 m and 3.2 m runs of L1 and S2. Check: the far runs' two numbers better than W1's; runs 1 to 19 within phase D's bounds against W1.
+- **W1** after M1, the short weights: the short ladder's frames and silences drawn by hand over every band; `senses.json` goes, with the builder's mention of its writer. Its runs: the coil's last spiral round the sender driven on the short ladder, kept as `bench/ref/near`, and L1's seeks. Check: on those runs the share of seconds under 30° and the mean error both better than before W1; `ref/coil` reported.
+- **W2** after S2, before D1, the far weights: the long levels' profiles and the bands redrawn over `ref/coil` and the far seeks the bench holds by then, L1's and S2's. Check: beyond 2 m from the sender the two numbers better than W1's; inside 2 m within phase D's bounds against W1.
 
 ### S, the silent slots at their beat (A/B with the Bolts)
 
 Today a silent slot is booked when the next frame arrives, at the nose of that moment, and a gap of more than two rounds books nothing. Booked at its own beat, the shift and the carry correct it like any frame, and a long gap counts. Silences count moving or standing, as today.
 
-- **S1** the variant: `observation.slots.mode` is `"late"` (today) or `"beat"`: a slot booked once a channel's expected frame plus `marginMs` (40 to start, the follow's window) has passed without a notify, on the channels of the current ladder heard within `expectMs`; a channel unheard longer books nothing until it is heard again. The bench replays both on every run; the brain tab picks the variant per seek, and the seek's line logs it. Check: `"late"` gives the digests of C3; the bench's numbers for `"beat"` go in the commit message.
+- **S1** the variant: `observation.slots.mode` is `"late"` (today) or `"beat"`: a slot booked once a channel's expected frame plus `marginMs` (40 to start, the follow's window) has passed without a notify, on the channels of the current ladder the read schedule still expects (F1); a channel unheard longer books nothing until it is heard again. The bench replays both on every run; the brain tab picks the variant per seek, and the seek's line logs it. Check: `"late"` gives the digests of the step before; the bench's numbers for `"beat"` go in the commit message.
 - **S2** the A/B runs: three pairs of seeks, `"late"` and `"beat"` from the three starts of L0, marked and extracted into the bench; more pairs while the eye cannot tell, the agent running them from the sixth pair on, its tools re-visited and tested first. The user judges by eye, the bench adds its numbers; the winner stays, the other variant is removed.
 
 ### D, mechanisms found in nature (small deviations)
@@ -184,9 +218,11 @@ Each step replaces one operator by cells and edges and is shown in full before i
 
 ### E, the end
 
-- **E1** the old code: `packages/core/src/brain/connectome/`, `utils/ladder.mjs`, `experiments/replay.mjs` and `replay-network.mjs` retired, `OLD=1` and the old motor's reference out of the bench; `seek.mjs`, `utils/link-load.mjs` and `agent/pull.sh`, which import or read them, go with the Open item.
+- **E1** the old code: `packages/core/src/brain/connectome/`, `utils/ladder.mjs`, `experiments/replay.mjs` and `replay-network.mjs` retired; `seek.mjs`, `utils/link-load.mjs` and `agent/pull.sh`, which import or read them, go with the Open item.
 - **E2** the docs: the scheme in the header of `types.ts`; `bolt-reference.md` (the ladder's timing names `brain/utils/ladder.mjs`), `brain-view.plan.md` (circuit.json, network.mjs, vis.mjs, replay-network.mjs) and `communication.ts`'s header (sensory_map.jsonc) pointing at the package; this plan closed. `hide-and-seek.md` names no code and stays.
 
 ## Open
 
 - The agent's `brain.mjs`, `seek.mjs`, `utils/link-load.mjs` and `pull.sh` onto the package or left, and `packages/brain` in `agent/sync.rules`: at E1.
+- A seek from 2.4 m with the line of sight free heard frames and none of its corner reads hit, the reads timed as in seeks that hit (bench run 31, retired). Not explained; F4's run shows whether it recurs.
+- With Seeker/green standing at 2.4 and 3.2 m and no rolls at all, 7 to 11 % of the corner reads fired get no ack (bench runs 20 and 22, retired). Not explained; R2 counts the acks again.
