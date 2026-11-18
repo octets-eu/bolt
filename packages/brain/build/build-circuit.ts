@@ -93,10 +93,10 @@ const OBSERVATION: ObservationConfig = {
   // the carrier: the weakest level heard at least `minFrames` times in `windowMs`;
   // the level that is just arriving has an edge, nose or tail (communication.ts, LADDERS)
   carrier: { windowMs: 3000, minFrames: 2 },
-  // near: the long ladder's level of `strength` heard in `minFrames` of the last
+  // near: the long ladder's level of `strength`, its weakest, heard in `minFrames` of the last
   // `windowMs` asks for the short ladder; nothing of the short one in `lostMs` asks back;
   // the referee switches the sender between the two (communication.ts, LADDERS)
-  near: { strength: 2, windowMs: 3500, minFrames: 3, lostMs: 3000 },
+  near: { strength: LADDERS.long.strengths[0]!, windowMs: 3500, minFrames: 2, lostMs: 3000 },
   // a frame's closeness is log2 of this over its strength: weaker frames arrive only near
   closenessRef: 32,
   // after the frames change ladder, the closeness is not compared for this long

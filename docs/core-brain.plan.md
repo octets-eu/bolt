@@ -169,7 +169,7 @@ The bench's run is the coil: Sender/blue on d1, Seeker/green from u2, a spiral o
 The minimum that makes the present brain run on R2's ladder. The full drawing by hand is W, after C.
 
 - **U1** (**done**) the levels and the bands: the builder's `channels` as R2's ladder; the distance bands to 4 m (today 10 of 20 cm to 2 m); the long levels' frames and silences onto ring and distance drawn by hand, `senses.json` counting the old strengths; the short ladder's profiles and the corner lobes as they are; the brain tab's places for the channels. Check: on `ref/coil` the share of seconds under 30° and the mean error both better than F5's, with the corner reads and without them.
-- **U2** the near rule: which level of R2's ladder, heard `minFrames` times in `windowMs`, asks for the short ladder; today it is the long ladder's weakest. Check: on `ref/coil` the rule is on inside the distance the user sets and off beyond it.
+- **U2** (**done**) the near rule: which level of R2's ladder, heard `minFrames` times in `windowMs`, asks for the short ladder; today it is the long ladder's weakest. Check: on `ref/coil` the rule is on inside the distance the user sets and off beyond it.
 
 ### L1, the live baseline
 
