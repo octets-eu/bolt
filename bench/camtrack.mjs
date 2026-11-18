@@ -20,6 +20,13 @@
 // turns 23 degrees a second on that spiral whatever the centre. The track's
 // times are the frames' less their age less the lag.
 //
+// Where the camera loses the seeker for more than GAP_MS, beyond its
+// picture's edge, the track is bridged: the locator's places between the two
+// camera points on either side, shifted by what the locator is off, that
+// shift sliding from the one point's to the other's. Bridged rows carry 0
+// pixels. HOLD=<from>-<to>[,...], seconds into the run, leaves the camera's
+// points of those stretches out and prints how far the bridge lies from them.
+//
 //   npx tsx bench/camtrack.mjs <frames dir> <session.jsonl> [<out.tsv>]
 
 import { readFileSync, readdirSync, writeFileSync } from 'node:fs';
@@ -35,6 +42,8 @@ const NOMINAL_LAG = 2750;  // for picking that frame, before the lag is found
 const MIN_PIXELS = 100;    // a lit matrix showed 240 to 400 pixels at the frame's edge and middle
 const LAGS = [500, 5000];  // the lags tried, ms
 const STEP_CM = 4;          // a course is taken from two frames this far apart and more, within a second and a half
+const GAP_MS = 1500;       // the camera's points further apart than this are bridged
+const BRIDGE_MS = 500;     // between two bridged rows, the frames' pace
 
 // the run: its clock against the wall's, its start, the seeker's start point, the locator's samples
 const lines = readFileSync(sessionPath, 'utf8').split('\n').filter(Boolean).map((l) => { try { return JSON.parse(l); } catch { return null; } }).filter(Boolean);
@@ -73,9 +82,27 @@ let lag = LAGS[0];
 for (let l = LAGS[0]; l <= LAGS[1]; l += 25) if (miss(l) < miss(lag)) lag = l;
 if (lag === LAGS[0] || lag === LAGS[1]) console.log('the lag sits at the edge of the range tried: not found');
 
-const track = seen.map((p) => ({ ...p, t: p.t - lag })).filter((p) => p.t >= start.t && p.t <= done.t);
+const camera = seen.map((p) => ({ ...p, t: p.t - lag })).filter((p) => p.t >= start.t && p.t <= done.t);
+/** The points with every gap bridged by the locator. */
+const bridge = (points) => points.flatMap((b, k) => {
+  const a = points[k - 1], la = a && at(a.t), lb = at(b.t), rows = [];
+  if (a && b.t - a.t > GAP_MS && la && lb) for (let t = a.t + BRIDGE_MS; t < b.t - BRIDGE_MS / 2; t += BRIDGE_MS) {
+    const l = at(t), f = (t - a.t) / (b.t - a.t);
+    rows.push({ t, x: l.x + (1 - f) * (a.x - la.x) + f * (b.x - lb.x), y: l.y + (1 - f) * (a.y - la.y) + f * (b.y - lb.y), n: 0 });
+  }
+  return [...rows, b];
+});
+const hold = (process.env.HOLD ?? '').split(',').filter(Boolean).map((w) => w.split('-').map((s) => start.t + 1000 * Number(s)));
+const held = (p) => hold.some(([from, to]) => p.t > from && p.t < to);
+const track = bridge(camera.filter((p) => !held(p)));
 const off = track.map((p) => { const l = at(p.t); return l ? Math.hypot(p.x - l.x, p.y - l.y) : null; }).filter((v) => v !== null).sort((a, b) => a - b);
 console.log(`${frames.length} frames, dark ${darkFrame.f}, ${seen.length} with the matrix, ${none} without; lag ${lag} ms (the course off by ${miss(lag).toFixed(1)} deg on average over ${steps.length} steps)`);
 console.log(`track: ${track.length} points over ${((track.at(-1).t - track[0].t) / 1000).toFixed(1)} s; first ${track[0].x.toFixed(1)}, ${track[0].y.toFixed(1)}, last ${track.at(-1).x.toFixed(1)}, ${track.at(-1).y.toFixed(1)}; the start point ${P.x}, ${P.y}`);
 console.log(`camera against locator: median ${off[Math.floor(off.length / 2)].toFixed(1)} cm apart, at most ${off.at(-1).toFixed(1)} cm; at the end the locator says ${locator.at(-1).x.toFixed(1)}, ${locator.at(-1).y.toFixed(1)}`);
+const bridged = track.filter((p) => p.n === 0);
+if (bridged.length) console.log(`bridged: ${bridged.length} rows in ${track.filter((p, k) => p.n === 0 && track[k - 1].n !== 0).length} gaps`);
+for (const [from, to] of hold) {   // the bridge at the moments of the camera's points left out
+  const miss = camera.filter((p) => p.t > from && p.t < to).map((p) => { const k = track.findIndex((q) => q.t >= p.t), a = track[k - 1], b = track[k], f = (p.t - a.t) / (b.t - a.t); return Math.hypot(a.x + f * (b.x - a.x) - p.x, a.y + f * (b.y - a.y) - p.y); }).sort((a, b) => a - b);
+  console.log(`held out ${((from - start.t) / 1000).toFixed(0)} to ${((to - start.t) / 1000).toFixed(0)} s: ${miss.length} points, the bridge ${miss[Math.floor(miss.length / 2)]?.toFixed(1)} cm from them in the median, ${miss.at(-1)?.toFixed(1)} at most`);
+}
 if (out) writeFileSync(out, 't\tx\ty\tpixels\n' + track.map((p) => `${p.t.toFixed(1)}\t${p.x.toFixed(1)}\t${p.y.toFixed(1)}\t${p.n}`).join('\n') + '\n');
