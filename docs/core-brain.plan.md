@@ -149,7 +149,7 @@ The starts are the plotter's reference points (`plotter.ts`, `floor-plan.svg`): 
 
 The long ladder is chosen before the brain's far weights: which levels arrive is the brain's cue for distance. The recorded runs carry the old ladder and retire with it (F).
 
-- **R1** code 7: Sender/blue sends code 7, Seeker/green listens beside it. Heard, the ladders have eight codes; not heard, seven, all in use, and a further long level takes a code of the short ladder.
+- **R1** (**done**) code 7: sent, acked and heard as 7 in both directions, Sender/blue to Seeker/green and back: the ladders have eight codes, seven in use.
 - **R2** the ladder: candidate strengths behind the long ladder's codes, each measured with both Bolts placed by hand and standing, at 1, 2, 3 and 4 m, Seeker/green on four headings: frames a second per level, and corner reads fired, acked and hit. The user picks; core's `LADDERS` and the builder's `channels` carry the pick. Check: at 4 m the strongest level arrives in every round and corner reads hit; at each distance the set of levels arriving differs from the next.
 
 ### F, the reference run (the bench's new ground)
@@ -226,3 +226,4 @@ Each step replaces one operator by cells and edges and is shown in full before i
 - The agent's `brain.mjs`, `seek.mjs`, `utils/link-load.mjs` and `pull.sh` onto the package or left, and `packages/brain` in `agent/sync.rules`: at E1.
 - A seek from 2.4 m with the line of sight free heard frames and none of its corner reads hit, the reads timed as in seeks that hit (bench run 31, retired). Not explained; F4's run shows whether it recurs.
 - With Seeker/green standing at 2.4 and 3.2 m and no rolls at all, 7 to 11 % of the corner reads fired get no ack (bench runs 20 and 22, retired). Not explained; R2 counts the acks again.
+- With one code sent every 200 ms, frames are lost in blocks: a block whose notify follows the send by about 40 ms loses a fifth to a third of its frames, whatever the code; blocks with another delay lose none. Not explained; R2's counts per level are taken over several blocks until it is.
