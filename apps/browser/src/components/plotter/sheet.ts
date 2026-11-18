@@ -37,7 +37,7 @@ export const points: { [point: string]: { x: number, y: number, heading: number 
  * half. Above OPEN_Y the floor is free only within OPEN_CM of u2.
  */
 const BLOCKS: readonly (readonly [number, number, number, number])[] = [[-999, 308, 181, 327], [324, 308, 999, 327], [364, 256, 463, 298], [30, 327, 180, 407], [399, 327, 470, 435], [255, 502.5, 470, 999], [-999, 60, 140, 308]];
-const KEEP_OFF = 12, WIDEST = 90, OPEN_Y = 105, OPEN_CM = 52;
+const KEEP_OFF = 12, WIDEST = 50, OPEN_Y = 105, OPEN_CM = 52;
 
 /**
  * The widest circle round each cm of the line from `from` to `to` that stays

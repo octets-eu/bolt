@@ -51,7 +51,7 @@ const info = (e) => (e.name === 'info' && typeof e.data === 'string' ? e.data : 
 const epoch0 = Date.parse(lines.find((e) => e.kind === 'session').startedAt);
 const start = lines.findLast((e) => info(e).startsWith('brain path start'));
 const done = lines.find((e) => e.t > start.t && info(e).startsWith('brain path done'));
-const lit = lines.find((e) => e.t > start.t && info(e).startsWith('archimedean start')) ?? start;
+const lit = lines.find((e) => e.t > start.t && /^(archimedean|coil) start/.test(info(e))) ?? start;
 const seeker = start.bolt;
 const starts = JSON.parse(info(lines.findLast((e) => e.t <= start.t && info(e).startsWith('starts {'))).slice(7));
 const P = points[starts[seeker].point];
