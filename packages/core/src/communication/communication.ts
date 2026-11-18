@@ -32,11 +32,11 @@ export interface Ladder {
  * A seek sends one ladder at a time and switches while it runs: the long
  * one until the seeker is near, the short one from then on, the long one
  * again when the short one falls silent. The seeker asks (the observation
- * layer's `near`, brain/connectome/sensory_map.jsonc), the referee switches
+ * layer's `near`, circuit.json's `observation`), the referee switches
  * the sender, which hears nothing.
  */
 export const LADDERS: { readonly [range in LadderRange]: Ladder } = {
-  long:  { range: 'long',  channels: [0, 1, 2, 3], strengths: [2, 4, 8, 16], roundMs: 4 * 200 + 50 },
+  long:  { range: 'long',  channels: [0, 1, 2, 3], strengths: [4, 8, 16, 128], roundMs: 4 * 200 + 50 },
   short: { range: 'short', channels: [4, 5, 6],    strengths: [1, 2, 4],     roundMs: 3 * 200 + 50 },
 };
 /** The long ladder's strengths and round, for the experiments written against the one ladder. */
