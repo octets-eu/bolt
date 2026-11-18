@@ -117,7 +117,7 @@ export class Observation {
     this.events.any = 1;
     if (!this.heardAt || t - this.heardAt > this.ir.secondNotifyMs) this.events.frames[channel] = (this.events.frames[channel] ?? 0) + 1;   // one frame, not its second notify
     this.heardAt = t;
-    this.events.closeness += Math.log2(32 / level.strength);   // 16 says 1, 1 says 5: weaker frames arrive only near
+    this.events.closeness += Math.log2(this.ir.closenessRef / level.strength);   // half the reference says 1: weaker frames arrive only near
     if (level.strength === this.carrier && level.range === this.range()) { this.events.carrier = 1; this.carrierAt = t; }
     else if (this.carrier !== null && level.strength > this.carrier) {   // a stronger level: was the carrier's frame of this round missed?
       const roundMs = 200 * [...this.channels.values()].filter((c) => c.range === level.range).length;
@@ -232,7 +232,7 @@ export class Observation {
     this.carrierRange = range;
 
     if (!this.near) {
-      const weakest = this.heard.filter((h) => h.range === 'long' && h.strength === 2 && now - h.t <= near.windowMs).length;
+      const weakest = this.heard.filter((h) => h.range === 'long' && h.strength === near.strength && now - h.t <= near.windowMs).length;
       this.near = weakest >= near.minFrames;
     } else if (!this.heard.some((h) => h.range === 'short' && now - h.t <= near.lostMs) && this.nearSince !== undefined && now - this.nearSince > near.lostMs) {
       this.near = false;

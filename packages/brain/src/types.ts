@@ -69,7 +69,8 @@ export interface ObservationConfig {
   expectMs: number;
   volley: { leadMs: number; reads: number; stepMs: number };
   carrier: { windowMs: number; minFrames: number };
-  near: { windowMs: number; minFrames: number; lostMs: number };
+  near: { strength: number; windowMs: number; minFrames: number; lostMs: number };
+  closenessRef: number;
   settleMs: number;
   watchdogMs: number;
   fireMs: number;

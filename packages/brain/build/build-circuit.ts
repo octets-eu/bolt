@@ -50,6 +50,7 @@
 // does not read it.
 
 import { readFileSync, writeFileSync } from 'node:fs';
+import { LADDERS } from '@bolt/core';
 import type { LadderRange } from '@bolt/core';
 import type { Circuit, Corner, MotorConfig, NeuronDef, ObservationConfig } from '../src/types';
 import { bodyLayout } from './vis';
@@ -66,8 +67,9 @@ interface Senses {
 // --- the observation layer's constants, circuit.json's `observation`: what it knows of the ladder and the
 // receivers (docs/bolt-reference.md section 7, communication.ts)
 const OBSERVATION: ObservationConfig = {
-  // channel -> ladder and strength; a frame names its ladder and level
-  channels: { 0: ['long', 2], 1: ['long', 4], 2: ['long', 8], 3: ['long', 16], 4: ['short', 1], 5: ['short', 2], 6: ['short', 4] },
+  // channel -> ladder and strength, the sender's ladders (communication.ts, LADDERS, read from core's build: after
+  // a change of ladder core is built first); a frame names its ladder and level
+  channels: Object.fromEntries(Object.values(LADDERS).flatMap((l) => l.channels.map((ch, k): [number, [LadderRange, number]] => [ch, [l.range, l.strengths[k]!]]))),
   // the sender's beat: one command per 200 ms on its schedule (ladder.ts), the notify 45 ms after the frame;
   // a read lands only while the frame is in the air, 7.5 ms (behavior/beat.ts)
   beatMs: 200,
@@ -87,10 +89,12 @@ const OBSERVATION: ObservationConfig = {
   // the carrier: the weakest level heard at least `minFrames` times in `windowMs`;
   // the level that is just arriving has an edge, nose or tail (communication.ts, LADDERS)
   carrier: { windowMs: 3000, minFrames: 2 },
-  // near: the long ladder's weakest level heard in `minFrames` of the last
+  // near: the long ladder's level of `strength` heard in `minFrames` of the last
   // `windowMs` asks for the short ladder; nothing of the short one in `lostMs` asks back;
   // the referee switches the sender between the two (communication.ts, LADDERS)
-  near: { windowMs: 3500, minFrames: 3, lostMs: 3000 },
+  near: { strength: 2, windowMs: 3500, minFrames: 3, lostMs: 3000 },
+  // a frame's closeness is log2 of this over its strength: weaker frames arrive only near
+  closenessRef: 32,
   // after the frames change ladder, the closeness is not compared for this long
   settleMs: 3000,
   // the watchdog: nothing heard for this long, the listen is re-armed through the queue

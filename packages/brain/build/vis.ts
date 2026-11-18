@@ -12,7 +12,7 @@
 // - The ring, a torus about the vertical axis, a neuron's wedge at its angle.
 // - The distance column, coaxial above the ring, one layer per distance
 //   neuron, near at the bottom.
-// - Seven glomeruli in an arc in front, one per IR channel, the long ladder
+// - The glomeruli in an arc in front, one per IR channel, the long ladder
 //   left, the short right, by strength.
 // - An ear nucleus inside each corner receiver, the corner neuron's body.
 // - The motor neuropil below the ring.
@@ -31,7 +31,8 @@ const BALL_R = 3.5;
 const RIND_R = 3.05;
 const RING: { at: V3; r: number; tube: number } = { at: [0, 0, -0.3], r: 1.45, tube: 0.27 };
 const COLUMN: { at: V3; r: number; z0: number; dz: number } = { at: [0, 0, 0], r: 0.58, z0: 0.42, dz: 0.21 };
-const GLOMERULI: { r: number; dist: number; z: number; azimuths: Record<LadderRange, number[]> } = { r: 0.3, dist: 2.4, z: 1.15, azimuths: { long: [-57, -39, -21, -3], short: [21, 39, 57] } };
+/** `first`: the azimuth of the long ladder's strongest channel and of the short ladder's weakest; the others `step` further out, however many a ladder has. */
+const GLOMERULI: { r: number; dist: number; z: number; step: number; first: Record<LadderRange, number> } = { r: 0.3, dist: 2.4, z: 1.15, step: 18, first: { long: -3, short: 21 } };
 const EAR_NUCLEI = { r: 0.22, dist: 2.45, z: -0.3 };
 const MOTOR: { at: V3; r: number; flat: number } = { at: [0, 0, -1.55], r: 0.68, flat: 0.45 };
 const HEARING: { at: V3; r: number } = { at: [0, 2.2, -1.15], r: 0.5 };
@@ -57,7 +58,7 @@ export function bodyLayout (neurons: NeuronDef[], ir: ObservationConfig['channel
   const channels = Object.entries(ir).map(([ch, [ladder, strength]]) => ({ ch: Number(ch), ladder, strength }));
   const order = [...channels].sort((a, b) => (a.ladder === b.ladder ? a.strength - b.strength : a.ladder === 'long' ? -1 : 1));
   const azimuthOf = new Map<number, number>();
-  for (const ladder of ['long', 'short'] as const) order.filter((c) => c.ladder === ladder).forEach((c, k) => azimuthOf.set(c.ch, GLOMERULI.azimuths[ladder][k]!));
+  for (const ladder of ['long', 'short'] as const) order.filter((c) => c.ladder === ladder).forEach((c, k, all) => azimuthOf.set(c.ch, GLOMERULI.first[ladder] + GLOMERULI.step * (ladder === 'long' ? k - all.length + 1 : k)));
   const slotOf = new Map(order.map((c, k) => [c.ch, k]));   // a channel's place in the row of afferents
   const distance = neurons.filter((n) => n.role === 'distance').sort((a, b) => a.cm![0] - b.cm![0]);
   const layerZ = new Map(distance.map((n, i) => [n.id, COLUMN.z0 + i * COLUMN.dz]));
