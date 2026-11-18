@@ -52,6 +52,7 @@ export type { ReachResult } from './behavior/reach';
 export type { LockOnResult } from './behavior/lock-on';
 export type { SweepOptions, SweepResult } from './behavior/sweep';
 export type { ArchimedeanOptions, ArchimedeanResult } from './behavior/archimedean';
+export type { CoilOptions, CoilResult } from './behavior/coil';
 export type { Beat, BeatOptions } from './behavior/beat';
 export { PERIOD_MS, trackBeat, readVolley } from './behavior/beat';
 export { Experiments } from './experiments/experiments';

@@ -21,13 +21,16 @@
 //   at the start, so frames saved beside the run (bench/camrec.mjs) give its
 //   true track afterwards; the locator only steers the shape.
 //
+// - `coil` is the same routine on core's `coil` behavior: loops from the
+//   seeker's point down to the sender's, the room's widths from sheet.ts.
+//
 // - `ladder` is the standing measurement of a ladder: one Bolt sends the codes
 //   at their strengths, the other hears them through the brain's observation
 //   layer, turning in place; bench/ladder.mjs counts the session's lines.
 //
 // For the console and the browser tools as `Survey`.
 
-import type { ArchimedeanOptions, ArchimedeanResult, Bolt, LadderRange } from '@bolt/core';
+import type { ArchimedeanOptions, ArchimedeanResult, Bolt, CoilResult, LadderRange } from '@bolt/core';
 import { mod360, StabilizationIndex } from '@bolt/core';
 import { Observation } from '@bolt/brain';
 import { glows } from './tracking/glow';
@@ -35,11 +38,13 @@ import { boltOnSheet } from './tracking/floorcam';
 import { matrixBrain } from './matrix-brain';
 import { circuit } from './matrix-brain/connectome';
 import { Plotter } from './components/plotter/plotter';
+import { room } from './components/plotter/sheet';
 
 const LAG_MS = 3600;
 const MARKER: [number, number, number] = [0, 0, 255];   // blue at full: the largest patch without a clipped pixel
 const PROBE_CM = 25, LEARN_CM = 10;   // the first leg's length; a leg at least this long teaches the offset
 const OWNER = 'survey';
+const ORBIT = { from: 50, to: 20, pitch: 10 };   // the coil's last spiral round the sender, cm; its loops stay `from` off the sender
 /** `ladder`: the listener's headings; on each, segments of rounds with a pause between, so one segment's timing does not decide a level's count. */
 const HEADINGS = [0, 90, 180, 270], SEGMENTS = 3, ROUNDS = 4, TURN_MS = 1800, PAUSE_MS = 250;
 const wait = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
@@ -56,6 +61,41 @@ async function pixels (): Promise<ImageData> {
 
 export interface Fix { x: number; y: number; pixels: number; patches: number }
 
+type Place = { x: number; y: number };
+
+/**
+ * A survey's drive, a path for the bench named `what`: the brain's mode by
+ * hand on the seeker, the sender on the long ladder, the seeker's matrix dark
+ * for LAG_MS and then the marker, `run` with both start points on the sheet
+ * and the sender's place in the seeker's locator frame.
+ */
+async function drive (seeker: Bolt, sender: Bolt, what: string, options: unknown, run: (places: { from: Place; to: Place; at: Place }) => Promise<ArchimedeanResult | CoilResult>): Promise<void> {
+  Survey.last = null;
+  try {
+    if (matrixBrain.on) throw new Error('the brain\'s mode is on');
+    const from = Plotter.startOf(seeker.name), to = Plotter.startOf(sender.name);
+    if (!from || !to) throw new Error('no start on the sheet');
+    const at = Plotter.toLocator(seeker.name, to.x, to.y)!;
+    await matrixBrain.toggle(false, { seeker: seeker.name, sender: sender.name });
+    const { matrix } = seeker.actuators;
+    matrix.hold(OWNER);
+    await matrix.color([0, 0, 0], OWNER);
+    seeker.log('info', `brain path start ${JSON.stringify({ at, sender: sender.name, seeker: seeker.name, [what]: options })}`);
+    await wait(LAG_MS + 1000);   // the dark frames
+    await matrix.color(MARKER, OWNER);
+    const result = await run({ from, to, at });
+    await wait(LAG_MS + 1000);   // the camera sees where it ended
+    seeker.log('info', `brain path done: ${what} ${JSON.stringify(result)}`);
+    Survey.last = result;
+  } catch (e) {
+    Survey.last = { error: String(e) };
+    void seeker.actuators.motor.stop().catch(() => {});
+  } finally {
+    seeker.actuators.matrix.release(OWNER);
+    if (matrixBrain.on) await matrixBrain.toggle();
+  }
+}
+
 let before: ImageData | null = null;
 /** Sheet heading less the Bolt's own, deg, per Bolt, learnt from its legs. */
 const offset: { [name: string]: number } = {};
@@ -63,8 +103,8 @@ const offset: { [name: string]: number } = {};
 export const Survey = {
 
   offset,
-  /** The last spiral's or ladder's outcome, for reading after the run. */
-  last: null as null | ArchimedeanResult | { frames: number; reads: number; landed: number } | { error: string },
+  /** The last spiral's, coil's or ladder's outcome, for reading after the run. */
+  last: null as null | ArchimedeanResult | CoilResult | { frames: number; reads: number; landed: number } | { error: string },
 
   /**
    * The seeker's spiral around the point it was reset on, the options
@@ -72,30 +112,20 @@ export const Survey = {
    * buttons); the brain's mode must be off.
    */
   async spiral (seeker: Bolt, sender: Bolt, options: ArchimedeanOptions = {}): Promise<void> {
-    Survey.last = null;
-    try {
-      if (matrixBrain.on) throw new Error('the brain\'s mode is on');
-      const from = Plotter.startOf(seeker.name), to = Plotter.startOf(sender.name);
-      if (!from || !to) throw new Error('no start on the sheet');
-      const at = Plotter.toLocator(seeker.name, to.x, to.y)!;
-      await matrixBrain.toggle(false, { seeker: seeker.name, sender: sender.name });
-      const { matrix } = seeker.actuators;
-      matrix.hold(OWNER);
-      await matrix.color([0, 0, 0], OWNER);
-      seeker.log('info', `brain path start ${JSON.stringify({ at, sender: sender.name, seeker: seeker.name, spiral: options })}`);
-      await wait(LAG_MS + 1000);   // the dark frames
-      await matrix.color(MARKER, OWNER);
-      const result = await seeker.behavior.archimedean(options);
-      await wait(LAG_MS + 1000);   // the camera sees where it ended
-      seeker.log('info', `brain path done: spiral ${JSON.stringify(result)}`);
-      Survey.last = result;
-    } catch (e) {
-      Survey.last = { error: String(e) };
-      void seeker.actuators.motor.stop().catch(() => {});
-    } finally {
-      seeker.actuators.matrix.release(OWNER);
-      if (matrixBrain.on) await matrixBrain.toggle();
-    }
+    return drive(seeker, sender, 'spiral', options, () => seeker.behavior.archimedean(options));
+  },
+
+  /**
+   * The seeker's coil from the point it was reset on down to the sender's, as
+   * wide as the room allows along the way (sheet.ts, `room`), its last spiral
+   * round the sender. The sender stands straight behind the seeker's nose.
+   * Both Bolts are reset on their points first; the brain's mode must be off.
+   */
+  async coil (seeker: Bolt, sender: Bolt, speed?: number): Promise<void> {
+    return drive(seeker, sender, 'coil', { orbit: ORBIT, speed }, ({ from, to, at }) => {
+      if (Math.abs(at.x) > 1 || at.y >= 0) throw new Error('the sender is not straight behind the seeker');
+      return seeker.behavior.coil({ widths: room(from, to, ORBIT.from), orbit: ORBIT, speed });
+    });
   },
 
   /**

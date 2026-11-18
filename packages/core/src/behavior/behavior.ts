@@ -15,6 +15,8 @@ import type { LadderAuthority } from '../referee/referee';
 import type { SweepOptions, SweepResult } from './sweep';
 import { archimedean } from './archimedean';
 import type { ArchimedeanOptions, ArchimedeanResult } from './archimedean';
+import { coil } from './coil';
+import type { CoilOptions, CoilResult } from './coil';
 import { log } from '../lifecycle/log';
 
 /**
@@ -66,6 +68,12 @@ export class Behavior {
   @log
   async archimedean (options: ArchimedeanOptions = {}): Promise<ArchimedeanResult> {
     return archimedean(this.ctx, this.actuators, this.sensors, options);
+  }
+
+  /** Drive overlapping loops down the line behind the Bolt, a spiral round its end; see coil.ts. */
+  @log
+  async coil (options: CoilOptions): Promise<CoilResult> {
+    return coil(this.ctx, this.actuators, this.sensors, options);
   }
 
 }
