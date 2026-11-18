@@ -118,13 +118,14 @@ export const Survey = {
   /**
    * The seeker's coil from the point it was reset on down to the sender's, as
    * wide as the room allows along the way (sheet.ts, `room`), its last spiral
-   * round the sender. The sender stands straight behind the seeker's nose.
+   * round the sender; `clockwise` false drives the mirrored track. The sender
+   * stands straight behind the seeker's nose.
    * Both Bolts are reset on their points first; the brain's mode must be off.
    */
-  async coil (seeker: Bolt, sender: Bolt, speed?: number): Promise<void> {
-    return drive(seeker, sender, 'coil', { orbit: ORBIT, speed }, ({ from, to, at }) => {
+  async coil (seeker: Bolt, sender: Bolt, options: { clockwise?: boolean; speed?: number } = {}): Promise<void> {
+    return drive(seeker, sender, 'coil', { orbit: ORBIT, ...options }, ({ from, to, at }) => {
       if (Math.abs(at.x) > 1 || at.y >= 0) throw new Error('the sender is not straight behind the seeker');
-      return seeker.behavior.coil({ widths: room(from, to, ORBIT.from), orbit: ORBIT, speed });
+      return seeker.behavior.coil({ widths: room(from, to, ORBIT.from), orbit: ORBIT, ...options });
     });
   },
 

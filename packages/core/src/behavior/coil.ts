@@ -11,6 +11,8 @@ export interface CoilOptions {
   pitch?: number | undefined;
   /** The last spiral, round the line's end: from the radius `from` in to `to`, `pitch` a turn. The widths keep the loops `from` off the end. */
   orbit?: { from: number; to: number; pitch: number } | undefined;
+  /** The loops' sense, seen from above; the last spiral runs the other way. */
+  clockwise?: boolean | undefined;
   /** The motor's command the whole way, 0..255. */
   speed?: number | undefined;
 }
@@ -33,14 +35,14 @@ const STEP_RAD = 0.02;   // the track's step
  * First a spiral out round the start, to `firstCm` or the width there. Then
  * loops whose centre creeps `pitch` a turn down the line, each as wide as
  * `widths` allows where its centre is, growing or shrinking `pitch` a turn at
- * most; clockwise, a loop's first point ahead of its centre. The loops end at
+ * most; clockwise or not, a loop's first point ahead of its centre. The loops end at
  * the far point of the first one smaller than `smallCm`, or of the first
  * with its centre on the line's end. From there the last spiral runs round
  * the line's end the other way, `orbit.from` in to `orbit.to`, and once more
  * round at `orbit.to`.
  */
-export function coilPath ({ widths, pitch = 20, orbit = { from: 50, to: 20, pitch: 10 } }: CoilOptions): Point[] {
-  const firstCm = 50, smallCm = 25;
+export function coilPath ({ widths, pitch = 20, orbit = { from: 50, to: 20, pitch: 10 }, clockwise = true }: CoilOptions): Point[] {
+  const firstCm = 50, smallCm = 25, sign = clockwise ? 1 : -1;
   const length = widths.length - 1, grow = pitch * STEP_RAD / (2 * Math.PI);
   const path: Point[] = [];
   let r = 0, along = 0, creeping = false;
@@ -49,13 +51,13 @@ export function coilPath ({ widths, pitch = 20, orbit = { from: 50, to: 20, pitc
     if (r >= Math.min(firstCm, want) - 0.5) creeping = true;
     if (creeping) along = Math.min(length, along + grow);
     r += Math.max(-grow, Math.min(grow, want - r));
-    path.push({ x: r * Math.sin(a), y: r * Math.cos(a) - along });
+    path.push({ x: sign * r * Math.sin(a), y: r * Math.cos(a) - along });
     if (a > 4 * Math.PI && (r < smallCm || along >= length) && Math.abs(a % (2 * Math.PI) - Math.PI) < STEP_RAD) break;
   }
   const turns = (orbit.from - orbit.to) / orbit.pitch + 1;
   for (let b = 0; b <= 2 * Math.PI * turns; b += STEP_RAD) {
     const rho = Math.max(orbit.to, orbit.from - orbit.pitch * b / (2 * Math.PI));
-    path.push({ x: -rho * Math.sin(b), y: rho * Math.cos(b) - length });
+    path.push({ x: -sign * rho * Math.sin(b), y: rho * Math.cos(b) - length });
   }
   return path;
 }
@@ -96,7 +98,7 @@ export async function coil (ctx: Context, actuators: Actuators, sensors: Sensors
   let done = (): void => {};
   const arrived = new Promise<void>((resolve) => { done = () => { ended = true; resolve(); }; });
 
-  ctx.log('info', `coil start ${JSON.stringify({ line: options.widths.length - 1, pitch: options.pitch ?? null, orbit: options.orbit ?? null, speed, lookCm, rollMs, cm: Math.round(cm), budgetMs: Math.round(budgetMs) })}`);
+  ctx.log('info', `coil start ${JSON.stringify({ line: options.widths.length - 1, pitch: options.pitch ?? null, orbit: options.orbit ?? null, clockwise: options.clockwise ?? true, speed, lookCm, rollMs, cm: Math.round(cm), budgetMs: Math.round(budgetMs) })}`);
   await actuators.motor.stabilize(StabilizationIndex.full);
   const release = await sensors.motion.subscribe((sample) => {
     if (ended) return;
