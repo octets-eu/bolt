@@ -6,7 +6,7 @@ What happens when two Bolts play hide and seek. This is the goal the code is bui
 
 A Bolt is a ball that rolls, with four infrared emitters and four infrared receivers at its corners. It cannot see. It can call out, and it can hear a call, but hearing only says "a message came", not from where.
 
-- **The hider** stands still somewhere on the floor and calls out without pause. The call is the ladder: a message at strength 2, then 4, 8 and 16, one every 200 ms, on all four emitters, round after round.
+- **The hider** stands still somewhere on the floor and calls out without pause. The call is the ladder: four messages of rising strength, one every 200 ms, on all four emitters, round after round. The strengths are set by measured evidence (2026-11-18: 4, 8, 16, 128).
 - **The seeker** listens, finds out where the call comes from, drives there and bumps into the hider so that both feel it.
 - **The referee** is a program on the computer, connected to both. It starts the game, tells the hider which ladder to send, hears both Bolts report the bump and calls the tag. It never tells the seeker where the hider is.
 
