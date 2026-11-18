@@ -24,6 +24,7 @@ const START = /^brain (seek:|path start)/, END = /^brain (seek (found|time|runaw
 const MARK = /^brain replay (\{.*\})$/;
 const STARTS = /^starts \{/;
 const VOID = /^brain path void/;   // the user's verdict on the path just ended: not for the bench
+const SINCE = '2026-11-18T19-22';   // sessions from before were sent the old ladder: their runs are in archive/bench/ and stay out
 const ZIPS = 'apps/browser/sessions';
 process.chdir(new URL('..', import.meta.url).pathname);
 
@@ -68,7 +69,7 @@ sources.push(...process.argv.slice(2));
 const found = new Map();
 for (const spec of sources) for (const r of runsOf(read(spec))) {
   const key = `${r.id} ${r.t0}`;
-  if (stored.has(key) || (found.has(key) && (found.get(key).mark || !r.mark))) continue;
+  if (r.id < SINCE || stored.has(key) || (found.has(key) && (found.get(key).mark || !r.mark))) continue;
   found.set(key, { ...r, source: spec });
 }
 

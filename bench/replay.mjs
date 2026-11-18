@@ -9,13 +9,19 @@
 // estimator that takes the same events can be run over the run, as often
 // as wanted, without a Bolt. The locator's slip is the truth's error bar.
 //
-//   npx tsx bench/replay.mjs <zip>:<member>|<file.jsonl> ... [--check] [--trace] [--steps <file>]
+// A reference run has a camera: where track.tsv lies beside the session file
+// (bench/camtrack.mjs), the seeker's place for the truth is the camera's at
+// that moment, turned into its locator frame by the reset point of the run's
+// `starts` line; its nose is the stream's yaw either way. The estimator gets
+// the Bolt's own events unchanged.
+//
+//   npx tsx bench/replay.mjs <zip>:<member>|<file.jsonl> ... [--check] [--trace] [--steps <file>] [--without corners|frames|slots]
 //   npx tsx bench/replay.mjs --list            runs in every zip of apps/browser/sessions/
 //
 // bench/run.mjs runs it over the bench's runs. The estimator is @bolt/brain's
-// network (replay-network.mjs); OLD=1 runs the old modules in
-// packages/core/src/brain, the reference of docs/core-brain.plan.md's
-// behaviour-identical steps: equal digests pass.
+// network (replay-network.mjs); equal digests say two brains step alike.
+// --without leaves one sense out of what the network is given, the corner
+// reads, the frames or the silent slots, so a run judges the others alone.
 //
 // --steps <file> writes every network step as TSV: file, run, t, belief,
 // length, distance, truth, trueCm, heading. The side, in each run's line and
@@ -38,8 +44,9 @@
 // error, the mean length, and the estimate and the motor digest (replay-network.mjs).
 
 import { execFileSync } from 'node:child_process';
-import { readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { network } from './replay-network.mjs';
+import { points, turn } from '../apps/browser/src/components/plotter/sheet.ts';
 
 const LOCK_DEG = 30, LOCK_S = 3;
 const SIDE_CM = [40, 120];   // the approach: the truth within these, for the side
@@ -62,7 +69,7 @@ const args = process.argv.slice(2);
 const flag = (f) => args.includes(f);
 const opt = (f, d) => { const i = args.indexOf(f); return i >= 0 ? args[i + 1] : d; };
 
-const specs = args.filter((a, i) => !a.startsWith('--') && !['--estimator', '--offset', '--param', '--steps'].includes(args[i - 1] ?? ''));
+const specs = args.filter((a, i) => !a.startsWith('--') && !['--estimator', '--offset', '--param', '--steps', '--without'].includes(args[i - 1] ?? ''));
 /** Every network step of every run, for --steps. */
 const STEPS = opt('--steps') ? [] : null;
 const mod360 = (a) => ((a % 360) + 360) % 360;
@@ -80,16 +87,17 @@ function load (spec) {
 /** The runs in the lines: each with its name, the seeker, the sender's place `at`, and the lines between `.in` and `.out`. */
 function runs (lines) {
   const out = [];
-  let cur = null;
+  let cur = null, starts = null;
   for (const e of lines) {
     const d = e.data;
+    if (e.name === 'info' && typeof d === 'string' && d.startsWith('starts {')) { try { starts = JSON.parse(d.slice(7)); } catch { /* the last one stays */ } continue; }
     if (e.name === 'info' && typeof d === 'string' && RUNS.test(d)) {
       const m = d.match(RUNS);
       const name = m[1] ?? m[3] ?? m[5], step = m[2] ?? (m[4] === ':' ? 'in' : m[4] ? 'out' : m[6] === 'start' ? 'in' : 'out');
       if (step === 'in' && name === 'path') {
         let at = PATH_AT;
         if (d.includes('{')) { try { at = JSON.parse(d.slice(d.indexOf('{'))).at ?? PATH_AT; } catch { /* the default */ } }
-        cur = { name, t0: e.t, seeker: e.bolt, sender: null, at, args: { direction: 0 }, lines: [], trials: [] };
+        cur = { name, t0: e.t, seeker: e.bolt, sender: null, at, start: points[starts?.[e.bolt]?.point], args: { direction: 0 }, lines: [], trials: [] };
       } else if (step === 'in' && name === 'seek') {
         // brain seek: seeker SB-9129 on sender SB-11DF, ... (the matrix-brain mode of the browser app); `at` comes with the mark
         const who = d.match(/seeker (\S+) on sender (\S+)/);
@@ -165,15 +173,34 @@ function headingOffset () {
   return opt('--offset') !== undefined ? Number(opt('--offset')) : 0;
 }
 
+/**
+ * The camera's track beside a session file as the seeker's place at a moment in its locator frame, between the
+ * track's points, held before the first and after the last; null without a track or a reset point.
+ */
+function camera (spec, start) {
+  const file = spec.replace(/[^/]*$/, 'track.tsv');
+  if (!start || spec.includes('.zip:') || !existsSync(file)) return null;
+  const track = readFileSync(file, 'utf8').split('\n').slice(1).filter(Boolean).map((l) => { const [t, x, y] = l.split('\t').map(Number); return { t, ...turn(start.heading, x - start.x, y - start.y) }; });
+  return (t) => {
+    const k = track.findIndex((p) => p.t >= t);
+    if (k <= 0) return k === 0 ? track[0] : track.at(-1);
+    const a = track[k - 1], b = track[k], f = (t - a.t) / (b.t - a.t);
+    return { x: a.x + f * (b.x - a.x), y: a.y + f * (b.y - a.y) };
+  };
+}
+
 function score (run, estimator) {
   const ev = events(run);
   if (!run.at || !ev.length) return null;
   const offset = headingOffset();
+  const seen = camera(run.spec, run.start);
+  /** The motion sample with the place the truth takes: the camera's when the run has a track. */
+  const placed = (s) => (seen ? { ...s, ...seen(s.t) } : s);
   let m = null, nextSec = ev[0].t + 1000;
   const secs = [];
   let frames = 0, reads = 0, hits = 0;
   for (const e of ev) {
-    if (e.type === 'motion') m = e;
+    if (e.type === 'motion') m = placed(e);
     if (e.type === 'frame') frames++;
     if (e.type === 'read') { reads++; if (e.payload.some((v) => v !== 255)) hits++; }
     const stepped = estimator.step(e);
@@ -197,7 +224,7 @@ function score (run, estimator) {
   const after = lock === null ? [] : secs.filter((s) => s.t >= lock);
   const mean = (a, f) => (a.length ? a.reduce((x, s) => x + f(s), 0) / a.length : NaN);
   const approach = secs.filter((s) => s.tcm >= SIDE_CM[0] && s.tcm <= SIDE_CM[1]);
-  return { offset, seconds: secs.length, frames, reads, hits, lock, lockedShare: after.length ? after.filter((s) => s.err < LOCK_DEG).length / after.length : 0, under: secs.length ? secs.filter((s) => s.err < LOCK_DEG).length / secs.length : 0, side: mean(approach, (s) => s.signed), sideN: approach.length, digest: estimator.digest?.(), motorDigest: estimator.motorDigest?.(), meanErr: mean(secs, (s) => s.err), meanLen: mean(secs, (s) => s.length), secs };
+  return { offset, camera: !!seen, seconds: secs.length, frames, reads, hits, lock, lockedShare: after.length ? after.filter((s) => s.err < LOCK_DEG).length / after.length : 0, under: secs.length ? secs.filter((s) => s.err < LOCK_DEG).length / secs.length : 0, side: mean(approach, (s) => s.signed), sideN: approach.length, digest: estimator.digest?.(), motorDigest: estimator.motorDigest?.(), meanErr: mean(secs, (s) => s.err), meanLen: mean(secs, (s) => s.length), secs };
 }
 
 /**
@@ -231,7 +258,7 @@ const ESTIMATORS = { network };
 if (!specs.length) { console.error('usage: replay.mjs <zip>:<member>|<file.jsonl> ... [--check] [--estimator network] | --list'); process.exit(1); }
 /** `--param tauMs=60000,wCorner=10`: the estimator's parameters, numbers. */
 const params = Object.fromEntries((opt('--param', '') || '').split(',').filter(Boolean).map((kv) => { const [k, v] = kv.split('='); return [k, Number(v)]; }));
-const make = () => ESTIMATORS[opt('--estimator', 'network')](params);
+const make = () => ESTIMATORS[opt('--estimator', 'network')](params, opt('--without'));
 if (!ESTIMATORS[opt('--estimator', 'network')]) { console.error(`no estimator ${opt('--estimator')}; have ${Object.keys(ESTIMATORS).join(', ')}`); process.exit(1); }
 const all = [];
 for (const spec of specs) {
@@ -242,7 +269,7 @@ for (const spec of specs) {
     const s = score(r, await make());
     if (!s) continue;
     all.push(s);
-    console.log(`  ${r.name} ${r.seeker} at (${r.at.x.toFixed(0)}, ${r.at.y.toFixed(0)}) offset ${s.offset.toFixed(0)}°: ${s.seconds} s, ${s.frames} frames, ${s.hits}/${s.reads} reads hit; lock ${s.lock === null ? 'never' : s.lock + ' s'}, locked share ${(s.lockedShare * 100).toFixed(0)} %, under ${LOCK_DEG}° ${(s.under * 100).toFixed(0)} %, side ${s.sideN ? `${s.side >= 0 ? '+' : ''}${s.side.toFixed(0)}° over ${s.sideN} s` : '-'}, mean |err| ${s.meanErr.toFixed(0)}°, mean len ${s.meanLen.toFixed(2)}; estimate ${s.digest}, motor ${s.motorDigest}`);
+    console.log(`  ${r.name} ${r.seeker} at (${r.at.x.toFixed(0)}, ${r.at.y.toFixed(0)}) offset ${s.offset.toFixed(0)}°${s.camera ? ', places by the camera' : ''}: ${s.seconds} s, ${s.frames} frames, ${s.hits}/${s.reads} reads hit; lock ${s.lock === null ? 'never' : s.lock + ' s'}, locked share ${(s.lockedShare * 100).toFixed(0)} %, under ${LOCK_DEG}° ${(s.under * 100).toFixed(0)} %, side ${s.sideN ? `${s.side >= 0 ? '+' : ''}${s.side.toFixed(0)}° over ${s.sideN} s` : '-'}, mean |err| ${s.meanErr.toFixed(0)}°, mean len ${s.meanLen.toFixed(2)}; estimate ${s.digest}, motor ${s.motorDigest}`);
   }
 }
 if (all.length) {
@@ -252,7 +279,7 @@ if (all.length) {
   // the error by time since the run's start: does it keep falling as frames accumulate
   const buckets = [[0, 10], [10, 30], [30, 60], [60, 120], [120, 1e9]];
   console.log('  |err| by time since start: ' + buckets.map(([a, b]) => { const x = secs.filter((v) => v.t >= a && v.t < b); return x.length ? `${a}-${b === 1e9 ? '' : b} s ${mean(x, (v) => v.err).toFixed(0)}° (${(100 * x.filter((v) => v.err < LOCK_DEG).length / x.length).toFixed(0)} %)` : ''; }).filter(Boolean).join(', '));
-  console.log(`${opt('--estimator', 'network')}${opt('--param') ? ' ' + opt('--param') : ''}: ${all.length} runs, ${secs.length} s; locked ${locks.length} of ${all.length}, median lock ${locks.length ? locks[Math.floor(locks.length / 2)] : '-'} s; `
+  console.log(`${opt('--estimator', 'network')}${opt('--param') ? ' ' + opt('--param') : ''}${opt('--without') ? ' without ' + opt('--without') : ''}: ${all.length} runs, ${secs.length} s; locked ${locks.length} of ${all.length}, median lock ${locks.length ? locks[Math.floor(locks.length / 2)] : '-'} s; `
     + `seconds under ${LOCK_DEG}°: ${(100 * secs.filter((x) => x.err < LOCK_DEG).length / secs.length).toFixed(0)} %; mean |err| ${mean(secs, (x) => x.err).toFixed(0)}°; side ${(() => { const a = secs.filter((x) => x.tcm >= SIDE_CM[0] && x.tcm <= SIDE_CM[1]); return a.length ? `${mean(a, (x) => x.signed) >= 0 ? '+' : ''}${mean(a, (x) => x.signed).toFixed(0)}° over ${a.length} s` : '-'; })()}; mean len ${mean(secs, (x) => x.length).toFixed(2)}`
     + (secs.some((x) => x.dErr !== null) ? `; distance: mean ${mean(secs.filter((x) => x.dErr !== null), (x) => x.dErr).toFixed(0)} cm off, mean |off| ${mean(secs.filter((x) => x.dErr !== null), (x) => Math.abs(x.dErr)).toFixed(0)} cm` : ''));
 }
