@@ -30,7 +30,7 @@ import type { NeuronDef, ObservationConfig, V3, Vis } from '../src/types';
 const BALL_R = 3.5;
 const RIND_R = 3.05;
 const RING: { at: V3; r: number; tube: number } = { at: [0, 0, -0.3], r: 1.45, tube: 0.27 };
-const COLUMN: { at: V3; r: number; z0: number; dz: number } = { at: [0, 0, 0], r: 0.58, z0: 0.42, dz: 0.21 };
+const COLUMN: { at: V3; r: number; z0: number; z1: number } = { at: [0, 0, 0], r: 0.58, z0: 0.42, z1: 2.31 };   // the layers between z0 and z1, however many
 /** `first`: the azimuth of the long ladder's strongest channel and of the short ladder's weakest; the others `step` further out, however many a ladder has. */
 const GLOMERULI: { r: number; dist: number; z: number; step: number; first: Record<LadderRange, number> } = { r: 0.3, dist: 2.4, z: 1.15, step: 18, first: { long: -3, short: 21 } };
 const EAR_NUCLEI = { r: 0.22, dist: 2.45, z: -0.3 };
@@ -61,7 +61,7 @@ export function bodyLayout (neurons: NeuronDef[], ir: ObservationConfig['channel
   for (const ladder of ['long', 'short'] as const) order.filter((c) => c.ladder === ladder).forEach((c, k, all) => azimuthOf.set(c.ch, GLOMERULI.first[ladder] + GLOMERULI.step * (ladder === 'long' ? k - all.length + 1 : k)));
   const slotOf = new Map(order.map((c, k) => [c.ch, k]));   // a channel's place in the row of afferents
   const distance = neurons.filter((n) => n.role === 'distance').sort((a, b) => a.cm![0] - b.cm![0]);
-  const layerZ = new Map(distance.map((n, i) => [n.id, COLUMN.z0 + i * COLUMN.dz]));
+  const layerZ = new Map(distance.map((n, i) => [n.id, COLUMN.z0 + i * (COLUMN.z1 - COLUMN.z0) / Math.max(1, distance.length - 1)]));
   const bandLows = [...new Set(neurons.filter((n) => n.role === 'gated').map((n) => n.band![0]))].sort((a, b) => a - b);   // the band groups, nearest first
 
   const glomeruli = Object.fromEntries(channels.map(({ ch }) => [ch, p(around(must(azimuthOf.get(ch), `azimuth of channel ${ch}`), GLOMERULI.dist, GLOMERULI.z))]));
@@ -87,7 +87,7 @@ export function bodyLayout (neurons: NeuronDef[], ir: ObservationConfig['channel
       slot: () => row(-0.14),
       ring: () => onRind(n.angle!, 0.35),
       distance: () => onRind(180, must(layerZ.get(n.id), `layer of ${n.id}`) + 0.25),
-      gated: () => onRindAt(must(azimuthOf.get(n.channel!), `azimuth of ${n.id}`), 50 + 9 * bandLows.indexOf(n.band![0])),
+      gated: () => onRindAt(must(azimuthOf.get(n.channel!), `azimuth of ${n.id}`), 50 + 27 * bandLows.indexOf(n.band![0]) / Math.max(1, bandLows.length - 1)),
       steer: () => around(n.angle!, 2.4, -1.75),
     };
     const at = fixed[n.id] ?? places[n.role]?.();

@@ -168,7 +168,7 @@ The bench's run is the coil: Sender/blue on d1, Seeker/green from u2, a spiral o
 
 The minimum that makes the present brain run on R2's ladder. The full drawing by hand is W, after C.
 
-- **U1** the levels and the bands: the builder's `channels` as R2's ladder; the distance bands to 4 m (today 10 of 20 cm to 2 m); the long levels' frames and silences onto ring and distance drawn by hand, `senses.json` counting the old strengths; the short ladder's profiles and the corner lobes as they are; the brain tab's places for the channels. Check: on `ref/coil` the share of seconds under 30° and the mean error both better than F5's, with the corner reads and without them.
+- **U1** (**done**) the levels and the bands: the builder's `channels` as R2's ladder; the distance bands to 4 m (today 10 of 20 cm to 2 m); the long levels' frames and silences onto ring and distance drawn by hand, `senses.json` counting the old strengths; the short ladder's profiles and the corner lobes as they are; the brain tab's places for the channels. Check: on `ref/coil` the share of seconds under 30° and the mean error both better than F5's, with the corner reads and without them.
 - **U2** the near rule: which level of R2's ladder, heard `minFrames` times in `windowMs`, asks for the short ladder; today it is the long ladder's weakest. Check: on `ref/coil` the rule is on inside the distance the user sets and off beyond it.
 
 ### L1, the live baseline
@@ -229,5 +229,6 @@ Each step replaces one operator by cells and edges and is shown in full before i
 - A seek from 2.4 m with the line of sight free heard frames and none of its corner reads hit, the reads timed as in seeks that hit (bench run 31, retired). Not explained; F4's run shows whether it recurs.
 - With Seeker/green standing at 2.4 and 3.2 m and no rolls at all, 7 to 11 % of the corner reads fired get no ack (bench runs 20 and 22, retired). Not explained; R2 counts the acks again.
 - With one code sent every 200 ms, frames are lost in blocks: a block whose notify follows the send by about 40 ms loses a fifth to a third of its frames, whatever the code; blocks with another delay lose none. Not explained; R2's counts per level are taken over several blocks until it is.
+- On the long ladder alone the belief is too far and left of the truth inside 120 cm: its four levels arrive alike inside 80 cm, so nothing in it says how near. The reference runs hold no short ladder; U2 and `ref/near` are its judges.
 - Code 7 loses a quarter of its frames at 4 m, in both directions, where the codes beside it lose few; whether it is the code or its place in the round, before code 0, is not separated. The ladders do not use it.
 - Seeker/green's frames reach about one level less far than Sender/blue's at every distance of R2; the ladder is picked with Sender/blue sending.
