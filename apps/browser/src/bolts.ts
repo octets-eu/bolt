@@ -301,6 +301,13 @@ class bolts {
     await Promise.all([...this.bolts].map(bolt => this.disconnectBolt(bolt)));
   }
 
+  /** Disconnects the Bolt and has Chrome forget it, so no reload reconnects it; Pair brings it back. */
+  public async unpairBolt ( bolt: Bolt ) {
+    await this.disconnectBolt(bolt);
+    await (bolt.transport as WebBleTransport).device.forget();
+    console.log(...bolt.format('unpaired'));
+  }
+
   public async disconnectBolt ( bolt: Bolt ) {
 
     console.log(...bolt.format('disconnecting ...'));

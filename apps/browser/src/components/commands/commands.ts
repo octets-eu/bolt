@@ -27,6 +27,7 @@ const BoltCommands = Factory.create('Layout', {
         ]))
       : m('div.commands.w-100.flex.items-center.flex-wrap', { className }, [
           m('div.di.f3.ma2.mono', bolt.name),
+          m('button.br2.mh1.cmd', { title: 'Disconnect and forget; no reload reconnects it, Pair brings it back', onclick: () => Bolts.unpairBolt(bolt) }, 'Unpair'),
           m('button.br2.mh1.cmd', { onclick: () => Bolts.disconnectBolt(bolt) },                         'Disconnect'),
           m('button.br2.mh1.cmd', { title: 'Sleep (soft, wakes on command)',                onclick: run(() => bolt.lifecycle.sleep()) }, Icon('bed')),
           m('button.br2.mh1.cmd', { title: 'Wake',                                           onclick: run(() => bolt.lifecycle.wake()) },  Icon('alarmClock')),
