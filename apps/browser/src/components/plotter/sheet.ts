@@ -34,14 +34,16 @@ export const points: { [point: string]: { x: number, y: number, heading: number 
  * What a Bolt's centre keeps off, sheet cm, left, top, right, bottom: the
  * partition's two parts, the chest, the danger zone and the cupboard below
  * the partition, the cabinet below d1, the cables at the left of the upper
- * half. Above OPEN_Y the floor is free only within OPEN_CM of u2.
+ * half. Above OPEN_Y the floor is free only within OPEN_CM of u2. A circle
+ * is WIDEST at most, and NARROW with its centre below NARROW_Y, where the
+ * chest and the partition stand.
  */
 const BLOCKS: readonly (readonly [number, number, number, number])[] = [[-999, 308, 181, 327], [324, 308, 999, 327], [364, 256, 463, 298], [30, 327, 180, 407], [399, 327, 470, 435], [255, 502.5, 470, 999], [-999, 60, 140, 308]];
-const KEEP_OFF = 12, WIDEST = 50, OPEN_Y = 105, OPEN_CM = 52;
+const KEEP_OFF = 12, WIDEST = 90, NARROW = 50, NARROW_Y = 177.5, OPEN_Y = 105, OPEN_CM = 52;
 
 /**
  * The widest circle round each cm of the line from `from` to `to` that stays
- * on free floor: KEEP_OFF from every block, `off` from `to`, WIDEST at most.
+ * on free floor: KEEP_OFF from every block, `off` from `to`, WIDEST or NARROW at most.
  * One entry per cm, the first at `from`.
  */
 export function room (from: { x: number, y: number }, to: { x: number, y: number }, off: number): number[] {
@@ -50,8 +52,9 @@ export function room (from: { x: number, y: number }, to: { x: number, y: number
     && !BLOCKS.some(([left, top, right, bottom]) => x > left - KEEP_OFF && x < right + KEEP_OFF && y > top - KEEP_OFF && y < bottom + KEEP_OFF);
   return Array.from({ length: length + 1 }, (_, cm) => {
     const cx = from.x + (to.x - from.x) * cm / length, cy = from.y + (to.y - from.y) * cm / length;
+    const most = cy < NARROW_Y ? WIDEST : NARROW;
     let r = 0;
-    while (r < WIDEST) {
+    while (r < most) {
       let ok = true;
       for (let a = 0; a < 6.3 && ok; a += 0.05) ok = free(cx + (r + 1) * Math.sin(a), cy - (r + 1) * Math.cos(a));
       if (!ok) break;
