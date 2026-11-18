@@ -81,6 +81,8 @@ const OBSERVATION: ObservationConfig = {
   follow: { withinMs: 40, pull: 0.4 },
   // a channel stays expected, its frames read into, this long after it was last heard
   expectMs: 3000,
+  // the channel heard last stays expected this long: far out it is the only one that arrives, and seldom
+  expectLastMs: 10000,
   // over the bridge a read lands at a 40 to 55 ms lead (utils/read-timing.mjs, 2026-11-06), and
   // commands reach the Bolt on a 15 ms grid: three reads 7 ms apart, leads 60 to 46, span a grid
   // slot (behavior/beat.ts: three land in 35 to 39 % of frames, five in 43 %); five loaded the link

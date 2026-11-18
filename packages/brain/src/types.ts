@@ -67,6 +67,7 @@ export interface ObservationConfig {
   secondNotifyMs: number;
   follow: { withinMs: number; pull: number };
   expectMs: number;
+  expectLastMs: number;
   volley: { leadMs: number; reads: number; stepMs: number };
   carrier: { windowMs: number; minFrames: number };
   near: { strength: number; windowMs: number; minFrames: number; lostMs: number };

@@ -172,12 +172,13 @@ export class Observation {
     this.expect.set(channel, { t: Math.abs(t - pred) < withinMs ? pred + pull * (t - pred) : t, heard: t, range });
   }
 
-  /** When the next volley's first read goes: before the soonest expected notify of a channel heard within `expectMs`. */
+  /** When the next volley's first read goes: before the soonest expected notify of a channel heard within `expectMs`, the one heard last within `expectLastMs`. */
   nextVolley (now: number): number {
     const { leadMs } = this.ir.volley, range = this.range();
-    let next = Infinity;
+    let next = Infinity, last = -Infinity;
+    for (const e of this.expect.values()) if (e.range === range) last = Math.max(last, e.heard);
     for (const e of this.expect.values()) {
-      if (e.range !== range || now - e.heard > this.ir.expectMs) continue;
+      if (e.range !== range || now - e.heard > (e.heard === last ? this.ir.expectLastMs : this.ir.expectMs)) continue;
       const round = this.roundMs(range);
       next = Math.min(next, e.t + Math.ceil((now + leadMs + 5 - e.t) / round) * round);
     }

@@ -158,7 +158,7 @@ The long ladder is chosen before the brain's far weights: which levels arrive is
 
 The bench's run is the coil: Sender/blue on d1, Seeker/green from u2, a spiral out round u2, loops creeping down the line to d1 as wide as the floor allows, a last spiral round the sender. It covers 20 to 365 cm on the line of sight and shows the sender every side of the seeker at every distance. Its truth is the camera's track. `bench/ref/coil/target.png` is the path.
 
-- **F1** the read schedule: the last heard channel stays expected for 10 s, the others 3 s as today (`observation.ts`, `nextVolley`). Check: the bench's numbers before and after go in the commit message.
+- **F1** (**done**) the read schedule: the last heard channel stays expected for 10 s, the others 3 s as today (`observation.ts`, `nextVolley`). Check: the bench's numbers before and after go in the commit message.
 - **F2** the coil: a behavior in core beside `archimedean`, the radius given to it per step, the room's widths in the app's survey code, a roll every 280 ms. Check: the dry run's track lies on `target.png`.
 - **F3** the track beyond the camera's top edge: `bench/camtrack.mjs` bridges it by the locator between the camera's points. Check: on `ref/archimedean`, a stretch of the camera's track left out and bridged lies within the distance camera and locator are apart on that run.
 - **F4** the run: the coil driven on R2's ladder, kept as `bench/ref/coil` with the session's cut, the track and the image. Check: frames a second and corner reads hit by distance from the sender go in the commit message.
