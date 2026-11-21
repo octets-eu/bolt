@@ -106,6 +106,7 @@ export interface ObservationConfig {
   follow: { withinMs: number; pull: number };
   expectMs: number;
   expectLastMs: number;
+  slots: { mode: 'late' | 'beat'; marginMs: number };
   volley: { leadMs: number; reads: number; stepMs: number };
   carrier: { windowMs: number; minFrames: number };
   near: { strength: number; windowMs: number; minFrames: number; lostMs: number };

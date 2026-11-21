@@ -22,7 +22,7 @@ export const ROLES = { seeker: 'SB-9129', sender: 'SB-11DF' };   // green seeks,
 /** The seek's exits, the user's: the time limit by start distance, cm and s, a start taking the nearest listed distance's; the runaway fence beyond the start distance. */
 export const SEEK_DEFAULTS = { timeLimits: [[120, 60], [240, 100], [320, 130]] as [number, number][], fenceCm: 100 };
 /** What one run may set instead of the defaults: its exits and its roles, the Bolts' names. */
-export type SeekOverrides = Partial<Pick<SeekOptions, 'limitS' | 'fenceCm' | 'ladder'>> & { seeker?: string; sender?: string };
+export type SeekOverrides = Partial<Pick<SeekOptions, 'limitS' | 'fenceCm' | 'ladder' | 'slots'>> & { seeker?: string; sender?: string };
 
 let brain: MatrixBrain | null = null;
 let busy = false;
@@ -64,7 +64,7 @@ export const matrixBrain = {
         lastRun = null;
       }
       const [, limitS] = SEEK_DEFAULTS.timeLimits.reduce((a, b) => (Math.abs(b[0] - startCm) < Math.abs(a[0] - startCm) ? b : a));
-      const b = new MatrixBrain(seeker, sender, { motors, startCm, at, limitS: overrides.limitS ?? limitS, fenceCm: overrides.fenceCm ?? SEEK_DEFAULTS.fenceCm, ladder: overrides.ladder });
+      const b = new MatrixBrain(seeker, sender, { motors, startCm, at, limitS: overrides.limitS ?? limitS, fenceCm: overrides.fenceCm ?? SEEK_DEFAULTS.fenceCm, ladder: overrides.ladder, slots: overrides.slots });
       seeking = motors;
       if (motors) void b.ended.then(() => { lastRun = b.summary; if (brain === b) void matrixBrain.toggle(); });
       const off = () => { if (brain === b) void matrixBrain.toggle(); };
@@ -78,7 +78,7 @@ export const matrixBrain = {
   },
 };
 
-/** For the console and the browser tools: `Seek.start({ limitS: 120, seeker: 'SB-11DF', sender: 'SB-9129' })` seeks with the exits and roles given, `stop()` ends it, `last()` is the last run's brain lines in order, seconds first, without the step and roll lines unless asked. */
+/** For the console and the browser tools: `Seek.start({ limitS: 120, seeker: 'SB-11DF', sender: 'SB-9129', slots: 'beat' })` seeks with the exits, the roles and the booking of silent slots given, `stop()` ends it, `last()` is the last run's brain lines in order, seconds first, without the step and roll lines unless asked. */
 export const Seek = {
   defaults: SEEK_DEFAULTS,
   start: (overrides: SeekOverrides = {}): Promise<void> => matrixBrain.toggle(true, overrides),

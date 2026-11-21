@@ -15,13 +15,15 @@
 // `starts` line; its nose is the stream's yaw either way. The estimator gets
 // the Bolt's own events unchanged.
 //
-//   npx tsx bench/replay.mjs <zip>:<member>|<file.jsonl> ... [--check] [--trace] [--steps <file>] [--without corners|frames|slots]
+//   npx tsx bench/replay.mjs <zip>:<member>|<file.jsonl> ... [--check] [--trace] [--steps <file>] [--without corners|frames|slots] [--slots late|beat]
 //   npx tsx bench/replay.mjs --list            runs in every zip of apps/browser/sessions/
 //
 // bench/run.mjs runs it over the bench's runs. The estimator is @bolt/brain's
 // network (replay-network.mjs); equal digests say two brains step alike.
 // --without leaves one sense out of what the network is given, the corner
 // reads, the frames or the silent slots, so a run judges the others alone.
+// --slots books the silent slots that way, when the next frame arrives or at
+// their own beat (observation.ts), instead of the circuit's.
 //
 // --steps <file> writes every network step as TSV: file, run, t, belief,
 // length, distance, truth, trueCm, heading. The side, in each run's line and
@@ -69,7 +71,7 @@ const args = process.argv.slice(2);
 const flag = (f) => args.includes(f);
 const opt = (f, d) => { const i = args.indexOf(f); return i >= 0 ? args[i + 1] : d; };
 
-const specs = args.filter((a, i) => !a.startsWith('--') && !['--estimator', '--offset', '--param', '--steps', '--without'].includes(args[i - 1] ?? ''));
+const specs = args.filter((a, i) => !a.startsWith('--') && !['--estimator', '--offset', '--param', '--steps', '--without', '--slots'].includes(args[i - 1] ?? ''));
 /** Every network step of every run, for --steps. */
 const STEPS = opt('--steps') ? [] : null;
 const mod360 = (a) => ((a % 360) + 360) % 360;
@@ -258,7 +260,7 @@ const ESTIMATORS = { network };
 if (!specs.length) { console.error('usage: replay.mjs <zip>:<member>|<file.jsonl> ... [--check] [--estimator network] | --list'); process.exit(1); }
 /** `--param tauMs=60000,wCorner=10`: the estimator's parameters, numbers. */
 const params = Object.fromEntries((opt('--param', '') || '').split(',').filter(Boolean).map((kv) => { const [k, v] = kv.split('='); return [k, Number(v)]; }));
-const make = () => ESTIMATORS[opt('--estimator', 'network')](params, opt('--without'));
+const make = () => ESTIMATORS[opt('--estimator', 'network')](params, opt('--without'), opt('--slots'));
 if (!ESTIMATORS[opt('--estimator', 'network')]) { console.error(`no estimator ${opt('--estimator')}; have ${Object.keys(ESTIMATORS).join(', ')}`); process.exit(1); }
 const all = [];
 for (const spec of specs) {
@@ -279,7 +281,7 @@ if (all.length) {
   // the error by time since the run's start: does it keep falling as frames accumulate
   const buckets = [[0, 10], [10, 30], [30, 60], [60, 120], [120, 1e9]];
   console.log('  |err| by time since start: ' + buckets.map(([a, b]) => { const x = secs.filter((v) => v.t >= a && v.t < b); return x.length ? `${a}-${b === 1e9 ? '' : b} s ${mean(x, (v) => v.err).toFixed(0)}° (${(100 * x.filter((v) => v.err < LOCK_DEG).length / x.length).toFixed(0)} %)` : ''; }).filter(Boolean).join(', '));
-  console.log(`${opt('--estimator', 'network')}${opt('--param') ? ' ' + opt('--param') : ''}${opt('--without') ? ' without ' + opt('--without') : ''}: ${all.length} runs, ${secs.length} s; locked ${locks.length} of ${all.length}, median lock ${locks.length ? locks[Math.floor(locks.length / 2)] : '-'} s; `
+  console.log(`${opt('--estimator', 'network')}${opt('--param') ? ' ' + opt('--param') : ''}${opt('--without') ? ' without ' + opt('--without') : ''}${opt('--slots') ? ' slots ' + opt('--slots') : ''}: ${all.length} runs, ${secs.length} s; locked ${locks.length} of ${all.length}, median lock ${locks.length ? locks[Math.floor(locks.length / 2)] : '-'} s; `
     + `seconds under ${LOCK_DEG}°: ${(100 * secs.filter((x) => x.err < LOCK_DEG).length / secs.length).toFixed(0)} %; mean |err| ${mean(secs, (x) => x.err).toFixed(0)}°; side ${(() => { const a = secs.filter((x) => x.tcm >= SIDE_CM[0] && x.tcm <= SIDE_CM[1]); return a.length ? `${mean(a, (x) => x.signed) >= 0 ? '+' : ''}${mean(a, (x) => x.signed).toFixed(0)}° over ${a.length} s` : '-'; })()}; mean len ${mean(secs, (x) => x.length).toFixed(2)}`
     + (secs.some((x) => x.dErr !== null) ? `; distance: mean ${mean(secs.filter((x) => x.dErr !== null), (x) => x.dErr).toFixed(0)} cm off, mean |off| ${mean(secs.filter((x) => x.dErr !== null), (x) => Math.abs(x.dErr)).toFixed(0)} cm` : ''));
 }

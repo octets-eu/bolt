@@ -21,6 +21,7 @@ const CORNER_PORTS: Record<`corner.${Corner}`, true> = { 'corner.FL': true, 'cor
 export function checkCircuit (circuit: Circuit): void {
   const bad: string[] = [];
   if (circuit.scheme !== 2) bad.push(`scheme ${String(circuit.scheme)}, not 2`);
+  if (circuit.observation.slots?.mode !== 'late' && circuit.observation.slots?.mode !== 'beat') bad.push(`observation.slots.mode ${String(circuit.observation.slots?.mode)}`);
   const ids = new Set<string>();
   for (const n of circuit.neurons) { if (ids.has(n.id)) bad.push(`neuron ${n.id} twice`); ids.add(n.id); }
   const cell = (name: string, where: string): void => { if (!ids.has(name)) bad.push(`${where}: no neuron ${name}`); };

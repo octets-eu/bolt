@@ -7,7 +7,7 @@
 // runs (`ref/coil 37-40`); every other argument goes to replay.mjs, and so
 // does the environment: CIRCUIT=<path> scores a circuit under test.
 //
-//   node bench/run.mjs [ref/<name> | n | n-m ...] [--without corners|frames|slots] [--trace] [--steps <file>]
+//   node bench/run.mjs [ref/<name> | n | n-m ...] [--without corners|frames|slots] [--slots late|beat] [--trace] [--steps <file>]
 
 import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';

@@ -44,15 +44,16 @@ const SENSES = { corners: 'corner.', frames: 'frame.ch', slots: 'slot.ch' };
  * CIRCUIT=<path>: a circuit under test instead of circuit.json (build-circuit.ts
  * with OUT). `forward=0` as a parameter gives the observation layer no
  * efference copy. `without`, a key of SENSES, leaves that sense's ports at 0
- * in every step: the network runs on the others alone.
+ * in every step: the network runs on the others alone. `slots`, "late" or
+ * "beat", books the silent slots that way instead of the circuit's.
  */
-export async function network (params = {}, without) {
+export async function network (params = {}, without, slots) {
   if (without && !SENSES[without]) throw new Error(`--without ${without}: one of ${Object.keys(SENSES).join(', ')}`);
   const bolt = { sensors: { listenInfrared: async () => {} }, queue: { fire: async () => ({}) } };   // no Bolt for the listen's re-arm
   let now = 0;
   const circuit = process.env.CIRCUIT ? JSON.parse(readFileSync(process.env.CIRCUIT, 'utf8')) : loadCircuit();
   const net = new Network(circuit);
-  const obs = new Observation(bolt, { ...circuit.observation, repeat: 1 }, { now: () => now });
+  const obs = new Observation(bolt, { ...circuit.observation, repeat: 1, ...(slots ? { slots: { ...circuit.observation.slots, mode: slots } } : {}) }, { now: () => now });
   const motor = new Motor(circuit.motor);
   const command = (heading, commanded, dtMs) => motor.command((port) => net.output(port), heading, commanded, dtMs, now);
   let last = null;

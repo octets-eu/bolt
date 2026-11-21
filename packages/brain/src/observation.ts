@@ -6,8 +6,9 @@
 //   ladder and level arrived, not from where. The weakest level arriving is
 //   the carrier, heard with the sender inside its lobe ahead or behind.
 // - Each frame heard says which level got through, `frame.ch<k>`, and the
-//   beats between heard frames are slots that went silent, `slot.ch<k>`
-//   (see `slots`); the circuit weighs both per level.
+//   beats between heard frames are slots that went silent, `slot.ch<k>`,
+//   booked when the next frame arrives (`slots`) or, by `slots.mode`, at
+//   their own beat (`silences`); the circuit weighs both per level.
 // - The four corner receivers show the channel while a frame is in the air.
 //   A volley of reads fired 46 to 60 ms before a frame's expected notify
 //   lands in it three times in ten; the corners that heard name the side.
@@ -61,7 +62,7 @@ export class Observation {
   readonly channels: Map<number, Level>;
   readonly heard: Heard[] = [];                 // the notifies, the last windows' worth
   events: Events;
-  readonly expect = new Map<number, { t: number; heard: number; range: LadderRange }>();   // channel -> its next notify expected at t + k rounds, last heard
+  readonly expect = new Map<number, { t: number; heard: number; range: LadderRange; next: number }>();   // channel -> its next notify expected at t + k rounds, last heard; `next`, the first expected notify not yet heard or booked silent
   carrier: number | null = null;                // strength of the carrier
   near = false;
   motion: Motion | null = null;                 // the last tick's motion sample
@@ -111,7 +112,7 @@ export class Observation {
     if (!level) return;
     const t = this.clock.now();
     this.stats.frames++;
-    this.slots(channel, level.range, t);
+    if (this.ir.slots.mode === 'late') this.slots(channel, level.range, t);
     if (this.heard.length && level.range !== this.range()) this.switchedAt = t;
     this.heard.push({ t, channel, ...level });
     this.events.any = 1;
@@ -151,6 +152,27 @@ export class Observation {
     }
   }
 
+  /**
+   * `slots.mode` "beat": the frames that did not arrive, booked at their own
+   * beat. A channel's slot is silent once its expected notify is `marginMs`
+   * past with none: booked then, so the turn and the step that follow correct
+   * it like any frame. Only the channels the read schedule still expects are
+   * booked (`nextVolley`), and no slot from before the ladder came on; a
+   * channel unheard longer books nothing until it is heard again.
+   */
+  silences (now: number): void {
+    const range = this.range(), round = this.roundMs(range);
+    let last = -Infinity;
+    for (const e of this.expect.values()) if (e.range === range) last = Math.max(last, e.heard);
+    for (const [ch, e] of this.expect) {
+      if (e.range !== range) continue;
+      const keep = e.heard === last ? this.ir.expectLastMs : this.ir.expectMs;
+      for (; e.next + this.ir.slots.marginMs < now; e.next += round) {
+        if (e.next - e.heard <= keep && e.next > this.switchedAt) this.events.slots[ch] = (this.events.slots[ch] ?? 0) + 1;
+      }
+    }
+  }
+
   /** The ladder the frames come on now: the last frame's. */
   range (): LadderRange { return this.heard.at(-1)?.range ?? 'long'; }
 
@@ -169,7 +191,8 @@ export class Observation {
     const { withinMs, pull } = this.ir.follow;
     if (e && t - e.heard < this.ir.secondNotifyMs) return;
     const pred = e ? e.t + Math.round((t - e.t) / round) * round : t;
-    this.expect.set(channel, { t: Math.abs(t - pred) < withinMs ? pred + pull * (t - pred) : t, heard: t, range });
+    const at = Math.abs(t - pred) < withinMs ? pred + pull * (t - pred) : t;
+    this.expect.set(channel, { t: at, heard: t, range, next: at + round });
   }
 
   /** When the next volley's first read goes: before the soonest expected notify of a channel heard within `expectMs`, the one heard last within `expectLastMs`. */
@@ -253,6 +276,7 @@ export class Observation {
   tick (motion: Motion, forward = 0): Sources {
     const now = this.clock.now();
     this.update(now);
+    if (this.ir.slots.mode === 'beat') this.silences(now);
     if (this.running && now - (this.heardAt ?? this.armedAt ?? now) > this.ir.watchdogMs && now - (this.armedAt ?? 0) > this.ir.watchdogMs) {   // the watchdog
       this.armedAt = now;
       this.stats.rearmed = (this.stats.rearmed ?? 0) + 1;
