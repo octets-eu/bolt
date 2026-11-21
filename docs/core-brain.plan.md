@@ -8,7 +8,7 @@
 2. **circuit.json is the connectome.** Neurons, edges, populations, the ports to the observation layer and the motor, and the constants of all three layers are data. The network code knows a short list of cell models, synapse kinds and population operators, and no neuron names. The operators are a step on the way: at the end every mechanism is cells and edges.
 3. **Observation and motor are code behind interfaces.** The observation layer turns the Bolt's streams into input ports, the motor turns output ports into a roll; nothing crosses by a neuron's name.
 
-The weights of the senses onto the belief are drawn by hand: the four corner lobes first (W0), the long levels with the new ladder and the bands to 4 m (U), the short ladder's and the far redraw in phase W. Until W1 the short ladder's profiles are the builder's from `senses.json`. Phase C changes no weight. The edges the steps add (C3's and D1 to D5's) are structural: their weights follow from the mechanism and are not drawn.
+The weights of the senses onto the belief are drawn by hand: the four corner lobes first (W0), the long levels with the new ladder and the bands to 4 m (U), the short ladder's (W1), the far redraw in W2. Phase C changes no weight. The edges the steps add (C3's and D1 to D5's) are structural: their weights follow from the mechanism and are not drawn.
 
 ## Rules for every step
 
@@ -183,10 +183,10 @@ The minimum that makes the present brain run on R2's ladder. The full drawing by
 
 ### W, the weights by hand (the bench judges)
 
-The profiles of the senses onto the ring and the distance are drawn by hand from the body and scored on the bench. U drew the long levels'; the short ladder's still come from `senses.json`, the counted tables of the retired runs, read by the builder alone.
+The profiles of the senses onto the ring and the distance are drawn by hand from the body and scored on the bench. U drew the long levels', W1 the short ladder's.
 
 - **W0** before B1, the corner lobes: each corner's profile onto the ring drawn as G·max(0, cos(θ − corner))^n at the receiver's angle (`CORNER_G`, `CORNER_N` in the builder), the frames' and silences' profiles as counted until W1; the old copy of `circuit.json` rewritten with it. Check: the bench's side within ±5°, share and mean |err| better than the counted circuit's; `OLD=1` byte-identical.
-- **W1** the short weights: the short ladder's frames and silences drawn by hand over every band; `senses.json` goes, with the builder's mention of its writer. Its runs: the coil's last spiral round the sender driven on the short ladder, kept as `bench/ref/near`, and L1's seeks. Check: on those runs the share of seconds under 30° and the mean error both better than before W1; `ref/coil` reported.
+- **W1** (**done**) the short weights: the short ladder's frames and silences drawn by hand over every band; `senses.json` goes, with the builder's mention of its writer. Its runs: the coil from u2 down to the sender on u1 with the short ladder held, driven both ways, kept as `bench/ref/near` and `bench/ref/near-ccw`, and L1's seeks. Check: on those runs the share of seconds under 30° and the mean error both better than before W1; `ref/coil` reported.
 - **W2** after S2, before D1, the far weights: the long levels' profiles and the bands redrawn over `ref/coil` and the far seeks the bench holds by then, L1's and S2's. Check: beyond 2 m from the sender the two numbers better than W1's; inside 2 m within phase D's bounds against W1.
 
 ### S, the silent slots at their beat (A/B with the Bolts)
@@ -229,7 +229,8 @@ One Bluetooth link per Bolt carries its rolls, its corner reads, the listen's re
 - A seek from 2.4 m with the line of sight free heard frames and none of its corner reads hit, the reads timed as in seeks that hit (bench run 31, retired). Not explained; F4's run shows whether it recurs.
 - With Seeker/green standing at 2.4 and 3.2 m and no rolls at all, 7 to 11 % of the corner reads fired get no ack (bench runs 20 and 22, retired). Not explained; R2 counts the acks again.
 - With one code sent every 200 ms, frames are lost in blocks: a block whose notify follows the send by about 40 ms loses a fifth to a third of its frames, whatever the code; blocks with another delay lose none. Not explained; R2's counts per level are taken over several blocks until it is.
-- On the long ladder alone the belief is too far and left of the truth inside 120 cm: its four levels arrive alike inside 80 cm, so nothing in it says how near. The reference runs hold no short ladder; U2 and `ref/near` are its judges.
+- On the long ladder alone the belief is too far and left of the truth inside 120 cm: its four levels arrive alike inside 80 cm, so nothing in it says how near. The two coils hold no short ladder; `ref/near` and `ref/near-ccw` do.
 - In L1's three seeks the believed distance does not fall steadily on the approach: after the short ladder is asked for it rises again and stays there until shortly before the tag. Not explained; the short ladder's weights are W1's.
+- On the two near runs, the seeker circling the sender inside 1 m, the share of seconds under 30° stays about half after W1. Where on the track the error sits is not looked at.
 - Code 7 loses a quarter of its frames at 4 m, in both directions, where the codes beside it lose few; whether it is the code or its place in the round, before code 0, is not separated. The ladders do not use it.
 - Seeker/green's frames reach about one level less far than Sender/blue's at every distance of R2; the ladder is picked with Sender/blue sending.

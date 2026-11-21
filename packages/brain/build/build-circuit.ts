@@ -28,14 +28,10 @@
 // rate times the band's share of the distance belief), and its strength's
 // range profile to the distance; every slot of the sender's schedule that
 // went silent adds the profile of not hearing that channel; a corner read
-// adds a lobe drawn at its receiver's angle (CORNER_G, CORNER_N). The long
-// ladder's profiles are drawn by hand from the body (REACH_4 and what
-// follows it). A frame's or a silence's profile of the short ladder is the
-// log of a rate over its mean,
-// the rate measured over the recordings with the sender's place known
-// (senses.json, counted once by a replay option since retired): frames per
-// second of the channel's ladder being sent with the sender in each of 8
-// sectors about the nose, and in each band of distance. Without the silent
+// adds a lobe drawn at its receiver's angle (CORNER_G, CORNER_N). The levels'
+// profiles, both ladders', are drawn by hand from the body (REACH_4 and what
+// follows it): the log of the chance to hear a level, or not to, over its
+// mean. Without the silent
 // slots every heard frame says "ahead", the front receivers hear better, and
 // nothing says "behind". The ring never forgets; it is turned against the yaw and, when
 // the Bolt moves, by the parallax of the believed distance, so a frame heard
@@ -58,20 +54,11 @@
 // neuropils' and organs' places and the cell bodies' (vis.ts); the network
 // does not read it.
 
-import { readFileSync, writeFileSync } from 'node:fs';
+import { writeFileSync } from 'node:fs';
 import { LADDERS } from '@bolt/core';
 import type { LadderRange } from '@bolt/core';
 import type { Circuit, Corner, Edge, MotorConfig, NeuronDef, ObservationConfig } from '../src/types';
 import { bodyLayout } from './vis';
-
-/** senses.json: counts by sector of the sender's true bearing (8 x 45 deg, 0 ahead, clockwise) and by band of distance (bandCm, the last open), in samples at `hz`. */
-interface Counted { sector: number[]; band: number[]; bandSector: number[][] }
-interface Senses {
-  about: string; sectors: number; bands: number; bandCm: number; hz: number;
-  exposure: Record<LadderRange, Counted>;             // samples per ladder sent
-  frames: Record<string, Counted>;                    // frames heard per channel
-  corners: Record<string, { sector: number[]; bandSector: number[][] }>;   // reads landed per corner
-}
 
 // --- the observation layer's constants, circuit.json's `observation`: what it knows of the ladder and the
 // receivers (docs/bolt-reference.md section 7, communication.ts)
@@ -155,42 +142,16 @@ const STEP_MIN_CM = 0.2, SLIDE_MIN = 0.02, FLOOR_CM = 7;
 const CORNER_G = Number(process.env['CORNER_G'] ?? 4);
 const CORNER_N = Number(process.env['CORNER_N'] ?? 1);
 
-// --- the senses, measured: senses.json, counted over the recordings with the sender's place known. Counts of
-// frames per channel and of landed reads per corner by sector of the sender's true bearing and by band of
-// distance, and the exposure in each, per ladder the sender was sending: a channel can only be heard while its
-// ladder is on, and the brain asks for the short ladder when it believes it is near, so against the whole
-// exposure the short channels looked five times more frequent ahead than behind under 40 cm, the approaches, an
-// artefact that pinned the belief ahead through a pass (run 11, 2026-11-09); against their own ladder's exposure
-// they are flat there.
-const S = JSON.parse(readFileSync(new URL('./senses.json', import.meta.url), 'utf8')) as Senses;
-const secs = (samples: number): number => samples / S.hz;
-const EPS_SECTOR = 0.5;   // counts added before a sector rate, so an empty sector is rare, not impossible
-const EPS_BAND = 0.3;     // added to a band's rate, less where the band's exposure is long
-const MIN_EXPOSURE_S = 5;    // a sector or band with less exposure of the channel's ladder says nothing: its weight is 0
-const MIN_GROUP_S = 20;      // a band group with less exposure gets no product neuron
-const MIN_FRAMES = 20;       // a channel with fewer frames in a band group says nothing about the bearing there
-// the bearing profiles by distance band: beyond 120 cm the strong channels are heard 2.5 times more often ahead
-// than behind, between 40 and 80 cm flat, under 40 cm inverted; one profile over all distances said "ahead" for
-// every strong frame and held the belief 40 to 50 deg ahead of the truth at 30 cm (run 9, 2026-11-09)
-const BAND_EDGES_CM = [40, 80, 120];   // four groups: under 40, 40 to 80, 80 to 120, 120 and beyond
-const groupOf = (bandIndex: number): number => BAND_EDGES_CM.filter((e) => bandIndex * S.bandCm >= e).length;
-const GROUPS = BAND_EDGES_CM.length + 1;
-const groupLo: number[] = [0, ...BAND_EDGES_CM], groupHi: (number | null)[] = [...BAND_EDGES_CM, null];
-/** The senses' fine bands summed into the groups: [group][sector]. */
-const grouped = (bandSector: number[][]): number[][] => { const out = Array.from({ length: GROUPS }, () => new Array<number>(S.sectors).fill(0)); bandSector.forEach((row, b) => row.forEach((v, i) => { const g = out[groupOf(b)]!; g[i] = g[i]! + v; })); return out; };
-/** The senses' bands onto the BANDS distance neurons: the senses' last band is open, every neuron from there on takes it. */
-const toBands = (a: number[]): number[] => Array.from({ length: BANDS }, (_, i) => a[Math.min(i, a.length - 1)]!);
-/** Log of each value over the mean of the defined ones; undefined (null) values get 0, no weight. */
-const logOverMean = (v: (number | null)[]): number[] => { const d = v.filter((x): x is number => x !== null); const mean = d.reduce((a, b) => a + b, 0) / d.length; return v.map((x) => (x === null ? 0 : Math.log(x / mean))); };
-/** Frames per second of exposure per sector, null where the exposure is under MIN_EXPOSURE_S. */
-const sectorRate = (counts: number[], exposure: number[]): (number | null)[] => counts.map((c, i) => (secs(exposure[i]!) < MIN_EXPOSURE_S ? null : (c + EPS_SECTOR) / secs(exposure[i]!)));
+/** The log of each value over the mean of all. */
+const logOverMean = (v: number[]): number[] => { const mean = v.reduce((a, b) => a + b, 0) / v.length; return v.map((x) => Math.log(x / mean)); };
 const channels = Object.entries(OBSERVATION.channels).map(([ch, [ladder, strength]]) => ({ ch: Number(ch), ladder, strength }));
 
-// --- the long ladder's levels, drawn by hand from the body: a level is heard all round inside its reach, at its
+// --- the ladders' levels, drawn by hand from the body: a level is heard all round inside its reach, at its
 // reach's edge only with the sender ahead or behind, the receivers hearing along the nose's line further than
 // across it, and beyond not at all; a stronger level reaches further. The chance to hear a slot of a level:
 // IN_REACH inside its reach, falling over EDGE_CM at the reach, which is REACH_4 abeam for strength 4, REACH_STEP
-// more for every doubling of the strength, and AXIS times as far along the nose's line. A frame heard and a slot
+// more for every doubling of the strength above it, half for every halving below it, the edge narrowing with
+// the reach there, and AXIS times as far along the nose's line. A frame heard and a slot
 // gone silent weigh as the log of that chance and of its complement over their means, NEVER the least a chance is
 // taken for, so no place is ruled out by one frame. The constants are the user's; the bench judges them.
 const REACH_4    = Number(process.env['REACH_4'] ?? 90);
@@ -199,11 +160,12 @@ const AXIS       = Number(process.env['AXIS'] ?? 2);
 const IN_REACH   = Number(process.env['IN_REACH'] ?? 0.6);
 const EDGE_CM    = Number(process.env['EDGE_CM'] ?? 25);
 const NEVER      = 0.03;
-const LONG_GROUP_CM = 40;   // the long levels' bearing profiles by the believed distance, a product neuron per group of bands
+const GROUP_CM = 40;   // the levels' bearing profiles by the believed distance, a product neuron per group of bands
 /** The chance to hear a slot of a level of `strength` from `cm` away, the sender `angle` deg off the nose. */
 const heard = (strength: number, cm: number, angle: number): number => {
-  const reach = (REACH_4 + REACH_STEP * Math.log2(strength / 4)) * (1 + (AXIS - 1) * Math.cos(angle * Math.PI / 180) ** 2);
-  return Math.max(NEVER, IN_REACH / (1 + Math.exp((cm - reach) / EDGE_CM)));
+  const abeam = strength >= 4 ? REACH_4 + REACH_STEP * Math.log2(strength / 4) : REACH_4 * strength / 4;
+  const reach = abeam * (1 + (AXIS - 1) * Math.cos(angle * Math.PI / 180) ** 2);
+  return Math.max(NEVER, IN_REACH / (1 + Math.exp((cm - reach) / (EDGE_CM * Math.min(1, abeam / REACH_4)))));
 };
 
 // motor: F, B, R, L read the ring's vector; SEARCH is on unless that vector has a length;
@@ -217,25 +179,6 @@ const ringAngle = (j: number): number => j * 360 / N;
 const id = (j: number): string => `R${String(j).padStart(2, '0')}`;
 const did = (i: number): string => `D${String(i).padStart(2, '0')}`;
 const r3 = (v: number): number => Math.round(v * 1000) / 1000;
-/** A sector profile onto the ring: the log of the rate over its mean, interpolated between the sector centres. */
-const sectorProfile = (rates: (number | null)[]): number[] => {
-  const ll = logOverMean(rates);
-  return Array.from({ length: N }, (_, j) => { const pos = ringAngle(j) / 45, k = Math.floor(pos), f = pos - k; return ll[k % 8]! * (1 - f) + ll[(k + 1) % 8]! * f; });
-};
-/** Slots per round of the ladder: a channel is sent once per round. */
-const roundS = (ladder: LadderRange): number => OBSERVATION.beatMs * channels.filter((c) => c.ladder === ladder).length / 1000;
-/**
- * Chance per slot of the channel to hear it: frames heard over slots sent (the exposure in rounds), a count
- * added on both sides so it stays off 0 and 1; null where the exposure is under MIN_EXPOSURE_S. As a rate
- * times the round it ran over 1 for a channel heard every round and, capped, made one silent slot say "not
- * here" at a weight of 3 (2026-11-09).
- */
-const heardPerSlot = (counts: number[], exposure: number[], ladder: LadderRange): (number | null)[] => counts.map((c, i) => (secs(exposure[i]!) < MIN_EXPOSURE_S ? null : Math.min(0.95, (c + EPS_SECTOR) / (secs(exposure[i]!) / roundS(ladder) + 2 * EPS_SECTOR))));
-/** Frames per second per distance neuron from counts per band and the ladder's exposure per band, in samples; null where the exposure is short. */
-const bandRate = (counts: number[], exposure: number[]): (number | null)[] => {
-  const c = toBands(counts), x = toBands(exposure).map(secs);
-  return c.map((v, i) => (x[i]! < MIN_EXPOSURE_S ? null : v / x[i]! + EPS_BAND / Math.max(1, x[i]! / 50)));
-};
 
 const neurons: NeuronDef[] = [], edges: Edge[] = [];
 const neuron = (nid: string, role: string, extra: Partial<NeuronDef> = {}): void => {
@@ -271,40 +214,20 @@ for (const [c, a] of Object.entries(CORNERS)) ontoRing(`IR_${c}`, Array.from({ l
 // a frame heard, gated by the believed distance: IR_CH<k>_B<j> is the receiver's rate times the share of the
 // distance neurons in band group j, with the group's own sector profile onto the ring (network.ts, the product cells)
 const cellsIn = (lo: number, hi: number | null): string[] => neurons.filter((n) => n.role === 'distance' && n.cm![0] >= lo && (hi === null || n.cm![0] < hi)).map((n) => n.id);
-const inGroup = (j: number): string[] => cellsIn(groupLo[j]!, groupHi[j]!);
 const ringAngles = Array.from({ length: N }, (_, j) => ringAngle(j)), bandMids = Array.from({ length: BANDS }, (_, i) => (i + 0.5) * BAND_CM);
 const around = (f: (angle: number) => number): number => ringAngles.reduce((a, angle) => a + f(angle), 0) / N;   // the mean over every bearing
 for (const { ch, ladder, strength } of channels) {
-  if (ladder === 'long') {
-    // a frame heard, by the believed distance: its bearing profile at each group of bands' middle
-    for (let lo = 0; lo < BANDS * BAND_CM; lo += LONG_GROUP_CM) {
-      const nid = `IR_CH${ch}_B${lo / LONG_GROUP_CM}`, hi = lo + LONG_GROUP_CM < BANDS * BAND_CM ? lo + LONG_GROUP_CM : null;
-      product(nid, `IR_CH${ch}`, cellsIn(lo, hi), { band: [lo, hi], channel: ch, ladder, strength });
-      ontoRing(nid, logOverMean(ringAngles.map((angle) => heard(strength, lo + LONG_GROUP_CM / 2, angle))));
-    }
-    // a silent slot onto the ring, whatever the distance: the chance of silence at each bearing over every band
-    ontoRing(`IR_SLOT${ch}`, logOverMean(ringAngles.map((angle) => bandMids.reduce((a, cm) => a + 1 - heard(strength, cm, angle), 0) / BANDS)));
-    // the range: heard, and silent, at each band over every bearing
-    logOverMean(bandMids.map((cm) => around((angle) => heard(strength, cm, angle)))).forEach((w, i) => edge(`IR_CH${ch}`, did(i), W_DIST * w));
-    logOverMean(bandMids.map((cm) => 1 - around((angle) => heard(strength, cm, angle)))).forEach((w, i) => edge(`IR_SLOT${ch}`, did(i), W_DIST * w));
-    continue;
+  // a frame heard, by the believed distance: its bearing profile at each group of bands' middle
+  for (let lo = 0; lo < BANDS * BAND_CM; lo += GROUP_CM) {
+    const nid = `IR_CH${ch}_B${lo / GROUP_CM}`, hi = lo + GROUP_CM < BANDS * BAND_CM ? lo + GROUP_CM : null;
+    product(nid, `IR_CH${ch}`, cellsIn(lo, hi), { band: [lo, hi], channel: ch, ladder, strength });
+    ontoRing(nid, logOverMean(ringAngles.map((angle) => heard(strength, lo + GROUP_CM / 2, angle))));
   }
-  const f = S.frames[ch], x = S.exposure[ladder];
-  if (!f) continue;
-  const counts = grouped(f.bandSector), exposure = grouped(x.bandSector);
-  for (let j = 0; j < GROUPS; j++) {
-    if (secs(exposure[j]!.reduce((a, b) => a + b, 0)) < MIN_GROUP_S || counts[j]!.reduce((a, b) => a + b, 0) < MIN_FRAMES) continue;
-    const nid = `IR_CH${ch}_B${j}`;
-    product(nid, `IR_CH${ch}`, inGroup(j), { band: [groupLo[j]!, groupHi[j]!], channel: ch, ladder, strength });
-    ontoRing(nid, sectorProfile(sectorRate(counts[j]!, exposure[j]!)));
-  }
-  const silent = (q: number | null): number | null => (q === null ? null : 1 - q);
-  ontoRing(`IR_SLOT${ch}`, sectorProfile(heardPerSlot(f.sector, x.sector, ladder).map(silent)));
-  // the range: a frame heard by the channel's rate per band, a slot gone silent by the chance of not hearing it there;
-  // the strong channels are heard at every distance while their ladder is on, so the far evidence is in the silences of the weak ones
-  logOverMean(bandRate(f.band, x.band)).forEach((w, i) => edge(`IR_CH${ch}`, did(i), W_DIST * w));
-  // the short ladder's silences stay off the distance: near, its weak levels are heard ahead and behind but not at the
-  // sides, so their silent slots say "far" where the truth is 28 cm (the near path of 2026-11-09, pass 3)
+  // a silent slot onto the ring, whatever the distance: the chance of silence at each bearing over every band
+  ontoRing(`IR_SLOT${ch}`, logOverMean(ringAngles.map((angle) => bandMids.reduce((a, cm) => a + 1 - heard(strength, cm, angle), 0) / BANDS)));
+  // the range: heard, and silent, at each band over every bearing
+  logOverMean(bandMids.map((cm) => around((angle) => heard(strength, cm, angle)))).forEach((w, i) => edge(`IR_CH${ch}`, did(i), W_DIST * w));
+  logOverMean(bandMids.map((cm) => 1 - around((angle) => heard(strength, cm, angle)))).forEach((w, i) => edge(`IR_SLOT${ch}`, did(i), W_DIST * w));
 }
 
 // motor
