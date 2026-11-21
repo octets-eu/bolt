@@ -1,3 +1,4 @@
 n	session	start	kind	seeker	mark	s	end	source
-35	2026-11-18T19-53-24-566Z	65414.9	path	SB-9129	no	325.3	brain path done: coil {"reason":"done","turns":19.5,"at":{"x	frames/session-2026-11-18T19-53-24-566Z.jsonl
-36	2026-11-18T19-53-24-566Z	847931.1	path	SB-9129	no	326.8	brain path done: coil {"reason":"done","turns":19.5,"at":{"x	frames/session-2026-11-18T19-53-24-566Z.jsonl
+37	2026-11-21T11-49-25-016Z	165714.6	seek	SB-9129	yes	37.9	brain seek found after 37.9 s: frames 118, reads 414, landed	frames/session-2026-11-21T11-49-25-016Z.jsonl
+38	2026-11-21T11-49-25-016Z	850567.1	seek	SB-9129	yes	32.9	brain seek found after 32.8 s: frames 122, reads 363, landed	frames/session-2026-11-21T11-49-25-016Z.jsonl
+39	2026-11-21T11-49-25-016Z	1118077.5	seek	SB-9129	yes	37.3	brain seek found after 37.2 s: frames 109, reads 372, landed	frames/session-2026-11-21T11-49-25-016Z.jsonl

@@ -9,6 +9,9 @@
 // session, its start on the session's clock, kind, seeker, mark, length,
 // end line and source; it is rewritten from the store on every extract.
 //
+// A run kept in another folder of bench/, bench/ref/<name>/, is in the store
+// as well: it gets no number and no line in the index, and is not cut again.
+//
 // The sources are the month zips the app archives into
 // apps/browser/sessions/; session files given as arguments are read after
 // them, for a run not archived yet or a file that carries what the zip does
@@ -61,6 +64,11 @@ for (const n of readdirSync('bench').filter((d) => /^\d+$/.test(d)).map(Number))
   stored.set(`${r.id} ${r.t0}`, { ...r, n, source: sourceOf.get(String(n)) ?? '-' });
 }
 
+// the runs kept in bench/'s other folders, by their session and start
+const kept = new Set();
+for (const f of readdirSync('bench', { recursive: true }).filter((p) => /(^|\/)session\.jsonl$/.test(p) && !/^\d+\//.test(p)))
+  for (const r of runsOf(readFileSync(`bench/${f}`, 'utf8'))) kept.add(`${r.id} ${r.t0}`);
+
 // new runs from the zips, then the files given
 const sources = [];
 for (const zip of readdirSync(ZIPS).filter((f) => f.endsWith('.zip')).sort())
@@ -69,7 +77,7 @@ sources.push(...process.argv.slice(2));
 const found = new Map();
 for (const spec of sources) for (const r of runsOf(read(spec))) {
   const key = `${r.id} ${r.t0}`;
-  if (r.id < SINCE || stored.has(key) || (found.has(key) && (found.get(key).mark || !r.mark))) continue;
+  if (r.id < SINCE || stored.has(key) || kept.has(key) || (found.has(key) && (found.get(key).mark || !r.mark))) continue;
   found.set(key, { ...r, source: spec });
 }
 

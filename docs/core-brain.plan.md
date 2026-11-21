@@ -173,7 +173,7 @@ The minimum that makes the present brain run on R2's ladder. The full drawing by
 
 ### L1, the live baseline
 
-- **L1** three seeks on the Bolts from the three starts of L0, on R2's ladder with U's brain, each marked and extracted into the bench beside the reference run. L1 checks what the bench cannot see: the bundle on the rig, the link, the clock, the motor in the loop. It is the live baseline. A seeker that loses the line of sight drives on blind, its rolls tied to volleys (M1); such a seek is stopped by the user, stays unmarked and is repeated.
+- **L1** (**done**) three seeks on the Bolts from the three starts of L0, on R2's ladder with U's brain, each marked and extracted into the bench beside the reference run. L1 checks what the bench cannot see: the bundle on the rig, the link, the clock, the motor in the loop. It is the live baseline. A seeker that loses the line of sight drives on blind, its rolls tied to volleys (M1); such a seek is stopped by the user, stays unmarked and is repeated.
 
 ### C, the generic network (behaviour identical)
 
@@ -230,5 +230,6 @@ Each step replaces one operator by cells and edges and is shown in full before i
 - With Seeker/green standing at 2.4 and 3.2 m and no rolls at all, 7 to 11 % of the corner reads fired get no ack (bench runs 20 and 22, retired). Not explained; R2 counts the acks again.
 - With one code sent every 200 ms, frames are lost in blocks: a block whose notify follows the send by about 40 ms loses a fifth to a third of its frames, whatever the code; blocks with another delay lose none. Not explained; R2's counts per level are taken over several blocks until it is.
 - On the long ladder alone the belief is too far and left of the truth inside 120 cm: its four levels arrive alike inside 80 cm, so nothing in it says how near. The reference runs hold no short ladder; U2 and `ref/near` are its judges.
+- In L1's three seeks the believed distance does not fall steadily on the approach: after the short ladder is asked for it rises again and stays there until shortly before the tag. Not explained; the short ladder's weights are W1's.
 - Code 7 loses a quarter of its frames at 4 m, in both directions, where the codes beside it lose few; whether it is the code or its place in the round, before code 0, is not separated. The ladders do not use it.
 - Seeker/green's frames reach about one level less far than Sender/blue's at every distance of R2; the ladder is picked with Sender/blue sending.
