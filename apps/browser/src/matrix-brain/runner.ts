@@ -164,7 +164,7 @@ export class MatrixBrain {
 
   /** The belief after a network step, into the session file only: the ring's peak and its vector, the believed distance, the nose. 17 a second would flood the screen's logger. */
   private step (heading: number): void {
-    const est = this.net.estimate(), vec = ringVector(this.net.ringRates());
+    const est = this.net.estimate(), vec = ringVector(this.net.population('ring'));
     session.note(this.seeker.name, 'info', `brain step peak ${est.angle} vec ${mod360(vec.angle).toFixed(1)} len ${vec.length.toFixed(2)} dist ${est.distance === undefined ? '-' : est.distance.toFixed(1)} yaw ${heading.toFixed(1)}`);
   }
 
@@ -180,7 +180,7 @@ export class MatrixBrain {
   }
 
   /** What the ring holds now. */
-  ring () { const r = this.net.ringRates(); return { ...ringVector(r), rates: r }; }
+  ring () { const r = this.net.population('ring'); return { ...ringVector(r), rates: r }; }
 
   /** The ring onto the matrix, when it changed and the last draw is DRAW_MS ago. */
   private async draw (): Promise<void> {

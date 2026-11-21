@@ -19,7 +19,7 @@ const DECAY_MS = 300;
 const FULL = { turned: 90, fwd: 20, right: 20 } as Record<string, number>;
 
 /** The part of the network the light reads; network.mjs's Network has it. */
-export interface Rates { rate: Float64Array; neurons: { role: string; evidence?: boolean; axis?: string }[]; groups: Map<string, number[]> }
+export interface Rates { rate: Float64Array; neurons: { role: string; model: string; axis?: string }[]; populations: Map<string, number[]> }
 
 export class Light {
 
@@ -37,14 +37,14 @@ export class Light {
   /** One network step of `dtMs`. */
   take (net: Rates, dtMs: number): void {
     const { rate, neurons } = net;
-    for (const ids of net.groups.values()) {
+    for (const ids of net.populations.values()) {
       let mean = 0;
       for (const i of ids) mean += rate[i]!;
       mean /= ids.length;
       for (const i of ids) this.hold(i, mean < 1 - 1e-6 ? (rate[i]! - mean) / (1 - mean) : 0);
     }
     for (const [i, n] of neurons.entries()) {
-      if (n.evidence) continue;
+      if (n.model === 'evidence') continue;
       const r = rate[i]!;
       this.hold(i, n.role === 'self' ? Math.abs(r) * 1000 / Math.max(1, dtMs) / (FULL[n.axis ?? ''] ?? 1) : 1 - Math.exp(-Math.max(0, r)));
     }

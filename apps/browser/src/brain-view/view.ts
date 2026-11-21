@@ -128,7 +128,7 @@ function panel (w: World) {
     m('div', { style: muted }, `${n.role} · ${cell.grade}`),
     ...facts.map((f) => m('div', { style: text }, f)),
     note ? m('div', { style: { ...muted, marginTop: '6px' } }, note) : null,
-    m('div', { style: { ...text, marginTop: '10px' } }, `rate ${rate.toFixed(3)}${n.evidence ? `, evidence ${(net.evidence[selected] ?? 0).toFixed(2)}` : ''}`),
+    m('div', { style: { ...text, marginTop: '10px' } }, `rate ${rate.toFixed(3)}${n.model === 'evidence' ? `, evidence ${(net.evidence[selected] ?? 0).toFixed(2)}` : ''}`),
     synapses(w, 'in', w.anatomy.incoming[selected]!, (p, wt) => wt * (net.rate[p] ?? 0)),
     synapses(w, 'out', w.anatomy.outgoing[selected]!, (_p, wt) => wt * rate),
     m('div', { style: { marginTop: '12px' } }, m('button', { style: button, onclick: () => pick(null) }, 'clear')),

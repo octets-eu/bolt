@@ -1,13 +1,17 @@
-// Writes src/circuit.json, the seeker's connectome, in the worm's format
-// (examples/worm): neurons { id, type, role, side, pos } and edges
-// [pre, post, weight, type], type 0 chemical, signed; `pos` is the worm's
-// anatomical position, unused here. Fields the worm does not have: `angle`,
-// a neuron's direction off the nose, clockwise, deg; `evidence`, the neuron
-// sums its input per step into log-evidence and its rate is the softmax
-// over its role's group (network.ts); `cm`, a distance neuron's band;
+// Writes src/circuit.json, the seeker's connectome, grown from the worm's
+// format (examples/worm): neurons { id, type, role, side, pos } and edges
+// [pre, post, weight], signed; `pos` is the worm's anatomical position,
+// unused here. Fields the worm does not have: `model`, how the cell computes
+// (types.ts), given by what the cell carries: a `port` makes an input, a
+// `population` an evidence cell, `of` a product, anything else a relu;
+// `population`, the cells an evidence cell is normalised with: it sums its
+// input per step into log-evidence and its rate is the softmax over them
+// (network.ts), the file's `populations` saying how each is normalised and
+// decoded, `readouts` which two the estimate is read from; `angle`, a
+// neuron's direction off the nose, clockwise, deg; `cm`, a distance neuron's band;
 // `tauCm`, its evidence forgets with the travel in cm; `tauParallax`, it
-// forgets with the travel over the believed distance, radians; `bias`; `tauMs` for leaky
-// neurons. An input neuron carries `port`, the observation layer's value it
+// forgets with the travel over the believed distance, radians; `bias`.
+// An input neuron carries `port`, the observation layer's value it
 // takes each tick (an event counts on the tick it happened, else 0), `gain`
 // and `rateTauMs`, its events per second smoothed. Every constant of the
 // brain is here, the observation layer's and the motor's written out as
@@ -226,9 +230,11 @@ const bandRate = (counts: number[], exposure: number[]): (number | null)[] => {
   return c.map((v, i) => (x[i]! < MIN_EXPOSURE_S ? null : v / x[i]! + EPS_BAND / Math.max(1, x[i]! / 50)));
 };
 
-const neurons: NeuronDef[] = [], edges: [string, string, number, number][] = [];
-const neuron = (nid: string, role: string, extra: Partial<NeuronDef> = {}): void => { neurons.push({ id: nid, type: role, role, side: 'mid', pos: [0, 0, neurons.length], ...extra }); };
-const edge = (pre: string, post: string, w: number): void => { if (Math.abs(w) >= 0.001) edges.push([pre, post, r3(w), 0]); };
+const neurons: NeuronDef[] = [], edges: [string, string, number][] = [];
+const neuron = (nid: string, role: string, extra: Partial<NeuronDef> = {}): void => {
+  neurons.push({ id: nid, model: extra.port ? 'input' : extra.population ? 'evidence' : extra.of ? 'product' : 'relu', type: role, role, side: 'mid', pos: [0, 0, neurons.length], ...extra });
+};
+const edge = (pre: string, post: string, w: number): void => { if (Math.abs(w) >= 0.001) edges.push([pre, post, r3(w)]); };
 
 // observation: what the IR tells, each input neuron on its port (observation.ts)
 // a read that landed: the corners that heard the frame, unless all four (the sender on top, or a level heard
@@ -245,8 +251,8 @@ neuron('SELF_FWD', 'self', { axis: 'fwd', unit: 'cm', port: 'self.fwd' });
 neuron('SELF_RIGHT', 'self', { axis: 'right', unit: 'cm', port: 'self.right' });
 
 // the belief: the ring and the distance, evidence neurons
-for (let j = 0; j < N; j++) neuron(id(j), 'ring', { angle: ringAngle(j), evidence: true, ...(Number.isFinite(RING_TAU_RAD) ? { tauParallax: RING_TAU_RAD } : {}) });
-for (let i = 0; i < BANDS; i++) neuron(did(i), 'distance', { cm: [i * BAND_CM, (i + 1) * BAND_CM], tauCm: TAU_CM, evidence: true });
+for (let j = 0; j < N; j++) neuron(id(j), 'ring', { population: 'ring', angle: ringAngle(j), ...(Number.isFinite(RING_TAU_RAD) ? { tauParallax: RING_TAU_RAD } : {}) });
+for (let i = 0; i < BANDS; i++) neuron(did(i), 'distance', { population: 'distance', cm: [i * BAND_CM, (i + 1) * BAND_CM], tauCm: TAU_CM });
 const ontoRing = (pre: string, profile: number[]): void => profile.forEach((w, j) => edge(pre, id(j), w));
 for (const [c, a] of Object.entries(CORNERS)) ontoRing(`IR_${c}`, Array.from({ length: N }, (_, j) => CORNER_G * Math.max(0, Math.cos(deg(ringAngle(j) - a))) ** CORNER_N));   // a read lands whatever the ladder
 // a frame heard, gated by the believed distance: IR_CH<k>_B<j> is the receiver's rate times the share of the
@@ -308,16 +314,19 @@ neuron('REQ_SHORT', 'request');
 edge('IR_NEAR', 'REQ_SHORT', 1);
 
 const circuit: Circuit = {
+  scheme: 2,
   about: `Bolt seeker: IR observation -> ${N}-neuron egocentric ring of log-evidence plus ${BANDS} distance bands -> steering. `
     + 'Evidence neurons sum their input per step and their rate is the softmax over their group; the ring is shifted against the Bolt\'s turn (yaw) and by the parallax '
     + 'of the believed distance as the locator moves and forgets by the potential parallax of the step (tauParallax), the distance slid along the bearing and forgetting with the travel (tauCm); every other neuron is max(0, bias + sum of weight * rate).',
   observation: OBSERVATION, motor: MOTOR,
   neurons, edges,
+  populations: { ring: { normalize: 'peak', decode: 'peak' }, distance: { normalize: 'peak', decode: 'mean' } },
   outputs: {
     'steer.fwd': 'M_FWD', 'steer.back': 'M_BACK', 'steer.right': 'M_RIGHT', 'steer.left': 'M_LEFT',
     'mode.search': 'M_SEARCH', 'mode.roam': 'M_ROAM', 'mode.axis': 'M_AXIS', 'mode.near': 'IR_NEAR',
     'request.short': 'REQ_SHORT',
   },
+  readouts: { bearing: 'ring', distance: 'distance' },
   vis: bodyLayout(neurons, OBSERVATION.channels, CORNERS),
 };
 writeFileSync(process.env['OUT'] ?? new URL('../src/circuit.json', import.meta.url), JSON.stringify(circuit));

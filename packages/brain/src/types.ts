@@ -2,21 +2,30 @@
 // observation layer, the motor and the brain view read it: `observation` and
 // `motor`, the constants of the two layers; the neurons, an input neuron
 // with the `port` of the observation layer it takes its value from; the
-// edges in the worm's format [pre, post, weight, type]; `outputs`, the neuron
-// behind each output port; and `vis`, the view's anatomy. This is scheme 1,
-// what build/build-circuit.ts writes; docs/core-brain.plan.md's phase C
-// changes it.
+// edges [pre, post, weight]; `populations`, how the cells that name one are
+// normalised and decoded; `outputs`, the neuron behind each output port;
+// `readouts`, the populations behind the estimate; and `vis`, the view's
+// anatomy. This is scheme 2 on its way, what build/build-circuit.ts writes;
+// docs/core-brain.plan.md's phase C says what is still to come. check.ts
+// checks a file against it at load.
 
 import type { LadderRange } from '@bolt/core';
 
 export type V3 = [number, number, number];
 
-/** A neuron of circuit.json. The network reads `port`, `gain`, `rateTauMs`, `role`, `evidence`, `cm`, `tauCm`, `tauParallax`, `bias`, `tauMs`, `of`, `gate`, `axis` and `angle`; the view the rest. */
+/**
+ * How a cell computes: `input`, its port's value; `evidence`, its input added to what it holds, its rate from its
+ * population's normalisation; `product`, the cell it is `of` times the share of its `gate` cells in their population;
+ * `relu`, max(0, bias + input).
+ */
+export type Model = 'input' | 'relu' | 'evidence' | 'product';
+
+/** A neuron of circuit.json. The network reads `model`, `population`, `port`, `gain`, `rateTauMs`, `cm`, `tauCm`, `tauParallax`, `bias`, `of`, `gate` and `angle`, and of the self cells `role` and `axis`; the view the rest. */
 export interface NeuronDef {
-  id: string; type: string; role: string; side: string; pos: V3;
+  id: string; model: Model; population?: string; type: string; role: string; side: string; pos: V3;
   angle?: number; channel?: number; ladder?: string; strength?: number;
   of?: string; gate?: string[]; band?: [number, number | null]; cm?: [number, number]; tauCm?: number; tauParallax?: number;
-  bias?: number; tauMs?: number; evidence?: boolean; axis?: string; unit?: string;
+  bias?: number; axis?: string; unit?: string;
   port?: InputPort; gain?: number; rateTauMs?: number;   // an input neuron: the port's value, with `rateTauMs` its events per second smoothed, times `gain`
 }
 
@@ -46,7 +55,17 @@ export type OutputPort =
   | 'mode.search' | 'mode.roam' | 'mode.axis' | 'mode.near'
   | 'request.short';
 
-export interface Circuit { about?: string; observation: ObservationConfig; motor: MotorConfig; neurons: NeuronDef[]; edges: [string, string, number, number][]; outputs: Record<OutputPort, string>; vis: Vis }
+/** A population: its cells' rates are exp of what they hold less the population's peak (`peak`); it is decoded as the `angle` of its highest rate with that rate's share of the mass (`peak`) or as the rate-weighted mean of its cells' `cm` midpoints (`mean`). */
+export interface PopulationDef { normalize: 'peak'; decode: 'peak' | 'mean' }
+
+export interface Circuit {
+  scheme: 2; about?: string; observation: ObservationConfig; motor: MotorConfig;
+  neurons: NeuronDef[]; edges: [string, string, number][];
+  populations: Record<string, PopulationDef>;
+  outputs: Record<OutputPort, string>;
+  readouts: { bearing: string; distance?: string };   // the populations behind the estimate: the bearing decoded by its peak, the distance by its mean
+  vis: Vis;
+}
 
 export type Corner = 'FL' | 'FR' | 'BR' | 'BL';
 

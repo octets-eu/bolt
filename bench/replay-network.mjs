@@ -83,7 +83,7 @@ export async function network (params = {}, without) {
       return true;
     },
     /** The ring and the distance, for `--dump`. */
-    debug () { return `ring ${Array.from(net.ringRates(), (v) => v.toFixed(1)).join(' ')} | d ${net.believedDistance().toFixed(0)} cm`; },
+    debug () { return `ring ${Array.from(net.population('ring'), (v) => v.toFixed(1)).join(' ')} | d ${net.believedDistance().toFixed(0)} cm`; },
     estimate () { return net.estimate(); },
     digest () { return digest.hex(); },
     motorDigest () { return motorDigest.hex(); },
