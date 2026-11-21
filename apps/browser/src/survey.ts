@@ -65,18 +65,19 @@ type Place = { x: number; y: number };
 
 /**
  * A survey's drive, a path for the bench named `what`: the brain's mode by
- * hand on the seeker, the sender on the long ladder, the seeker's matrix dark
+ * hand on the seeker, the sender on the long ladder and the short when the
+ * seeker asks, or held on `ladder`, the seeker's matrix dark
  * for LAG_MS and then the marker, `run` with both start points on the sheet
  * and the sender's place in the seeker's locator frame.
  */
-async function drive (seeker: Bolt, sender: Bolt, what: string, options: unknown, run: (places: { from: Place; to: Place; at: Place }) => Promise<ArchimedeanResult | CoilResult>): Promise<void> {
+async function drive (seeker: Bolt, sender: Bolt, what: string, options: unknown, run: (places: { from: Place; to: Place; at: Place }) => Promise<ArchimedeanResult | CoilResult>, ladder?: LadderRange): Promise<void> {
   Survey.last = null;
   try {
     if (matrixBrain.on) throw new Error('the brain\'s mode is on');
     const from = Plotter.startOf(seeker.name), to = Plotter.startOf(sender.name);
     if (!from || !to) throw new Error('no start on the sheet');
     const at = Plotter.toLocator(seeker.name, to.x, to.y)!;
-    await matrixBrain.toggle(false, { seeker: seeker.name, sender: sender.name });
+    await matrixBrain.toggle(false, { seeker: seeker.name, sender: sender.name, ladder });
     const { matrix } = seeker.actuators;
     matrix.hold(OWNER);
     await matrix.color([0, 0, 0], OWNER);
@@ -118,15 +119,17 @@ export const Survey = {
   /**
    * The seeker's coil from the point it was reset on down to the sender's, as
    * wide as the room allows along the way (sheet.ts, `room`), its last spiral
-   * round the sender; `clockwise` false drives the mirrored track. The sender
-   * stands straight behind the seeker's nose.
+   * round the sender; `clockwise` false drives the mirrored track; `ladder`
+   * holds the sender on that ladder the whole way. The sender stands straight
+   * behind the seeker's nose.
    * Both Bolts are reset on their points first; the brain's mode must be off.
    */
-  async coil (seeker: Bolt, sender: Bolt, options: { clockwise?: boolean; speed?: number } = {}): Promise<void> {
+  async coil (seeker: Bolt, sender: Bolt, options: { clockwise?: boolean; speed?: number; ladder?: LadderRange } = {}): Promise<void> {
+    const { ladder, ...track } = options;
     return drive(seeker, sender, 'coil', { orbit: ORBIT, ...options }, ({ from, to, at }) => {
       if (Math.abs(at.x) > 1 || at.y >= 0) throw new Error('the sender is not straight behind the seeker');
-      return seeker.behavior.coil({ widths: room(from, to, ORBIT.from), orbit: ORBIT, ...options });
-    });
+      return seeker.behavior.coil({ widths: room(from, to, ORBIT.from), orbit: ORBIT, ...track });
+    }, ladder);
   },
 
   /**

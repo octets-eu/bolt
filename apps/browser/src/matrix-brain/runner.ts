@@ -34,8 +34,8 @@ const TAG_MS = 300;          // both collision reports within this: found
 /** Collision thresholds of brain/seek.mjs: the seeker fires on contact, the standing sender on contact only. */
 const THRESHOLDS = { seeker: { xThreshold: 15, yThreshold: 15, xSpeed: 0, ySpeed: 0 }, sender: { xThreshold: 10, yThreshold: 10, xSpeed: 0, ySpeed: 0 } };
 
-/** `at`: the sender's place in the seeker's locator frame, from the sheet starts, for the replay's truth; `limitS` ends the seek, `fenceCm` beyond the start distance ends it as a runaway. */
-export interface SeekOptions { motors: boolean; startCm: number; at?: { x: number, y: number } | undefined; limitS: number; fenceCm: number }
+/** `at`: the sender's place in the seeker's locator frame, from the sheet starts, for the replay's truth; `limitS` ends the seek, `fenceCm` beyond the start distance ends it as a runaway; `ladder` holds the sender on that ladder, the seeker's request for the short one not followed. */
+export interface SeekOptions { motors: boolean; startCm: number; at?: { x: number, y: number } | undefined; limitS: number; fenceCm: number; ladder?: LadderRange | undefined }
 /** What a run leaves for the `good` mark: the replay's truth and the outcome. */
 export interface RunSummary { seeker: string; sender: string; at: { x: number, y: number } | null; startCm: number; result: string; seconds: number }
 /** What a listener gets after each network step: the network, the sources it stepped on, the step in ms. */
@@ -84,7 +84,8 @@ export class MatrixBrain {
     this.sender = sender;
     this.options = options;
     this.obs = new Observation(seeker, circuit.observation);
-    this.ladder = new LadderSender(sender, 'long', 1);   // one beat per level, as brain/seek.mjs
+    this.range = options.ladder ?? 'long';
+    this.ladder = new LadderSender(sender, this.range, 1);   // one beat per level, as brain/seek.mjs
     this.ended = new Promise((r) => { this.finish = r; });
   }
 
@@ -136,7 +137,7 @@ export class MatrixBrain {
       }
       // the referee's part: the sender follows the seeker's request for the short ladder (communication.ts, LADDERS)
       const want: LadderRange = this.net.output('request.short') > 0.5 ? 'short' : 'long';
-      if (want !== this.range) { this.range = want; this.ladder.switch(want); this.seeker.log('info', `brain ladder ${want}`); }
+      if (!this.options.ladder && want !== this.range) { this.range = want; this.ladder.switch(want); this.seeker.log('info', `brain ladder ${want}`); }
       if (this.options.motors && !this.obs.timed && Date.now() - this.lastRoll >= ROLL_MS) this.roll();
     });
     // before the frames are timed, and for the flash's end
@@ -146,7 +147,7 @@ export class MatrixBrain {
       const { startCm, limitS, fenceCm } = this.options;
       setTimeout(() => this.end('time'), limitS * 1000);
       this.seeker.log('info', `brain seek: seeker ${this.seeker.name} on sender ${this.sender.name}, ${startCm} cm given, limit ${limitS.toFixed(0)} s, fence ${startCm + fenceCm} cm, speed ${circuit.motor.seekSpeed}`);
-    } else this.seeker.log('info', `brain on: seeker ${this.seeker.name}, sender ${this.sender.name}, ladder long`);
+    } else this.seeker.log('info', `brain on: seeker ${this.seeker.name}, sender ${this.sender.name}, ladder ${this.range}${this.options.ladder ? ', held' : ''}`);
   }
 
   /** The motor layer's roll, as brain.mjs: right after a volley, fired past the queue. */
