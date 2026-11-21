@@ -2,7 +2,7 @@
 // observation layer, the motor and the brain view read it: `observation` and
 // `motor`, the constants of the two layers; the neurons, an input neuron
 // with the `port` of the observation layer it takes its value from; the
-// edges [pre, post, weight]; `populations`, how the cells that name one are
+// edges [pre, post, weight], a fourth field naming a kind other than adding; `populations`, how the cells that name one are
 // normalised and decoded; `outputs`, the neuron behind each output port;
 // `readouts`, the populations behind the estimate; and `vis`, the view's
 // anatomy. This is scheme 2 on its way, what build/build-circuit.ts writes;
@@ -15,16 +15,16 @@ export type V3 = [number, number, number];
 
 /**
  * How a cell computes: `input`, its port's value; `evidence`, its input added to what it holds, its rate from its
- * population's normalisation; `product`, the cell it is `of` times the share of its `gate` cells in their population;
- * `relu`, max(0, bias + input).
+ * population's normalisation; `product`, its input times the share of the cells on its gate edges in their
+ * population; `relu`, max(0, bias + input).
  */
 export type Model = 'input' | 'relu' | 'evidence' | 'product';
 
-/** A neuron of circuit.json. The network reads `model`, `population`, `port`, `gain`, `rateTauMs`, `cm`, `tauCm`, `tauParallax`, `bias`, `of`, `gate` and `angle`; the view the rest. */
+/** A neuron of circuit.json. The network reads `model`, `population`, `port`, `gain`, `rateTauMs`, `cm`, `tauCm`, `tauParallax`, `bias` and `angle`; the view the rest. */
 export interface NeuronDef {
   id: string; model: Model; population?: string; type: string; role: string; side: string; pos: V3;
   angle?: number; channel?: number; ladder?: string; strength?: number;
-  of?: string; gate?: string[]; band?: [number, number | null]; cm?: [number, number]; tauCm?: number; tauParallax?: number;
+  band?: [number, number | null]; cm?: [number, number]; tauCm?: number; tauParallax?: number;
   bias?: number; axis?: string; unit?: string;
   port?: InputPort; gain?: number; rateTauMs?: number;   // an input neuron: the port's value, with `rateTauMs` its events per second smoothed, times `gain`
 }
@@ -74,9 +74,12 @@ export interface PopulationDef {
   forget?: Step & { distance?: string; floorCm?: number };
 }
 
+/** An edge adds its weight times the pre's rate to the post's input; of kind `gate` it multiplies instead: a product cell's input times the sum over its gate edges, weight times rate, divided by the total of the gates' population. */
+export type Edge = [pre: string, post: string, weight: number, kind?: 'gate'];
+
 export interface Circuit {
   scheme: 2; about?: string; observation: ObservationConfig; motor: MotorConfig;
-  neurons: NeuronDef[]; edges: [string, string, number][];
+  neurons: NeuronDef[]; edges: Edge[];
   populations: Record<string, PopulationDef>;
   outputs: Record<OutputPort, string>;
   readouts: { bearing: string; distance?: string };   // the populations behind the estimate: the bearing decoded by its peak, the distance by its mean

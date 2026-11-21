@@ -7,8 +7,9 @@
 //      with `rateTauMs` its events per second smoothed, times `gain`; among
 //      them the Bolt's own motion, its turn in degrees and its step over the
 //      floor, forward and to the right, in cm; then the
-//      `product` cells (`of`, `gate`): a receiver's rate times the share of the
-//      gate cells in their population's rates, the distance belief of the last step
+//      `product` cells: their input, a receiver's rate, times the share of the
+//      cells on their gate edges in their population's rates, the distance
+//      belief of the last step
 //   2. the populations' operators, as the file declares them on each, every
 //      one reading the beliefs as decoded before any of them ran: `carry`,
 //      the step carries the belief along, a ring turned by the parallax of
@@ -39,19 +40,17 @@ import type { Circuit, Estimate, NeuronDef, OutputPort, PopulationDef, Sources }
 const mod360 = (a: number): number => ((a % 360) + 360) % 360;
 const wrap180 = (a: number): number => ((a + 540) % 360) - 180;
 
-/** A product cell: its index, the cell it is `of`, its gate cells, the cells of the gates' population. */
-type Gated = [number, number, number[], number[]];
-
 export class Network {
 
   readonly neurons: NeuronDef[];
   readonly index: Map<string, number>;
   readonly rate: Float64Array;
   readonly evidence: Float64Array;
-  readonly inputs: [number, number][][];      // per neuron, its [pre, weight]
+  readonly inputs: [number, number][][];      // per neuron, its [pre, weight] over the edges that add
+  readonly gates: [number, number][][];       // and over its gate edges
   readonly ring: number[];                      // the cells of the bearing's population
   readonly distance: number[];                  // of the distance's, none without one
-  readonly gated: Gated[];
+  readonly products: [number, number[]][];    // a product cell and the cells of its gates' population
   readonly populations = new Map<string, number[]>();   // population -> its cells, in the file's order
   readonly defs: Record<string, PopulationDef>;   // population -> its normalisation, decoding and operators
   readonly smoothed = new Map<number, number>();   // per input neuron with rateTauMs, its events per second
@@ -64,17 +63,14 @@ export class Network {
     this.rate = new Float64Array(this.neurons.length);
     this.evidence = new Float64Array(this.neurons.length);
     this.inputs = this.neurons.map(() => []);
-    for (const [pre, post, w] of circuit.edges) this.inputs[this.id(post)]!.push([this.id(pre), w]);
+    this.gates = this.neurons.map(() => []);
+    for (const [pre, post, w, kind] of circuit.edges) (kind === 'gate' ? this.gates : this.inputs)[this.id(post)]!.push([this.id(pre), w]);
     this.defs = circuit.populations;
     for (const name of Object.keys(circuit.populations)) this.populations.set(name, []);
     for (const [i, n] of this.neurons.entries()) if (n.model === 'evidence') this.populations.get(n.population!)!.push(i);
     this.ring = this.populations.get(circuit.readouts.bearing)!;
     this.distance = circuit.readouts.distance === undefined ? [] : this.populations.get(circuit.readouts.distance)!;
-    this.gated = this.neurons.flatMap((n, i): Gated[] => {
-      if (n.model !== 'product') return [];
-      const gate = n.gate!.map((g) => this.id(g));
-      return [[i, this.id(n.of!), gate, this.populations.get(this.neurons[gate[0]!]!.population ?? '') ?? []]];
-    });
+    this.products = this.neurons.flatMap((n, i): [number, number[]][] => (n.model === 'product' ? [[i, this.populations.get(this.neurons[this.gates[i]![0]![0]]!.population!)!]] : []));
     this.outputs = Object.fromEntries(Object.entries(circuit.outputs).map(([port, name]) => [port, this.id(name)]));
     this.normalize();
   }
@@ -197,11 +193,12 @@ export class Network {
       }
       this.rate[i] = v * (n.gain ?? 1);
     }
-    for (const [i, of, gate, group] of this.gated) {
-      let share = 0, total = 0;
-      for (const g of gate) share += this.rate[g]!;
+    for (const [i, group] of this.products) {
+      let input = 0, share = 0, total = 0;
+      for (const [p, w] of this.inputs[i]!) input += w * this.rate[p]!;
+      for (const [g, w] of this.gates[i]!) share += w * this.rate[g]!;
       for (const g of group) total += this.rate[g]!;
-      this.rate[i] = total > 0 ? this.rate[of]! * share / total : 0;
+      this.rate[i] = total > 0 ? input * share / total : 0;
     }
     this.operate();
     const last = Float64Array.from(this.rate);

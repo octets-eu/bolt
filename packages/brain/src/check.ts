@@ -30,12 +30,23 @@ export function checkCircuit (circuit: Circuit): void {
     if (!MODELS.has(n.model)) bad.push(`neuron ${n.id}: model ${String(n.model)}`);
     if (n.model === 'input' && !(n.port !== undefined && produced.has(n.port))) bad.push(`neuron ${n.id}: port ${String(n.port)}, not one the observation produces`);
     if (n.model === 'evidence' && !(n.population !== undefined && populations.has(n.population))) bad.push(`neuron ${n.id}: population ${String(n.population)}`);
-    if (n.model === 'product') {
-      if (n.of === undefined || !n.gate?.length) bad.push(`neuron ${n.id}: a product without \`of\` or \`gate\``);
-      for (const name of [...(n.of === undefined ? [] : [n.of]), ...(n.gate ?? [])]) cell(name, `neuron ${n.id}`);
-    }
   }
-  for (const [pre, post] of circuit.edges) { cell(pre, `edge ${pre} ${post}`); cell(post, `edge ${pre} ${post}`); }
+  const byId = new Map(circuit.neurons.map((n) => [n.id, n]));
+  const adds = new Set<string>(), gatesOf = new Map<string, Set<string | undefined>>();   // per product cell: it has an input; its gates' populations
+  for (const [pre, post, , kind] of circuit.edges) {
+    cell(pre, `edge ${pre} ${post}`); cell(post, `edge ${pre} ${post}`);
+    if (kind !== undefined && kind !== 'gate') bad.push(`edge ${pre} ${post}: kind ${String(kind)}`);
+    if (kind === 'gate') {
+      if (byId.get(post)?.model !== 'product') bad.push(`edge ${pre} ${post}: a gate onto a cell that is no product`);
+      gatesOf.set(post, (gatesOf.get(post) ?? new Set()).add(byId.get(pre)?.population));
+    } else adds.add(post);
+  }
+  for (const n of circuit.neurons) {
+    if (n.model !== 'product') continue;
+    const of = gatesOf.get(n.id);
+    if (!adds.has(n.id) || !of) bad.push(`neuron ${n.id}: a product without an input or without a gate`);
+    if (of && (of.size !== 1 || of.has(undefined))) bad.push(`neuron ${n.id}: its gates are not the cells of one population`);
+  }
   for (const [name, p] of populations) {
     if (p.normalize !== 'peak') bad.push(`population ${name}: normalize ${String(p.normalize)}`);
     if (p.decode !== 'peak' && p.decode !== 'mean') bad.push(`population ${name}: decode ${String(p.decode)}`);

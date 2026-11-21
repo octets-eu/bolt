@@ -3,8 +3,9 @@
 // build/vis.ts). Plain data, no three.js; scene.ts turns it into meshes.
 //
 // A cell's look follows from what it does (docs/brain-view.plan.md):
-// - grade: `product` for a cell with `of` and `gate`, whose second input is a
-//   rule; `stand-in` for a cell with no edges that nothing gates, read by name
+// - grade: `product` for a cell of that model, its inputs, an edge from the
+//   frame it multiplies and its gate edges, drawn as its two fields and not
+//   as synapses; `stand-in` for a cell with no edges that nothing gates, read by name
 //   in the network's rules (the self neurons); `natural` for the rest;
 // - an edge is a synapse: about ten contacts per unit of weight, at least
 //   one, on the postsynaptic cell's arbor; the presynaptic axon reaches them
@@ -85,10 +86,13 @@ export function grow (circuit: Circuit): Anatomy {
   const soma = (id: string): V3 => { const p = vis.soma[id]; if (!p) throw new Error(`anatomy: no soma for ${id}`); return p; };
   const { ring, column, glomeruli, motor } = vis.neuropils;
   const { ears, muscle } = vis.organs;
-  const gated = new Set(neurons.flatMap((n) => n.gate ?? []));
+  const products = new Set(neurons.flatMap((n) => (n.model === 'product' ? [n.id] : [])));
+  const synaptic = edges.filter(([, b]) => !products.has(b));   // a product cell's inputs are its two fields
+  const gatesOf = (id: string) => edges.flatMap(([a, b, , kind]) => (b === id && kind === 'gate' ? [a] : []));
+  const gated = new Set(edges.flatMap(([a, , , kind]) => (kind === 'gate' ? [a] : [])));
   const incoming: [number, number][][] = neurons.map(() => []);
   const outgoing: [number, number][][] = neurons.map(() => []);
-  for (const [a, b, w] of edges) { outgoing[at(a)]!.push([at(b), w]); incoming[at(b)]!.push([at(a), w]); }
+  for (const [a, b, w] of synaptic) { outgoing[at(a)]!.push([at(b), w]); incoming[at(b)]!.push([at(a), w]); }
 
   // --- the places the wiring refers to
   const glomAt = (ch: number | undefined): V3 => { const p = glomeruli.at[String(ch)]; if (!p) throw new Error(`anatomy: no glomerulus ${ch}`); return p; };
@@ -130,7 +134,7 @@ export function grow (circuit: Circuit): Anatomy {
 
   const contacts: Contact[] = [];
   const contactsOf = neurons.map(() => [] as Contact[]);
-  for (const [a, b, w] of edges) {
+  for (const [a, b, w] of synaptic) {
     const pre = at(a), post = at(b), n = Math.max(1, Math.round(Math.abs(w) * CONTACTS_PER_W));
     for (let k = 0; k < n; k++) {
       const c = { pre, post, w, at: contactAt(def(pre), def(post), `${a}>${b}#${k}`) };
@@ -144,7 +148,7 @@ export function grow (circuit: Circuit): Anatomy {
     const s = soma(n.id), mine = contactsOf[i]!;
     const cell: Cell = {
       index: i, def: n, soma: s, somaR: 0.06, tubes: [], hollow: [], twigs: [], dashed: [],
-      grade: n.of ? 'product' : (!incoming[i]!.length && !outgoing[i]!.length && !gated.has(n.id) ? 'stand-in' : 'natural'),
+      grade: n.model === 'product' ? 'product' : (!incoming[i]!.length && !outgoing[i]!.length && !gated.has(n.id) ? 'stand-in' : 'natural'),
       forgets: Number.isFinite(n.tauCm) || Number.isFinite(n.tauParallax),
     };
     const tube = (r: number, ...path: V3[]) => cell.tubes.push({ r, path: bend(path, `${n.id}#${cell.tubes.length}`) });
@@ -210,7 +214,7 @@ export function grow (circuit: Circuit): Anatomy {
         const g = glomAt(n.channel), az = glomAzimuth(n.channel);
         tube(0.02, s, lerp(s, g, 0.5), g);                                   // the first field: the frame it multiplies
         for (let k = 0; k < 3; k++) tube(0.01, g, add(g, jit3(`${n.id}tuft${k}`, 0.2)));
-        const zs = (n.gate ?? []).map(layerZ), axis = scale(dir(az), 0.18);
+        const zs = gatesOf(n.id).map(layerZ), axis = scale(dir(az), 0.18);
         const top: V3 = [axis[0], axis[1], columnTop + 0.25];
         cell.hollow.push({ r: 0.022, path: [s, top, [axis[0], axis[1], Math.max(...zs)], [axis[0], axis[1], Math.min(...zs)]] });
         for (const z of zs) cell.hollow.push({ r: 0.014, path: [[axis[0], axis[1], z], columnPoint(az, column.r * 0.6, z)] });

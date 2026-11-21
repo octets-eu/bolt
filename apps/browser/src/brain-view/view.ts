@@ -121,7 +121,9 @@ function panel (w: World) {
     n.tauParallax !== undefined ? `forgets over ${n.tauParallax} rad of potential parallax` : null,
     n.axis ? `the Bolt's own ${n.axis}, ${n.unit}` : null,
   ].filter(Boolean);
-  const note = cell.grade === 'product' ? `rate = ${n.of} × the share of ${(n.gate ?? []).join(' ')} in the distance belief: a rule in network.ts, no synapses on the gate field`
+  const into = cell.grade === 'product' ? circuit.edges.filter(([, post]) => post === n.id) : [];
+  const from = (gate: boolean) => into.flatMap(([pre, , , kind]) => ((kind === 'gate') === gate ? [pre] : [])).join(' ');
+  const note = cell.grade === 'product' ? `rate = ${from(false)} × the share of ${from(true)} in the distance belief: an edge and gate edges, drawn as the cell's two fields`
     : cell.grade === 'stand-in' ? 'no synapses: the network reads it by name to turn and carry the ring and the distance' : null;
   return m('div', { style: box }, [
     m('div', { style: { ...text, fontSize: '14px' } }, n.id),

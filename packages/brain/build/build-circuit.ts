@@ -2,8 +2,10 @@
 // format (examples/worm): neurons { id, type, role, side, pos } and edges
 // [pre, post, weight], signed; `pos` is the worm's anatomical position,
 // unused here. Fields the worm does not have: `model`, how the cell computes
-// (types.ts), given by what the cell carries: a `port` makes an input, a
-// `population` an evidence cell, `of` a product, anything else a relu;
+// (types.ts): a `port` makes an input, a `population` an evidence cell, a
+// product is named one, anything else is a relu; a product's inputs are an
+// edge from the receiver it multiplies and `gate` edges, the fourth field,
+// from the distance cells whose share scales it;
 // `population`, the cells an evidence cell is normalised with: it sums its
 // input per step into log-evidence and its rate is the softmax over them
 // (network.ts), the file's `populations` saying how each is normalised and
@@ -49,8 +51,8 @@
 // OUT=<path> writes elsewhere, for a circuit under test on the replay bench
 // (CIRCUIT=<path>); N, TAU_CM, RING_TAU_RAD, W_DIST, CORNER_G, CORNER_N override.
 //
-// Fields beyond the worm's, continued: `of` and `gate`, a gated neuron's
-// source and the distance neurons whose share scales it; `band`, its cm.
+// Fields beyond the worm's, continued: `band`, the cm of distance a product
+// cell stands for.
 //
 // `vis`, beside neurons and edges: the anatomy for the brain view, the
 // neuropils' and organs' places and the cell bodies' (vis.ts); the network
@@ -59,7 +61,7 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { LADDERS } from '@bolt/core';
 import type { LadderRange } from '@bolt/core';
-import type { Circuit, Corner, MotorConfig, NeuronDef, ObservationConfig } from '../src/types';
+import type { Circuit, Corner, Edge, MotorConfig, NeuronDef, ObservationConfig } from '../src/types';
 import { bodyLayout } from './vis';
 
 /** senses.json: counts by sector of the sender's true bearing (8 x 45 deg, 0 ahead, clockwise) and by band of distance (bandCm, the last open), in samples at `hz`. */
@@ -235,11 +237,17 @@ const bandRate = (counts: number[], exposure: number[]): (number | null)[] => {
   return c.map((v, i) => (x[i]! < MIN_EXPOSURE_S ? null : v / x[i]! + EPS_BAND / Math.max(1, x[i]! / 50)));
 };
 
-const neurons: NeuronDef[] = [], edges: [string, string, number][] = [];
+const neurons: NeuronDef[] = [], edges: Edge[] = [];
 const neuron = (nid: string, role: string, extra: Partial<NeuronDef> = {}): void => {
-  neurons.push({ id: nid, model: extra.port ? 'input' : extra.population ? 'evidence' : extra.of ? 'product' : 'relu', type: role, role, side: 'mid', pos: [0, 0, neurons.length], ...extra });
+  neurons.push({ id: nid, model: extra.port ? 'input' : extra.population ? 'evidence' : 'relu', type: role, role, side: 'mid', pos: [0, 0, neurons.length], ...extra });
 };
 const edge = (pre: string, post: string, w: number): void => { if (Math.abs(w) >= 0.001) edges.push([pre, post, r3(w)]); };
+/** A product cell: the receiver `of` times the share of the distance cells `gates` in the distance belief. */
+const product = (nid: string, of: string, gates: string[], extra: Partial<NeuronDef>): void => {
+  neuron(nid, 'gated', { model: 'product', ...extra });
+  edge(of, nid, 1);
+  for (const g of gates) edges.push([g, nid, 1, 'gate']);
+};
 
 // observation: what the IR tells, each input neuron on its port (observation.ts)
 // a read that landed: the corners that heard the frame, unless all four (the sender on top, or a level heard
@@ -261,7 +269,7 @@ for (let i = 0; i < BANDS; i++) neuron(did(i), 'distance', { population: 'distan
 const ontoRing = (pre: string, profile: number[]): void => profile.forEach((w, j) => edge(pre, id(j), w));
 for (const [c, a] of Object.entries(CORNERS)) ontoRing(`IR_${c}`, Array.from({ length: N }, (_, j) => CORNER_G * Math.max(0, Math.cos(deg(ringAngle(j) - a))) ** CORNER_N));   // a read lands whatever the ladder
 // a frame heard, gated by the believed distance: IR_CH<k>_B<j> is the receiver's rate times the share of the
-// distance neurons in band group j, with the group's own sector profile onto the ring (network.ts, `of` and `gate`)
+// distance neurons in band group j, with the group's own sector profile onto the ring (network.ts, the product cells)
 const cellsIn = (lo: number, hi: number | null): string[] => neurons.filter((n) => n.role === 'distance' && n.cm![0] >= lo && (hi === null || n.cm![0] < hi)).map((n) => n.id);
 const inGroup = (j: number): string[] => cellsIn(groupLo[j]!, groupHi[j]!);
 const ringAngles = Array.from({ length: N }, (_, j) => ringAngle(j)), bandMids = Array.from({ length: BANDS }, (_, i) => (i + 0.5) * BAND_CM);
@@ -271,7 +279,7 @@ for (const { ch, ladder, strength } of channels) {
     // a frame heard, by the believed distance: its bearing profile at each group of bands' middle
     for (let lo = 0; lo < BANDS * BAND_CM; lo += LONG_GROUP_CM) {
       const nid = `IR_CH${ch}_B${lo / LONG_GROUP_CM}`, hi = lo + LONG_GROUP_CM < BANDS * BAND_CM ? lo + LONG_GROUP_CM : null;
-      neuron(nid, 'gated', { of: `IR_CH${ch}`, gate: cellsIn(lo, hi), band: [lo, hi], channel: ch, ladder, strength });
+      product(nid, `IR_CH${ch}`, cellsIn(lo, hi), { band: [lo, hi], channel: ch, ladder, strength });
       ontoRing(nid, logOverMean(ringAngles.map((angle) => heard(strength, lo + LONG_GROUP_CM / 2, angle))));
     }
     // a silent slot onto the ring, whatever the distance: the chance of silence at each bearing over every band
@@ -287,7 +295,7 @@ for (const { ch, ladder, strength } of channels) {
   for (let j = 0; j < GROUPS; j++) {
     if (secs(exposure[j]!.reduce((a, b) => a + b, 0)) < MIN_GROUP_S || counts[j]!.reduce((a, b) => a + b, 0) < MIN_FRAMES) continue;
     const nid = `IR_CH${ch}_B${j}`;
-    neuron(nid, 'gated', { of: `IR_CH${ch}`, gate: inGroup(j), band: [groupLo[j]!, groupHi[j]!], channel: ch, ladder, strength });
+    product(nid, `IR_CH${ch}`, inGroup(j), { band: [groupLo[j]!, groupHi[j]!], channel: ch, ladder, strength });
     ontoRing(nid, sectorProfile(sectorRate(counts[j]!, exposure[j]!)));
   }
   const silent = (q: number | null): number | null => (q === null ? null : 1 - q);

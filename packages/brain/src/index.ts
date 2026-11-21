@@ -11,4 +11,4 @@ export { ringVector } from './ring';
 export { LadderSender } from './ladder';
 export { Motor, fireRoll } from './motor';
 export type { Roll } from './motor';
-export type { Circuit, NeuronDef, Vis, V3, ObservationConfig, MotorConfig, Corner, InputPort, Sources, Motion, Estimate, OutputPort } from './types';
+export type { Circuit, Edge, NeuronDef, Vis, V3, ObservationConfig, MotorConfig, Corner, InputPort, Sources, Motion, Estimate, OutputPort } from './types';
