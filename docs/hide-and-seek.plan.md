@@ -40,6 +40,9 @@
 - 03, continue work on apps/play/rooms.md
     - turn into full arch/req docs, demo iPadOs
 
+- 04, choose a ladder for the room and build the brain from it
+    - bands, weights and limits follow the ladder
+
 **more tasks and goals will be defined**
 
 
