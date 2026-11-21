@@ -5,15 +5,17 @@
 //
 //   1. `input` cells take their port's value from the observation layer,
 //      with `rateTauMs` its events per second smoothed, times `gain`; among
-//      them the Bolt's own motion, role `self`: its turn (axis turned, deg)
-//      and its step over the floor (axes fwd and right, cm); then the
+//      them the Bolt's own motion, its turn in degrees and its step over the
+//      floor, forward and to the right, in cm; then the
 //      `product` cells (`of`, `gate`): a receiver's rate times the share of the
 //      gate cells in their population's rates, the distance belief of the last step
-//   2. the step carries the belief along: the ring turns by the parallax of
-//      the believed distance, the distance slides by the step along the
-//      believed bearing; evidence forgets with the travel, in cm (tauCm) or
+//   2. the populations' operators, as the file declares them on each, every
+//      one reading the beliefs as decoded before any of them ran: `carry`,
+//      the step carries the belief along, a ring turned by the parallax of
+//      the believed distance, a stack slid by the step along the believed
+//      bearing; `forget`, evidence forgets with the travel, in cm (tauCm) or
 //      in radians of the step over the believed distance (tauParallax)
-//   3. the ring shifts against the turn (ring.ts)
+//   3. `shift`, a ring shifts against the turn (ring.ts)
 //   4. `evidence` cells add their input to what they hold; the rate of each
 //      is exp of its evidence less the peak of its population, so the peak
 //      reads 1 and a flat population reads all 1
@@ -21,8 +23,8 @@
 //
 // The estimate is read off the populations `readouts` names: the bearing
 // from the one decoded by its peak, the distance from the one decoded by its
-// mean. The ring's turn, the carrying and the forgetting are still rules in
-// here, on those two populations.
+// mean. A population decoded by its peak is a ring, its cells evenly round
+// by their `angle`; one decoded by its mean a stack, its cells bands of `cm`.
 //
 // The motor and the referee read `output`, the neuron behind a port by
 // circuit.json's `outputs`, and no neuron's name.
@@ -32,7 +34,7 @@
 
 import { checkCircuit } from './check';
 import { shiftRing } from './ring';
-import type { Circuit, Estimate, NeuronDef, OutputPort, Sources } from './types';
+import type { Circuit, Estimate, NeuronDef, OutputPort, PopulationDef, Sources } from './types';
 
 const mod360 = (a: number): number => ((a % 360) + 360) % 360;
 const wrap180 = (a: number): number => ((a + 540) % 360) - 180;
@@ -50,8 +52,8 @@ export class Network {
   readonly ring: number[];                      // the cells of the bearing's population
   readonly distance: number[];                  // of the distance's, none without one
   readonly gated: Gated[];
-  readonly self: Record<string, number>;      // the Bolt's own motion: axis -> neuron, turned, fwd, right
   readonly populations = new Map<string, number[]>();   // population -> its cells, in the file's order
+  readonly defs: Record<string, PopulationDef>;   // population -> its normalisation, decoding and operators
   readonly smoothed = new Map<number, number>();   // per input neuron with rateTauMs, its events per second
   readonly outputs: Record<string, number>;   // output port -> neuron
 
@@ -63,6 +65,7 @@ export class Network {
     this.evidence = new Float64Array(this.neurons.length);
     this.inputs = this.neurons.map(() => []);
     for (const [pre, post, w] of circuit.edges) this.inputs[this.id(post)]!.push([this.id(pre), w]);
+    this.defs = circuit.populations;
     for (const name of Object.keys(circuit.populations)) this.populations.set(name, []);
     for (const [i, n] of this.neurons.entries()) if (n.model === 'evidence') this.populations.get(n.population!)!.push(i);
     this.ring = this.populations.get(circuit.readouts.bearing)!;
@@ -72,7 +75,6 @@ export class Network {
       const gate = n.gate!.map((g) => this.id(g));
       return [[i, this.id(n.of!), gate, this.populations.get(this.neurons[gate[0]!]!.population ?? '') ?? []]];
     });
-    this.self = Object.fromEntries(this.neurons.flatMap((n, i) => (n.role === 'self' && n.axis !== undefined ? [[n.axis, i] as [string, number]] : [])));
     this.outputs = Object.fromEntries(Object.entries(circuit.outputs).map(([port, name]) => [port, this.id(name)]));
     this.normalize();
   }
@@ -96,54 +98,81 @@ export class Network {
 
   /** The ring's peak as the believed bearing off the nose; its share of the ring's mass as the confidence, 1/N flat, 1 for one bin; the expected distance over the bands. */
   estimate (): Estimate {
-    let peak = this.ring[0]!, sum = 0;
-    for (const i of this.ring) { if (this.rate[i]! > this.rate[peak]!) peak = i; sum += this.rate[i]!; }
-    return { angle: this.neurons[peak]!.angle!, length: 1 / sum, ...(this.distance.length ? { distance: this.believedDistance() } : {}) };
+    return { ...this.peak(this.ring), ...(this.distance.length ? { distance: this.mean(this.distance) } : {}) };
   }
 
-  believedDistance (): number {
+  /** A ring decoded: the `angle` of its highest rate, the first of equals, and that rate's share of the mass. */
+  private peak (ids: number[]): { angle: number; length: number } {
+    let peak = ids[0]!, sum = 0;
+    for (const i of ids) { if (this.rate[i]! > this.rate[peak]!) peak = i; sum += this.rate[i]!; }
+    return { angle: this.neurons[peak]!.angle!, length: 1 / sum };
+  }
+
+  /** A stack decoded: the rate-weighted mean of its cells' `cm` midpoints. */
+  private mean (ids: number[]): number {
     let sum = 0, acc = 0;
-    for (const i of this.distance) { const [lo, hi] = this.neurons[i]!.cm!; sum += this.rate[i]!; acc += this.rate[i]! * (lo + hi) / 2; }
+    for (const i of ids) { const [lo, hi] = this.neurons[i]!.cm!; sum += this.rate[i]!; acc += this.rate[i]! * (lo + hi) / 2; }
     return acc / sum;
   }
 
-  /** The ring's evidence shifted by `d` degrees (ring.ts). */
-  turn (d: number): void {
-    const shifted = shiftRing(Float64Array.from(this.ring, (i) => this.evidence[i]!), d);
-    this.ring.forEach((i, j) => { this.evidence[i] = shifted[j]!; });
+  /** A ring's evidence shifted by `d` degrees (ring.ts). */
+  private turn (ids: number[], d: number): void {
+    const shifted = shiftRing(Float64Array.from(ids, (i) => this.evidence[i]!), d);
+    ids.forEach((i, j) => { this.evidence[i] = shifted[j]!; });
   }
 
   /**
-   * The belief carried along a step of `{ fwd, right }` cm in the Bolt's
-   * frame: a frame is a bearing from where the Bolt stood, so the
-   * point the belief names, at the believed bearing and distance, is placed
-   * anew relative to the Bolt, the ring turned to it and the distance slid to
-   * it. Evidence earned at a place is stale once the Bolt has moved on, so
-   * neurons with tauCm forget with the travel: the distance, and the ring if
-   * the circuit says so.
+   * The populations' operators, in the order carry, forget, shift, each
+   * reading the beliefs as decoded before any of them ran.
+   *
+   * `carry`: a frame is a bearing from where the Bolt stood, so the point the
+   * belief names, at the believed bearing and distance, is placed anew
+   * relative to the Bolt after its step: a ring is turned to it, a stack slid
+   * to it, by parts of a band, not under `minShift` of one. `forget`:
+   * evidence earned at a place is stale once the Bolt has moved on, so a cell
+   * forgets with the travel, by its `tauCm` in centimetres, or by its
+   * `tauParallax` in radians of the step over the believed distance, the
+   * angle the sender could have shifted by: a close pass forgets abruptly, a
+   * far approach gently, the distance floored at `floorCm`. Neither acts on
+   * a step of `minCm` or less. `shift`: a ring turned against the Bolt's turn.
    */
-  carry ({ fwd, right }: { fwd: number; right: number }): void {
-    const stepCm = Math.hypot(fwd, right);
-    if (stepCm <= 0.2 || !this.distance.length) return;
-    const d = this.believedDistance(), est = this.estimate();
-    const b = est.angle * Math.PI / 180;
-    const px = d * Math.sin(b) - right, py = d * Math.cos(b) - fwd;
-    this.turn(-wrap180(mod360(Math.atan2(px, py) * 180 / Math.PI) - mod360(est.angle)));
-    const [lo, hi] = this.neurons[this.distance[0]!]!.cm!, bandCm = hi - lo;
-    const shift = (Math.hypot(px, py) - d) / bandCm;
-    if (Math.abs(shift) > 0.02) {
-      const n = this.distance.length, at = (k: number): number => this.evidence[this.distance[Math.min(n - 1, Math.max(0, k))]!]!;
-      const out = this.distance.map((_, i) => { const src = i - shift, k = Math.floor(src), f = src - k; return at(k) * (1 - f) + at(k + 1) * f; });
-      this.distance.forEach((i, k) => { this.evidence[i] = out[k]!; });
+  private operate (): void {
+    const before = new Map<string, number>();   // per population the bearing it names, deg, or the distance, cm
+    for (const [name, ids] of this.populations) before.set(name, this.defs[name]!.decode === 'peak' ? this.peak(ids).angle : this.mean(ids));
+    const cell = (name: string): number => this.rate[this.id(name)]!;
+    for (const [name, ids] of this.populations) {
+      const c = this.defs[name]!.carry;
+      if (!c) continue;
+      const fwd = cell(c.fwd), right = cell(c.right);
+      if (Math.hypot(fwd, right) <= c.minCm) continue;
+      const ring = this.defs[name]!.decode === 'peak';
+      const angle = before.get(ring ? name : c.bearing!)!, d = before.get(ring ? c.distance! : name)!;
+      const b = angle * Math.PI / 180;
+      const px = d * Math.sin(b) - right, py = d * Math.cos(b) - fwd;
+      if (ring) { this.turn(ids, -wrap180(mod360(Math.atan2(px, py) * 180 / Math.PI) - mod360(angle))); continue; }
+      const [lo, hi] = this.neurons[ids[0]!]!.cm!, bandCm = hi - lo;
+      const shift = (Math.hypot(px, py) - d) / bandCm;
+      if (Math.abs(shift) > c.minShift!) {
+        const n = ids.length, at = (k: number): number => this.evidence[ids[Math.min(n - 1, Math.max(0, k))]!]!;
+        const out = ids.map((_, i) => { const src = i - shift, k = Math.floor(src), f = src - k; return at(k) * (1 - f) + at(k + 1) * f; });
+        ids.forEach((i, k) => { this.evidence[i] = out[k]!; });
+      }
     }
-    // forgetting with the travel: evidence earned at a place goes stale once the Bolt has moved on. tauCm in
-    // centimetres; tauParallax in radians of the step over the believed distance, the angle the sender could have
-    // shifted by, so a close pass forgets abruptly and a far approach gently; the distance floored at a Bolt's width
-    const potential = stepCm / Math.max(7, d);
-    for (const [i, n] of this.neurons.entries()) {
-      if (n.model !== 'evidence') continue;
-      if (typeof n.tauCm === 'number' && Number.isFinite(n.tauCm)) this.evidence[i] = this.evidence[i]! * Math.exp(-stepCm / n.tauCm);
-      if (typeof n.tauParallax === 'number' && Number.isFinite(n.tauParallax)) this.evidence[i] = this.evidence[i]! * Math.exp(-potential / n.tauParallax);
+    for (const [name, ids] of this.populations) {
+      const f = this.defs[name]!.forget;
+      if (!f) continue;
+      const stepCm = Math.hypot(cell(f.fwd), cell(f.right));
+      if (stepCm <= f.minCm) continue;
+      const potential = f.distance === undefined ? null : stepCm / Math.max(f.floorCm!, before.get(f.distance)!);
+      for (const i of ids) {
+        const n = this.neurons[i]!;
+        if (typeof n.tauCm === 'number' && Number.isFinite(n.tauCm)) this.evidence[i] = this.evidence[i]! * Math.exp(-stepCm / n.tauCm);
+        if (potential !== null && typeof n.tauParallax === 'number' && Number.isFinite(n.tauParallax)) this.evidence[i] = this.evidence[i]! * Math.exp(-potential / n.tauParallax);
+      }
+    }
+    for (const [name, ids] of this.populations) {
+      const s = this.defs[name]!.shift;
+      if (s) this.turn(ids, cell(s.by));
     }
   }
 
@@ -174,9 +203,7 @@ export class Network {
       for (const g of group) total += this.rate[g]!;
       this.rate[i] = total > 0 ? this.rate[of]! * share / total : 0;
     }
-    const own = (axis: string): number => { const i = this.self[axis]; return i === undefined ? 0 : this.rate[i]!; };
-    this.carry({ fwd: own('fwd'), right: own('right') });
-    this.turn(own('turned'));
+    this.operate();
     const last = Float64Array.from(this.rate);
     for (const [i, n] of this.neurons.entries()) {
       if (n.model !== 'evidence') continue;

@@ -178,7 +178,7 @@ The minimum that makes the present brain run on R2's ladder. The full drawing by
 ### C, the generic network (behaviour identical)
 
 - **C1** (**done**) models and populations: `model`, `population`, `populations` with `normalize` and `decode`, `readouts`, the edges three fields; the network dispatches on them, the self cells still found by `role` and `axis`; `checkCircuit`. Check: digests equal, the rebuild byte-identical.
-- **C2** the operators as data: `shift`, `carry` and `forget` declared on the populations with their cells and constants; `role` is not read from here on. Check: as C1.
+- **C2** (**done**) the operators as data: `shift`, `carry` and `forget` declared on the populations with their cells and constants; `role` is not read from here on. Check: as C1.
 - **C3** the product cells as edges: `model: "product"`; `of` and `gate` become an add edge and gate edges; the brain view's grade reads `model` instead of `of`, so it compiles. Check: as C1. The stash `corner lobes drawn` is decided here: ported onto scheme 2 or dropped.
 
 ### B3 and M1, the link and the silence (with the Bolts)

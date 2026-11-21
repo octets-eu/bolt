@@ -20,7 +20,7 @@ export type V3 = [number, number, number];
  */
 export type Model = 'input' | 'relu' | 'evidence' | 'product';
 
-/** A neuron of circuit.json. The network reads `model`, `population`, `port`, `gain`, `rateTauMs`, `cm`, `tauCm`, `tauParallax`, `bias`, `of`, `gate` and `angle`, and of the self cells `role` and `axis`; the view the rest. */
+/** A neuron of circuit.json. The network reads `model`, `population`, `port`, `gain`, `rateTauMs`, `cm`, `tauCm`, `tauParallax`, `bias`, `of`, `gate` and `angle`; the view the rest. */
 export interface NeuronDef {
   id: string; model: Model; population?: string; type: string; role: string; side: string; pos: V3;
   angle?: number; channel?: number; ladder?: string; strength?: number;
@@ -55,8 +55,24 @@ export type OutputPort =
   | 'mode.search' | 'mode.roam' | 'mode.axis' | 'mode.near'
   | 'request.short';
 
-/** A population: its cells' rates are exp of what they hold less the population's peak (`peak`); it is decoded as the `angle` of its highest rate with that rate's share of the mass (`peak`) or as the rate-weighted mean of its cells' `cm` midpoints (`mean`). */
-export interface PopulationDef { normalize: 'peak'; decode: 'peak' | 'mean' }
+/** The Bolt's step since the last tick, the two cells that hold it, cm; an operator does nothing on a step of `minCm` or less. */
+interface Step { fwd: string; right: string; minCm: number }
+
+/**
+ * A population: its cells' rates are exp of what they hold less the population's peak (`peak`); it is decoded as the
+ * `angle` of its highest rate with that rate's share of the mass (`peak`), which makes it a ring, or as the
+ * rate-weighted mean of its cells' `cm` midpoints (`mean`), a stack. Its operators (network.ts): `shift`, a ring
+ * turned by the value of the cell `by`, deg; `carry`, a ring turned by the parallax of the step at the distance the
+ * population `distance` names, a stack slid by the step along the bearing the population `bearing` names, not under
+ * `minShift` of a band; `forget`, each cell by its `tauCm`, or by its `tauParallax` with the distance the population
+ * `distance` names, floored at `floorCm`.
+ */
+export interface PopulationDef {
+  normalize: 'peak'; decode: 'peak' | 'mean';
+  shift?: { by: string };
+  carry?: Step & { distance?: string; bearing?: string; minShift?: number };
+  forget?: Step & { distance?: string; floorCm?: number };
+}
 
 export interface Circuit {
   scheme: 2; about?: string; observation: ObservationConfig; motor: MotorConfig;

@@ -7,7 +7,8 @@
 // `population`, the cells an evidence cell is normalised with: it sums its
 // input per step into log-evidence and its rate is the softmax over them
 // (network.ts), the file's `populations` saying how each is normalised and
-// decoded, `readouts` which two the estimate is read from; `angle`, a
+// decoded and which operators act on it with which cells and constants,
+// `readouts` which two the estimate is read from; `angle`, a
 // neuron's direction off the nose, clockwise, deg; `cm`, a distance neuron's band;
 // `tauCm`, its evidence forgets with the travel in cm; `tauParallax`, it
 // forgets with the travel over the believed distance, radians; `bias`.
@@ -140,6 +141,10 @@ const TAU_CM   = Number(process.env['TAU_CM'] ?? 30);    // the distance forgets
 // 11-08 from 34 to 60 % but is the same near and far.
 const RING_TAU_RAD = Number(process.env['RING_TAU_RAD'] ?? 1);   // 1 rad, the user's pick (2026-11-09): the seek runs of 11-08 at 62 %, today's four at 38, the pass of run 11 followed; 0.5 gave 60 / 39, 0.3 53 / 44
 const W_DIST   = Number(process.env['W_DIST'] ?? 1);     // a frame's range profile onto the distance
+// the populations' operators (network.ts): no carrying and no forgetting on a step of STEP_MIN_CM or less, the
+// distance not slid by less than SLIDE_MIN of a band, the ring's forgetting with the believed distance floored at
+// FLOOR_CM, a Bolt's width
+const STEP_MIN_CM = 0.2, SLIDE_MIN = 0.02, FLOOR_CM = 7;
 // a corner read onto the ring: a lobe drawn at the receiver's angle, G * max(0, cos(angle - corner))^n. The counted
 // profiles put the front-right receiver's peak at 0 deg and the front-left's at 320, so a sender ahead-right was
 // believed ahead and the belief sat left of the truth on every approach: the bench's side -13 deg, drawn +2, the
@@ -245,7 +250,7 @@ for (const { ch, ladder, strength } of channels) neuron(`IR_SLOT${ch}`, 'slot', 
 neuron('IR_ANY', 'presence', { port: 'frame.any', rateTauMs: 3000 });   // anything of the ladder: the sender is in range at all; frames per second
 neuron('IR_NEAR', 'near', { port: 'ladder.near' });                     // the ladder's state, held by the observation layer with its hysteresis
 // the Bolt's own motion since the last tick, from the yaw and the locator: the turn in degrees clockwise, the step
-// in cm in its own frame; read by the network's shift rules, not by weights
+// in cm in its own frame; read by the populations' operators (`populations`, below), not by weights
 neuron('SELF_TURN', 'self', { axis: 'turned', unit: 'deg', port: 'self.turned' });
 neuron('SELF_FWD', 'self', { axis: 'fwd', unit: 'cm', port: 'self.fwd' });
 neuron('SELF_RIGHT', 'self', { axis: 'right', unit: 'cm', port: 'self.right' });
@@ -313,6 +318,7 @@ edge('IR_ANY', 'M_ROAM', -ROAM_K);
 neuron('REQ_SHORT', 'request');
 edge('IR_NEAR', 'REQ_SHORT', 1);
 
+const STEP = { fwd: 'SELF_FWD', right: 'SELF_RIGHT', minCm: STEP_MIN_CM };
 const circuit: Circuit = {
   scheme: 2,
   about: `Bolt seeker: IR observation -> ${N}-neuron egocentric ring of log-evidence plus ${BANDS} distance bands -> steering. `
@@ -320,7 +326,18 @@ const circuit: Circuit = {
     + 'of the believed distance as the locator moves and forgets by the potential parallax of the step (tauParallax), the distance slid along the bearing and forgetting with the travel (tauCm); every other neuron is max(0, bias + sum of weight * rate).',
   observation: OBSERVATION, motor: MOTOR,
   neurons, edges,
-  populations: { ring: { normalize: 'peak', decode: 'peak' }, distance: { normalize: 'peak', decode: 'mean' } },
+  populations: {
+    ring: {
+      normalize: 'peak', decode: 'peak', shift: { by: 'SELF_TURN' },
+      carry: { ...STEP, distance: 'distance' },
+      forget: { ...STEP, distance: 'distance', floorCm: FLOOR_CM },
+    },
+    distance: {
+      normalize: 'peak', decode: 'mean',
+      carry: { ...STEP, bearing: 'ring', minShift: SLIDE_MIN },
+      forget: { ...STEP },
+    },
+  },
   outputs: {
     'steer.fwd': 'M_FWD', 'steer.back': 'M_BACK', 'steer.right': 'M_RIGHT', 'steer.left': 'M_LEFT',
     'mode.search': 'M_SEARCH', 'mode.roam': 'M_ROAM', 'mode.axis': 'M_AXIS', 'mode.near': 'IR_NEAR',

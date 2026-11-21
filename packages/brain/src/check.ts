@@ -39,6 +39,15 @@ export function checkCircuit (circuit: Circuit): void {
   for (const [name, p] of populations) {
     if (p.normalize !== 'peak') bad.push(`population ${name}: normalize ${String(p.normalize)}`);
     if (p.decode !== 'peak' && p.decode !== 'mean') bad.push(`population ${name}: decode ${String(p.decode)}`);
+    const decoded = (what: string, other: string | undefined, decode: string): void => {
+      if (other === undefined || populations.get(other)?.decode !== decode) bad.push(`population ${name}: ${what} names ${String(other)}, no population decoded by its ${decode}`);
+    };
+    if (p.shift) { cell(p.shift.by, `population ${name}: shift`); if (p.decode !== 'peak') bad.push(`population ${name}: shift on a population not decoded by its peak`); }
+    for (const [what, op] of [['carry', p.carry], ['forget', p.forget]] as const) if (op) { cell(op.fwd, `population ${name}: ${what}`); cell(op.right, `population ${name}: ${what}`); }
+    if (p.carry && p.decode === 'peak') decoded('carry', p.carry.distance, 'mean');
+    if (p.carry && p.decode === 'mean') { decoded('carry', p.carry.bearing, 'peak'); if (typeof p.carry.minShift !== 'number') bad.push(`population ${name}: carry without minShift`); }
+    if (p.forget?.distance !== undefined) { decoded('forget', p.forget.distance, 'mean'); if (typeof p.forget.floorCm !== 'number') bad.push(`population ${name}: forget by a distance without floorCm`); }
+    if (p.forget && p.forget.distance === undefined && circuit.neurons.some((n) => n.population === name && n.tauParallax !== undefined)) bad.push(`population ${name}: cells with tauParallax, forget names no distance`);
   }
   for (const port of Object.keys(OUTPUT_PORTS)) if (!(port in circuit.outputs)) bad.push(`output ${port} missing`);
   for (const [port, name] of Object.entries(circuit.outputs)) cell(name, `output ${port}`);
