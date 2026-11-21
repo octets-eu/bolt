@@ -181,19 +181,12 @@ The minimum that makes the present brain run on R2's ladder. The full drawing by
 - **C2** (**done**) the operators as data: `shift`, `carry` and `forget` declared on the populations with their cells and constants; `role` is not read from here on. Check: as C1.
 - **C3** (**done**) the product cells as edges: `model: "product"`; `of` and `gate` become an add edge and gate edges; the brain view's grade reads `model` instead of `of`, so it compiles. Check: as C1. The stash `corner lobes drawn` is dropped: its lobes are W0's.
 
-### B3 and M1, the link and the silence (with the Bolts)
-
-One Bluetooth link per Bolt carries its rolls, its corner reads, the listen's re-arm, the motion stream and every ack; infrared goes first. Today each drive keeps to that by its own care, and the brain rolls only after a volley, so silence stops the rolls.
-
-- **B3** the link gate: the observation layer owns the link's timetable and answers whether the link is free; the motor rolls on its own clock and yields to a volley; core's command queue holds the same gate, so every drive obeys it without knowing who reserved the link. Check: the estimate digest equal; on the Bolts, the share of corner reads without an ack not above L1's.
-- **M1** the motor's answer to silence: the motor is asked on B3's clock with or without frames; what it does without them is the circuit's, cells reading the belief and its length, shown in full before the step starts. Check: on the Bolts, a seek from 2.4 m that loses the line of sight behind the partition does not drive on at its last command.
-
 ### W, the weights by hand (the bench judges)
 
 The profiles of the senses onto the ring and the distance are drawn by hand from the body and scored on the bench. U drew the long levels'; the short ladder's still come from `senses.json`, the counted tables of the retired runs, read by the builder alone.
 
 - **W0** before B1, the corner lobes: each corner's profile onto the ring drawn as G·max(0, cos(θ − corner))^n at the receiver's angle (`CORNER_G`, `CORNER_N` in the builder), the frames' and silences' profiles as counted until W1; the old copy of `circuit.json` rewritten with it. Check: the bench's side within ±5°, share and mean |err| better than the counted circuit's; `OLD=1` byte-identical.
-- **W1** after M1, the short weights: the short ladder's frames and silences drawn by hand over every band; `senses.json` goes, with the builder's mention of its writer. Its runs: the coil's last spiral round the sender driven on the short ladder, kept as `bench/ref/near`, and L1's seeks. Check: on those runs the share of seconds under 30° and the mean error both better than before W1; `ref/coil` reported.
+- **W1** the short weights: the short ladder's frames and silences drawn by hand over every band; `senses.json` goes, with the builder's mention of its writer. Its runs: the coil's last spiral round the sender driven on the short ladder, kept as `bench/ref/near`, and L1's seeks. Check: on those runs the share of seconds under 30° and the mean error both better than before W1; `ref/coil` reported.
 - **W2** after S2, before D1, the far weights: the long levels' profiles and the bands redrawn over `ref/coil` and the far seeks the bench holds by then, L1's and S2's. Check: beyond 2 m from the sender the two numbers better than W1's; inside 2 m within phase D's bounds against W1.
 
 ### S, the silent slots at their beat (A/B with the Bolts)
@@ -217,6 +210,13 @@ Each step replaces one operator by cells and edges and is shown in full before i
 
 - **L2** after D3: the ring's rates change scale, and with them the motor's choice between target, axis and search. The motor digest shows the change; only the Bolts show whether it is better.
 - **L3** after D5: the current goal's test, 0.5 to 3.5 m.
+
+### B3 and M1, the link and the silence (with the Bolts)
+
+One Bluetooth link per Bolt carries its rolls, its corner reads, the listen's re-arm, the motion stream and every ack; infrared goes first. Today each drive keeps to that by its own care, and the brain rolls only after a volley, so silence stops the rolls. The two steps stand behind L3: the current goal's seeks keep the line of sight, and M1's check is a seek that loses it.
+
+- **B3** the link gate: the observation layer owns the link's timetable and answers whether the link is free; the motor rolls on its own clock and yields to a volley; core's command queue holds the same gate, so every drive obeys it without knowing who reserved the link. Check: the estimate digest equal; on the Bolts, the share of corner reads without an ack not above L1's.
+- **M1** the motor's answer to silence: the motor is asked on B3's clock with or without frames; what it does without them is the circuit's, cells reading the belief and its length, shown in full before the step starts. Check: on the Bolts, a seek from 2.4 m that loses the line of sight behind the partition does not drive on at its last command.
 
 ### E, the end
 
