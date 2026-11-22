@@ -76,7 +76,7 @@ What it may use:
 
 ### G, the profile from runs
 
-- **G1** an accepted run into the profile: the rubber band gives every station its distance, the stations' counts fill the table of B3; accepted runs add up. Check: the profile of two runs against B3's, the camera's.
+- **G1** an accepted run into the profile: every station's distance is counted back from the tag in the seeker's own locator units, no reset point and no true distance needed; the stations' counts fill the table of B3; accepted runs add up. Check: in this room, with the Bolts reset on points, the profile of two runs against B3's, the camera's.
 - **G2** what a profile lacks: a stretch of distance without a station, or a strength whose reach lies between no two stations, is named, with the place to start the next run from. Check: a run started halfway leaves the far half named.
 
 ### H, the ladder from the profile
