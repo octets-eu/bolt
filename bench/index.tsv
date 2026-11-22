@@ -2,3 +2,11 @@ n	session	start	kind	seeker	mark	s	end	source
 37	2026-11-21T11-49-25-016Z	165714.6	seek	SB-9129	yes	37.9	brain seek found after 37.9 s: frames 118, reads 414, landed	frames/session-2026-11-21T11-49-25-016Z.jsonl
 38	2026-11-21T11-49-25-016Z	850567.1	seek	SB-9129	yes	32.9	brain seek found after 32.8 s: frames 122, reads 363, landed	frames/session-2026-11-21T11-49-25-016Z.jsonl
 39	2026-11-21T11-49-25-016Z	1118077.5	seek	SB-9129	yes	37.3	brain seek found after 37.2 s: frames 109, reads 372, landed	frames/session-2026-11-21T11-49-25-016Z.jsonl
+40	2026-11-21T11-39-17-545Z	253162.4	seek	SB-9129	no	28.1	brain seek stopped after 28.0 s: frames 51, reads 180, lande	apps/browser/sessions/sessions-2026-11.zip:2026-11/21/session-2026-11-21T11-39-17-545Z.jsonl
+41	2026-11-22T17-39-44-247Z	159752.1	seek	SB-9129	yes	20.9	brain seek found after 20.9 s: frames 74, reads 234, landed 	frames/session-2026-11-22T17-39-44-247Z.jsonl
+42	2026-11-22T17-39-44-247Z	308240.9	seek	SB-9129	yes	16.5	brain seek found after 16.4 s: frames 62, reads 171, landed 	frames/session-2026-11-22T17-39-44-247Z.jsonl
+43	2026-11-22T17-39-44-247Z	468470.7	seek	SB-9129	yes	26.4	brain seek found after 26.3 s: frames 91, reads 294, landed 	frames/session-2026-11-22T17-39-44-247Z.jsonl
+44	2026-11-22T17-39-44-247Z	645259.8	seek	SB-9129	no	37.2	brain seek runaway after 37.1 s: frames 88, reads 303, lande	frames/session-2026-11-22T17-39-44-247Z.jsonl
+45	2026-11-22T17-39-44-247Z	920237.4	seek	SB-9129	yes	19.1	brain seek found after 19.0 s: frames 65, reads 198, landed 	frames/session-2026-11-22T17-39-44-247Z.jsonl
+46	2026-11-22T17-39-44-247Z	1099680.7	seek	SB-9129	yes	26.9	brain seek found after 26.8 s: frames 82, reads 267, landed 	frames/session-2026-11-22T17-39-44-247Z.jsonl
+47	2026-11-22T17-39-44-247Z	1316175.5	seek	SB-9129	yes	44.8	brain seek found after 44.7 s: frames 165, reads 504, landed	frames/session-2026-11-22T17-39-44-247Z.jsonl
