@@ -63,6 +63,8 @@ export class Observation {
   readonly heard: Heard[] = [];                 // the notifies, the last windows' worth
   events: Events;
   readonly expect = new Map<number, { t: number; heard: number; range: LadderRange; next: number }>();   // channel -> its next notify expected at t + k rounds, last heard; `next`, the first expected notify not yet heard or booked silent
+  private readonly on = new Map<number, number>();   // "beat": channel not heard since the ladder came on -> its next slot, by its place in the round after the one heard last
+  private onSince = NaN;                        // the switch of ladder `on` is of
   carrier: number | null = null;                // strength of the carrier
   near = false;
   motion: Motion | null = null;                 // the last tick's motion sample
@@ -156,20 +158,27 @@ export class Observation {
    * `slots.mode` "beat": the frames that did not arrive, booked at their own
    * beat. A channel's slot is silent once its expected notify is `marginMs`
    * past with none: booked then, so the turn and the step that follow correct
-   * it like any frame. Only the channels the read schedule still expects are
-   * booked (`nextVolley`), and no slot from before the ladder came on; a
-   * channel unheard longer books nothing until it is heard again.
+   * it like any frame. Every channel of the ladder is booked while the one
+   * heard last is still expected (`nextVolley`): a channel heard since the
+   * ladder came on at its own expected notify, the others by their place in
+   * the round after the one heard last (`on`). No slot from before the ladder
+   * came on.
    */
   silences (now: number): void {
     const range = this.range(), round = this.roundMs(range);
-    let last = -Infinity;
-    for (const e of this.expect.values()) if (e.range === range) last = Math.max(last, e.heard);
-    for (const [ch, e] of this.expect) {
-      if (e.range !== range) continue;
-      const keep = e.heard === last ? this.ir.expectLastMs : this.ir.expectMs;
-      for (; e.next + this.ir.slots.marginMs < now; e.next += round) {
-        if (e.next - e.heard <= keep && e.next > this.switchedAt) this.events.slots[ch] = (this.events.slots[ch] ?? 0) + 1;
+    const order = [...this.channels].filter(([, c]) => c.range === range).map(([ch]) => ch).sort((a, b) => a - b);
+    let last = -1;
+    for (const ch of order) if ((this.expect.get(ch)?.heard ?? -Infinity) > (this.expect.get(last)?.heard ?? -Infinity)) last = ch;
+    const l = this.expect.get(last);
+    if (!l || l.heard < this.switchedAt) return;
+    if (this.onSince !== this.switchedAt) { this.on.clear(); this.onSince = this.switchedAt; }
+    for (const ch of order) {
+      const e = this.expect.get(ch), own = e && e.heard >= this.switchedAt ? e : undefined;
+      let next = own?.next ?? this.on.get(ch) ?? l.t + ((order.indexOf(ch) - order.indexOf(last) + order.length) % order.length) * this.ir.beatMs;
+      for (; next + this.ir.slots.marginMs < now; next += round) {
+        if (next - l.heard <= this.ir.expectLastMs && next > this.switchedAt) this.events.slots[ch] = (this.events.slots[ch] ?? 0) + 1;
       }
+      if (own) own.next = next; else this.on.set(ch, next);
     }
   }
 

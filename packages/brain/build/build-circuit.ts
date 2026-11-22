@@ -80,7 +80,7 @@ const OBSERVATION: ObservationConfig = {
   // the channel heard last stays expected this long: far out it is the only one that arrives, and seldom
   expectLastMs: 10000,
   // a silent slot is booked when the next frame arrives, `late`, or once its channel's expected notify is
-  // `marginMs` past with none, `beat`, on the channels still expected (observation.ts, `slots` and `silences`)
+  // `marginMs` past with none, `beat`, on every channel while the one heard last is expected (observation.ts, `slots` and `silences`)
   slots: { mode: 'late', marginMs: 40 },
   // over the bridge a read lands at a 40 to 55 ms lead (utils/read-timing.mjs, 2026-11-06), and
   // commands reach the Bolt on a 15 ms grid: three reads 7 ms apart, leads 60 to 46, span a grid
