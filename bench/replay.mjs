@@ -9,6 +9,13 @@
 // estimator that takes the same events can be run over the run, as often
 // as wanted, without a Bolt. The locator's slip is the truth's error bar.
 //
+// A seek that ended in the tag has two known places: the reset it began on
+// and the tag, the Bolts touching. The locator counts the way short, so its
+// path is taken as a rubber band held at the run's first sample and pulled
+// until its end lies one ball's width from the sender, every place between
+// moved in proportion (`band`); the truth takes those places. A seek without
+// the tag keeps the locator's.
+//
 // A reference run has a camera: where track.tsv lies beside the session file
 // (bench/camtrack.mjs), the seeker's place for the truth is the camera's at
 // that moment, turned into its locator frame by the reset point of the run's
@@ -52,6 +59,7 @@ import { points, turn } from '../apps/browser/src/components/plotter/sheet.ts';
 
 const LOCK_DEG = 30, LOCK_S = 3;
 const SIDE_CM = [40, 120];   // the approach: the truth within these, for the side
+const BALL_CM = 7.3;         // a Bolt's width: the centres' distance at the tag
 const RUNS = /^(sweepTest|approachTest)\.(in|out)|^brain (seek)(:| found| time| runaway| stopped)|^brain (path) (start|done)/;
 /**
  * A path run (the mode by hand, the seeker driven by its navigation or turned
@@ -191,13 +199,28 @@ function camera (spec, start) {
   };
 }
 
+/**
+ * A found seek's locator path as a rubber band: held at the first sample, pulled until the last one, the tag, lies
+ * BALL_CM from the sender, or as near as its line comes; a place on it for a sample, `k` the stretch. Null without the tag.
+ */
+function band (run, ev) {
+  if (run.mark?.result !== 'found') return null;
+  const ms = ev.filter((e) => e.type === 'motion'), a = ms[0], b = ms.at(-1);
+  if (!a) return null;
+  const ex = b.x - a.x, ey = b.y - a.y, sx = run.at.x - a.x, sy = run.at.y - a.y;
+  const ee = ex * ex + ey * ey, es = ex * sx + ey * sy;
+  if (!ee) return null;
+  const k = (es - Math.sqrt(Math.max(0, es * es - ee * (sx * sx + sy * sy - BALL_CM ** 2)))) / ee;
+  return Object.assign((s) => ({ x: a.x + k * (s.x - a.x), y: a.y + k * (s.y - a.y) }), { k });
+}
+
 function score (run, estimator) {
   const ev = events(run);
   if (!run.at || !ev.length) return null;
   const offset = headingOffset();
-  const seen = camera(run.spec, run.start);
-  /** The motion sample with the place the truth takes: the camera's when the run has a track. */
-  const placed = (s) => (seen ? { ...s, ...seen(s.t) } : s);
+  const seen = camera(run.spec, run.start), pulled = seen ? null : band(run, ev);
+  /** The motion sample with the place the truth takes: the camera's when the run has a track, the rubber band's when it ended in the tag. */
+  const placed = (s) => (seen ? { ...s, ...seen(s.t) } : pulled ? { ...s, ...pulled(s) } : s);
   let m = null, nextSec = ev[0].t + 1000;
   const secs = [];
   let frames = 0, reads = 0, hits = 0;
@@ -226,7 +249,7 @@ function score (run, estimator) {
   const after = lock === null ? [] : secs.filter((s) => s.t >= lock);
   const mean = (a, f) => (a.length ? a.reduce((x, s) => x + f(s), 0) / a.length : NaN);
   const approach = secs.filter((s) => s.tcm >= SIDE_CM[0] && s.tcm <= SIDE_CM[1]);
-  return { offset, camera: !!seen, seconds: secs.length, frames, reads, hits, lock, lockedShare: after.length ? after.filter((s) => s.err < LOCK_DEG).length / after.length : 0, under: secs.length ? secs.filter((s) => s.err < LOCK_DEG).length / secs.length : 0, side: mean(approach, (s) => s.signed), sideN: approach.length, digest: estimator.digest?.(), motorDigest: estimator.motorDigest?.(), meanErr: mean(secs, (s) => s.err), meanLen: mean(secs, (s) => s.length), secs };
+  return { offset, camera: !!seen, stretch: pulled?.k, seconds: secs.length, frames, reads, hits, lock, lockedShare: after.length ? after.filter((s) => s.err < LOCK_DEG).length / after.length : 0, under: secs.length ? secs.filter((s) => s.err < LOCK_DEG).length / secs.length : 0, side: mean(approach, (s) => s.signed), sideN: approach.length, digest: estimator.digest?.(), motorDigest: estimator.motorDigest?.(), meanErr: mean(secs, (s) => s.err), meanLen: mean(secs, (s) => s.length), secs };
 }
 
 /**
@@ -271,7 +294,7 @@ for (const spec of specs) {
     const s = score(r, await make());
     if (!s) continue;
     all.push(s);
-    console.log(`  ${r.name} ${r.seeker} at (${r.at.x.toFixed(0)}, ${r.at.y.toFixed(0)}) offset ${s.offset.toFixed(0)}°${s.camera ? ', places by the camera' : ''}: ${s.seconds} s, ${s.frames} frames, ${s.hits}/${s.reads} reads hit; lock ${s.lock === null ? 'never' : s.lock + ' s'}, locked share ${(s.lockedShare * 100).toFixed(0)} %, under ${LOCK_DEG}° ${(s.under * 100).toFixed(0)} %, side ${s.sideN ? `${s.side >= 0 ? '+' : ''}${s.side.toFixed(0)}° over ${s.sideN} s` : '-'}, mean |err| ${s.meanErr.toFixed(0)}°, mean len ${s.meanLen.toFixed(2)}; estimate ${s.digest}, motor ${s.motorDigest}`);
+    console.log(`  ${r.name} ${r.seeker} at (${r.at.x.toFixed(0)}, ${r.at.y.toFixed(0)}) offset ${s.offset.toFixed(0)}°${s.camera ? ', places by the camera' : ''}${s.stretch ? `, path stretched ${s.stretch.toFixed(2)} to the tag` : ''}: ${s.seconds} s, ${s.frames} frames, ${s.hits}/${s.reads} reads hit; lock ${s.lock === null ? 'never' : s.lock + ' s'}, locked share ${(s.lockedShare * 100).toFixed(0)} %, under ${LOCK_DEG}° ${(s.under * 100).toFixed(0)} %, side ${s.sideN ? `${s.side >= 0 ? '+' : ''}${s.side.toFixed(0)}° over ${s.sideN} s` : '-'}, mean |err| ${s.meanErr.toFixed(0)}°, mean len ${s.meanLen.toFixed(2)}; estimate ${s.digest}, motor ${s.motorDigest}`);
   }
 }
 if (all.length) {
