@@ -29,7 +29,7 @@
 
 ## Backlog
 
-- 01, build proper brain from : (**current task**)
+- 01, build proper brain from : (**current task, parked**)
     - Observation layer (code)
     - circuit.json to connectome 
     - Motor (code)
@@ -40,7 +40,7 @@
 - 03, continue work on apps/play/rooms.md
     - turn into full arch/req docs, demo iPadOs
 
-- 04, choose a ladder for the room and build the brain from it
+- 04, choose a ladder for the room and build the brain from it (**current subtask**)
     - bands, weights and limits follow the ladder
 
 **more tasks and goals will be defined**
