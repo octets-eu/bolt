@@ -31,7 +31,7 @@
 // For the console and the browser tools as `Survey`.
 
 import type { ArchimedeanOptions, ArchimedeanResult, Bolt, CoilResult, LadderRange } from '@bolt/core';
-import { mod360, StabilizationIndex } from '@bolt/core';
+import { mod360, PALETTE, StabilizationIndex } from '@bolt/core';
 import { Observation } from '@bolt/brain';
 import { glows } from './tracking/glow';
 import { boltOnSheet } from './tracking/floorcam';
@@ -133,14 +133,14 @@ export const Survey = {
   },
 
   /**
-   * The standing measurement of a ladder. `sender` sends `codes` in turn, one beat each, code k at
-   * `strengths[k]`; `listener` hears them as the brain does, through the observation layer with these
+   * The standing measurement of a ladder. `sender` sends `codes` in turn, one beat each, `codes[k]` at
+   * `strengths[k]`, core's palette when none are given; `listener` hears them as the brain does, through the observation layer with these
    * channels: its listen, its volley of corner reads before every expected frame. Both stand where they
    * were placed, `cm` apart; the listener turns in place through HEADINGS, SEGMENTS of ROUNDS on each.
    * The session carries a `ladder seg` line before each segment and `ladder segend` after it;
    * bench/ladder.mjs counts frames and reads per strength between them. The brain's mode must be off.
    */
-  async ladder (sender: Bolt, listener: Bolt, cm: number, strengths: readonly number[] = [2, 4, 8, 16, 32, 64, 128, 255], codes: readonly number[] = strengths.map((_, k) => k)): Promise<void> {
+  async ladder (sender: Bolt, listener: Bolt, cm: number, strengths: readonly number[] = PALETTE.strengths, codes: readonly number[] = PALETTE.channels): Promise<void> {
     Survey.last = null;
     const { observation } = circuit, beat = observation.beatMs;
     const obs = new Observation(listener, { ...observation, channels: Object.fromEntries(codes.map((code, k): [number, [LadderRange, number]] => [code, ['long', strengths[k]!]])) });

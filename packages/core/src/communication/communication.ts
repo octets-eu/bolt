@@ -42,6 +42,14 @@ export const LADDERS: { readonly [range in LadderRange]: Ladder } = {
 /** The long ladder's strengths and round, for the experiments written against the one ladder. */
 export const LADDER = LADDERS.long.strengths;
 export const ROUND_MS = LADDERS.long.roundMs;
+/**
+ * The palette: eight strengths a factor of two apart on the eight infrared codes, weakest first, for a palette run,
+ * which measures how every strength is heard (docs/palette-runs.plan.md). A code names its strength in every such
+ * run. The weakest strength sits on code 7, the code that loses frames at the far end, where it does not arrive anyway.
+ */
+export const PALETTE: { readonly channels: readonly number[]; readonly strengths: readonly number[] } = {
+  channels: [7, 6, 5, 4, 3, 2, 1, 0], strengths: [1, 2, 4, 8, 16, 32, 64, 128],
+};
 
 export interface BroadcastOptions {
   /** Infrared codes to send in turn, default all eight. */

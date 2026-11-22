@@ -43,7 +43,7 @@ export { Lifecycle } from './lifecycle/lifecycle';
 export type { WakeResult } from './lifecycle/lifecycle';
 export { Navigation } from './navigation/navigation';
 export type { RotateResult } from './navigation/navigation';
-export { Communication, LADDER, LADDERS, ROUND_MS } from './communication/communication';
+export { Communication, LADDER, LADDERS, PALETTE, ROUND_MS } from './communication/communication';
 export type { BroadcastOptions, Ladder, LadderRange, Slot } from './communication/communication';
 export { Calibration } from './calibration/calibration';
 export type { NorthOptions, NorthResult } from './calibration/calibration';
