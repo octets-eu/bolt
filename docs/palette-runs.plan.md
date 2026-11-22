@@ -48,7 +48,7 @@ What it may use:
 
 ### A, the palette
 
-- **A1** the palette's strengths and their codes, in core beside `LADDERS`: eight strengths a factor of two apart, the weakest on the code that loses frames at the far end (core-brain plan's Open). Check: `Survey.ladder` with the palette at two distances, every strength counted by `bench/ladder.mjs`.
+- **A1** (**done**) the palette's strengths and their codes, in core beside `LADDERS`: eight strengths a factor of two apart, the weakest on the code that loses frames at the far end (core-brain plan's Open). Check: `Survey.ladder` with the palette at two distances, every strength counted by `bench/ladder.mjs`.
 
 ### B, the bench on the palette
 
