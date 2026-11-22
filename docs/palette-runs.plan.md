@@ -95,7 +95,7 @@ What it may use:
 ## Open
 
 - Hearing while standing and hearing while driving differ; the profile measures standing, the seek drives. What the builder takes from the profile and what stays a property of the drive is I1's question.
-- The rubber band stretches a path evenly. A palette run's path has stops, contacts and steps to the side; whether an even stretch holds for it is checked in G1 against the camera.
+- A palette run's distances are on the seeker's own ruler, the locator's. Stops, contacts and steps to the side may disturb it; how far it lies from the true distance, and how steady it is from run to run, is measured in G1 against the camera.
 - Echoes are measured, not told apart from the direct light. A station with the sender lighting one emitter would tell them apart; no step needs it yet.
 - Seeker/green sends no collision event for some touches the sender reports, and many while it drives free. C1 starts there.
 - One code a strength in the palette, two ladders with codes of their own in the game: whether the game's ladders move onto the palette's codes is decided with H1.
