@@ -1,7 +1,11 @@
-"""The words of the edge seeker as a picture: lobe, edge, abeam, nose, carrier, leg, tack, spiral."""
+"""The words of the edge seeker as a picture: lobe, edge, abeam, nose, carrier, leg, tack, spiral; the silent slots, late and beat.
+
+python3 terms_image.py terms.svg writes the SVG; terms.png is that SVG at 2400 x 3200 from headless Chrome:
+"Google Chrome" --headless=new --hide-scrollbars --force-device-scale-factor=1 --window-size=2400,3200 --screenshot=terms.png file://<path>/terms.svg
+"""
 import math, sys
 
-W = H = 2400
+W, H = 2400, 3200
 GREEN, GREEN_FILL, GREY, BLUE, INK, PALE = '#2e7d32', '#c8e6c9', '#e0e0e0', '#1565c0', '#222', '#777'
 o = []
 
@@ -301,8 +305,79 @@ lines(850, 2270, [
     'moment a read can hit: three reads caught 35 to 39 % at 80 cm, 10 to 20 % in the',
     'sweeps. Each hit votes for the end of the axis nearer its quadrant; more hits win.'], size=18, gap=28)
 
+# ---------- 7  the silent slots: late and beat ----------
+frame(10, 2410, 1580, 780)
+title(30, 2445, '7  The silent slots: booked late, or at their beat')
+LEVELS, HEARD = (4, 8, 16, 128), {2, 3, 6, 18, 19}
+N, SLOT, OX, Y0 = 20, 62, 290, 2410   # slots drawn, px per 200 ms, x of slot 0, the panel's top
+def sx(k): return OX + k * SLOT
+def box(x, y, w, h, fill='white', stroke='none', dash=None):
+    d = f' stroke-dasharray="{dash}"' if dash else ''
+    o.append(f'<rect x="{x:.1f}" y="{y:.1f}" width="{w}" height="{h}" fill="{fill}" stroke="{stroke}"{d}/>')
+def dot(x, y):
+    o.append(f'<circle cx="{x:.1f}" cy="{y:.1f}" r="7" fill="{INK}"/>')
+for k in range(0, N + 1, 4):
+    line(sx(k) - SLOT / 2, Y0 + 70, sx(k) - SLOT / 2, Y0 + 585, stroke=PALE, width=1, dash='4 6')
+text(sx(1.5), Y0 + 88, 'a round, 0.8 s', size=15, fill=PALE)
+y = Y0 + 135
+text(30, y + 6, 'sent', size=20, anchor='start', weight='bold')
+text(30, y + 28, 'one level per 200 ms', size=15, anchor='start', fill=PALE)
+for k in range(N):
+    box(sx(k) - 23, y - 17, 46, 34, stroke=INK)
+    text(sx(k), y + 7, str(LEVELS[k % 4]), size=18)
+y = Y0 + 230
+text(30, y + 6, 'heard', size=20, anchor='start', weight='bold')
+text(30, y + 28, 'by the seeker', size=15, anchor='start', fill=PALE)
+for k in range(N):
+    if k in HEARD:
+        box(sx(k) - 23, y - 17, 46, 34, fill=BLUE)
+        text(sx(k), y + 7, str(LEVELS[k % 4]), size=18, fill='white')
+    else:
+        box(sx(k) - 23, y - 17, 46, 34, stroke=PALE, dash='5 4')
+text(sx(2.5), y - 30, 'frames', size=16, fill=BLUE)
+text(sx(4.5), y - 30, 'silent slots', size=16, fill=PALE)
+y = Y0 + 300
+line(sx(0) - SLOT / 2, y, sx(N - 1) + SLOT / 2 + 20, y, marker=True)
+for k in range(0, N + 1, 4):
+    line(sx(k) - SLOT / 2, y - 5, sx(k) - SLOT / 2, y + 5)
+    text(sx(k) - SLOT / 2, y + 26, f'{k * 0.2:.1f} s', size=14, fill=PALE)
+# late: the two slots before the third frame, booked with it; the long gap books none
+y = Y0 + 400
+text(30, y + 6, 'late', size=22, anchor='start', weight='bold')
+text(30, y + 30, 'booked when the', size=15, anchor='start', fill=PALE)
+text(30, y + 50, 'next frame arrives', size=15, anchor='start', fill=PALE)
+line(sx(6), Y0 + 250, sx(6), y - 14, stroke=BLUE, width=1, dash='3 4')
+for k in (4, 5):
+    box(sx(k) - 9, y - 9, 18, 18, stroke=PALE, dash='4 3')
+    o.append(f'<path d="M{sx(k):.1f},{y + 11} Q{(sx(k) + sx(6)) / 2:.1f},{y + 60 + (5 - k) * 22} {sx(6) - 10:.1f},{y + 6 + (5 - k) * 22}" fill="none" stroke="{INK}" stroke-width="1.5" marker-end="url(#arrow)"/>')
+dot(sx(6), y); dot(sx(6), y + 22)
+text(sx(6) + 14, y + 5, '8', size=14, anchor='start', fill=PALE)
+text(sx(6) + 14, y + 27, '4', size=14, anchor='start', fill=PALE)
+text(sx(6) + 34, y - 22, '2 slots booked, 0.2 and 0.4 s after their time', size=16, anchor='start')
+box(sx(7) - 26, y - 4, sx(17) - sx(7) + 52, 34, fill=GREY)
+text((sx(7) + sx(17)) / 2, y + 19, '11 silent slots, a gap of more than two rounds: none booked', size=16)
+# beat: every silent slot from the first frame on, 40 ms after its expected notify
+y = Y0 + 525
+text(30, y + 6, 'beat', size=22, anchor='start', weight='bold')
+text(30, y + 30, 'booked 40 ms after its', size=15, anchor='start', fill=PALE)
+text(30, y + 50, 'expected notify', size=15, anchor='start', fill=PALE)
+for k in range(4, N):
+    if k in HEARD: continue
+    line(sx(k), y - 16, sx(k), y + 16, stroke=PALE, width=1, dash='3 3')
+    dot(sx(k) + 40 / 200 * SLOT, y)
+    text(sx(k) + 40 / 200 * SLOT, y + 30, str(LEVELS[k % 4]), size=14, fill=PALE)
+text(sx(7), y - 28, '13 slots booked, each at its own time', size=16, anchor='start')
+box(sx(0) - 26, Y0 + 365, 2 * SLOT - 10, 205, fill='none', stroke=PALE, dash='4 5')
+for i, s in enumerate(('before the', 'first frame:', 'none booked')): text(sx(0.5), Y0 + 455 + i * 18, s, size=14, fill=PALE)
+lines(30, Y0 + 640, [
+    'Silent slot: a beat of the ladder on which a level was sent and not heard. It is evidence like a frame: this level does not reach the seeker here.',
+    'late: the slots since the last frame are booked when the next frame arrives, at the nose of that moment; after a gap of more than two rounds none are.',
+    'beat: each slot is booked 40 ms after its expected notify, at the nose of its own moment; the turn and the step that follow carry it along like a frame.',
+    'beat books every level of the ladder for 10 s after the last frame heard: a level heard at its own expected notify, the others by their place in the round.',
+    'Drawn: the long ladder, 4 8 16 128; five frames heard in 4 s. late books 2 silent slots, beat 13.'], size=18, gap=28)
+
 # ---------- the terms ----------
-frame(1610, 10, 780, 2380)
+frame(1610, 10, 780, H - 20)
 title(1630, 45, 'The terms')
 terms = [
     ('nose, heading', 'where the Bolt points; 0° of every bearing'),
@@ -332,6 +407,8 @@ terms = [
     ('axis', 'the line the sweep finds: the sender is at one end of it'),
     ('fit', 'the axis whose two lobes match the heard and silent headings best'),
     ('direction', 'the end of the axis the hits vote for'),
+    ('silent slot', 'a beat of the ladder on which a level was sent and not heard'),
+    ('late, beat', 'when a silent slot is booked: with the next frame, or at its own time'),
 ]
 y = 100
 for term, meaning in terms:
