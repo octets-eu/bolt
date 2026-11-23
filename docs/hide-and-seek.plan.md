@@ -43,6 +43,9 @@
 - 04, choose a ladder for the room and build the brain from it (**current subtask**)
     - bands, weights and limits follow the ladder
 
+- 05, Green bolt did not register 2 collisions, paired with blue.
+    - run a test a suite with gentle collisions to verify window and threshold, all bolts
+
 **more tasks and goals will be defined**
 
 
